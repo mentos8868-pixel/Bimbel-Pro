@@ -87,7 +87,8 @@ Lalu buka:
 
 ## Batasan prototipe (dikerjakan di tahap berikutnya)
 
-- Email orang tua belum diverifikasi, dan belum ada fitur "lupa kata sandi"
+- Email orang tua belum diverifikasi
+- "Lupa kata sandi" sudah ada (tautan ke email, berlaku 30 menit, sekali pakai), tapi server belum memasang layanan email. Selama `RESEND_API_KEY` dan `MAIL_FROM` belum diisi, isi email beserta tautannya hanya ditulis ke log server. `APP_URL` mengatur alamat web di tautan (bawaan `http://localhost:5173`)
 - Hasil permainan dikirim oleh browser, jadi anak yang paham teknis bisa memalsukan laporannya. Waktu bermain dihitung server, jadi tidak bisa dipalsukan
 - Chat baru ada di arena, belum ada di dalam meja game
 - Laporan pemain tersimpan di database, tapi belum ada panel moderator untuk meninjaunya. Saat akun dihapus, laporan tentang akun itu juga ikut terhapus

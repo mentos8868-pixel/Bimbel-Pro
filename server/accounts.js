@@ -8,6 +8,7 @@ import { rapikanAksesori } from "../shared/aksesori.js";
 import { handleToko } from "./toko.js";
 import { negaraOr, isNegara, jenjangDariKelas } from "../shared/negara.js";
 import { parentView, parentDecide, unblock, purgeUid, notify, kick } from "./social.js";
+import { sendMail, APP_URL } from "./mailer.js";
 
 const DAY = 86400000;
 const SESSION_MS = 30 * DAY;
@@ -149,7 +150,26 @@ setInterval(() => {
   for (const [k, v] of attempts) if (v.until < now) attempts.delete(k);
   db.prepare("DELETE FROM sessions WHERE expires_at < ?").run(now);
   db.prepare("DELETE FROM login_codes WHERE expires_at < ?").run(now);
+  db.prepare("DELETE FROM password_resets WHERE expires_at < ?").run(now);
 }, 60000).unref();
+
+const RESET_MS = 30 * 60000;
+// Buat token atur ulang kata sandi lalu kirim tautannya ke email orang tua.
+// Token ditaruh di bagian # alamat, sehingga tidak ikut terkirim ke server atau tercatat di log.
+function sendResetLink(p) {
+  db.prepare("DELETE FROM password_resets WHERE parent_id = ?").run(p.id); // tautan lama tidak berlaku lagi
+  const token = newToken();
+  db.prepare("INSERT INTO password_resets (token_hash, parent_id, expires_at) VALUES (?, ?, ?)")
+    .run(sha(token), p.id, Date.now() + RESET_MS);
+  const link = `${APP_URL}/orangtua.html#atur=${token}`;
+  sendMail({
+    to: p.email,
+    subject: "Atur ulang kata sandi Bimbel Pro",
+    text: `Halo ${p.name},\n\nKami menerima permintaan untuk mengatur ulang kata sandi akun orang tua Bimbel Pro.\n` +
+      `Buka tautan ini dalam 30 menit untuk membuat kata sandi baru:\n\n${link}\n\n` +
+      `Tautan hanya bisa dipakai sekali. Bila Anda tidak meminta ini, abaikan email ini; kata sandi Anda tidak berubah.`,
+  }).catch((e) => console.error("Lupa kata sandi:", e.message));
+}
 
 // ---------- validasi ----------
 const str = (v, max) => String(v ?? "").trim().slice(0, max);
@@ -292,6 +312,35 @@ export async function handleApi(req, res) {
       if (!p || !checkSecret(body.password || "", p.pass_hash)) { lim.fail(); throw new ApiError(401, "Email atau kata sandi salah."); }
       lim.ok();
       const token = createSession("ortu", p.id);
+      return send(200, { ok: true }, { "Set-Cookie": cookie(COOKIE.ortu, token, SESSION_MS / 1000) }), true;
+    }
+    // Lupa kata sandi: jawabannya selalu sama, supaya tidak bisa dipakai untuk menebak email mana yang terdaftar.
+    if (m === "POST" && path[0] === "lupa-sandi") {
+      const email = str(body.email, 120).toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ApiError(400, "Alamat email tidak valid.");
+      const perIp = limited(`lupa:${ip}`, 5);
+      const perEmail = limited(`lupa-email:${email}`, 3); // mencegah kotak masuk seseorang dibanjiri email
+      perIp.fail();
+      perEmail.fail();
+      const p = db.prepare("SELECT id, email, name FROM parents WHERE email = ?").get(email);
+      if (p) sendResetLink(p);
+      return send(200, { ok: true }), true;
+    }
+    if (m === "POST" && path[0] === "atur-sandi") {
+      const lim = limited(`atur:${ip}`);
+      const password = String(body.password || "");
+      if (password.length < 8) throw new ApiError(400, "Kata sandi minimal 8 karakter.");
+      const row = db.prepare("SELECT * FROM password_resets WHERE token_hash = ?").get(sha(String(body.token || "")));
+      if (!row || row.expires_at < Date.now()) {
+        lim.fail();
+        throw new ApiError(400, "Tautan sudah kedaluwarsa atau sudah dipakai. Minta tautan baru lewat \"Lupa kata sandi?\".");
+      }
+      lim.ok();
+      db.prepare("UPDATE parents SET pass_hash = ? WHERE id = ?").run(hashSecret(password), row.parent_id);
+      db.prepare("DELETE FROM password_resets WHERE parent_id = ?").run(row.parent_id);
+      // Keluarkan semua sesi orang tua di perangkat lain (sesi anak tetap berjalan).
+      db.prepare("DELETE FROM sessions WHERE parent_id = ? AND role = 'ortu'").run(row.parent_id);
+      const token = createSession("ortu", row.parent_id);
       return send(200, { ok: true }, { "Set-Cookie": cookie(COOKIE.ortu, token, SESSION_MS / 1000) }), true;
     }
     if (m === "POST" && path[0] === "keluar") {

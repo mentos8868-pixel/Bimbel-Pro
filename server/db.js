@@ -69,6 +69,13 @@ db.exec(`
     created_at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS results_child ON results(child_id, created_at);
+
+  -- Lupa kata sandi orang tua: token dari tautan email (disimpan dalam bentuk hash), berlaku 30 menit, sekali pakai.
+  CREATE TABLE IF NOT EXISTS password_resets (
+    token_hash TEXT PRIMARY KEY,
+    parent_id INTEGER NOT NULL REFERENCES parents(id) ON DELETE CASCADE,
+    expires_at INTEGER NOT NULL
+  );
 `);
 
 // Kolom avatar (database lama ditingkatkan otomatis).
