@@ -165,8 +165,12 @@ export function createArena(canvas) {
 
   // Ruang Bimbel (utara)
   room(scene, walls, { cx: 0, cz: 25, w: 16, d: 12, door: "s", floor: "#fff3d6", wall: "#f2b134" });
-  const bimbelSign = makeSign(scene, ["Ruang Bimbel", "Segera hadir"], { width: 5, height: 1.6, bg: "#f2b134", fg: "#3b2a05" });
+  const bimbelSign = makeSign(scene, ["Ruang Bimbel", "Ruang Pintar"], { width: 5, height: 1.6, bg: "#f2b134", fg: "#3b2a05" });
   bimbelSign.position.set(0, 3.2, 18.6);
+  // Meja belajar: membuka aplikasi Ruang Pintar (game/public/bimbel) di tab baru.
+  const studyDesk = { id: "bimbel", x: 0, z: 25, label: "Ruang Pintar", action: "Belajar di Ruang Pintar", ready: true };
+  plainTable(scene, studyDesk.x, studyDesk.z, "#f2b134", walls);
+  makeSign(scene, ["Ruang Pintar"], { width: 2.6, height: 0.7 }).position.set(studyDesk.x, 2.3, studyDesk.z);
 
   // Ruang Game (timur)
   room(scene, walls, { cx: 25, cz: 0, w: 14, d: 18, door: "w", floor: "#e3efff", wall: "#4f9cf0" });
@@ -203,7 +207,7 @@ export function createArena(canvas) {
   for (const [x, z] of [[-9, 9], [9, 9], [-9, -9], [9, -9]]) walls.push({ minX: x - 0.3, maxX: x + 0.3, minZ: z - 0.3, maxZ: z + 0.3 });
 
   window.addEventListener("resize", () => engine.resize());
-  return { engine, scene, camera, walls, tables };
+  return { engine, scene, camera, walls, tables: [...tables, studyDesk] };
 }
 
 // Gelembung chat di atas kepala avatar (hilang setelah 5 detik).
