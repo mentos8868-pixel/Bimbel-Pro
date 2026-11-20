@@ -232,6 +232,8 @@ let LV=2;                                   // 1 Mudah, 2 Sedang, 3 Sulit
 const D=(a,b,c)=>[a,b,c][LV-1];
 const story=()=>Math.random()<D(.15,.45,.75);
 const LVNAME={1:'Mudah',2:'Sedang',3:'Sulit'};
+const LVNAME_EN={0:'Mixed',1:'Easy',2:'Medium',3:'Hard'};
+const lvName=(l,kur)=>(kur&&kur!=='merdeka'?LVNAME_EN:{...LVNAME,0:'Campuran'})[l];   // Cambridge & Singapore: bahasa Inggris
 
 /* ============ Bantuan penulisan ============ */
 const NAMA=['Rina','Budi','Siti','Dimas','Ayu','Raka','Putri','Andi','Lina','Joko','Nisa','Fajar'];
@@ -841,7 +843,7 @@ function renderHome(app){
   const list=topics.map((t,i)=>{const st=S.topics[`${t.id}|${S.lv}`]||{best:0,att:0};const nb=t.bank?t.bank.filter(s=>s.lv===S.lv).length:0;
     return `<div class="topic ${st.best===3?'done':''}">
       <div class="num">${t.mix?'★':i+1}</div>
-      <div><h3>${esc(t.name)}</h3><p>${esc(t.desc)}${t.bank?` · ${nb} soal ${LVNAME[S.lv].toLowerCase()}`:''} · ${starsHTML(st.best)}</p></div>
+      <div><h3>${esc(t.name)}</h3><p>${esc(t.desc)}${t.bank?` · ${nb} soal ${lvName(S.lv,S.kur).toLowerCase()}`:''} · ${starsHTML(st.best)}</p></div>
       <div class="act"><button class="btn" data-t="${t.id}">${st.att?'Latihan lagi':'Mulai'}</button></div>
     </div>`}).join('');
   const empty=S.kur==='merdeka'&&S.mapel==='ipa'&&S.kelas<=2?`IPA (IPAS) di Kurikulum Merdeka mulai dari kelas 3. Pilih kelas 3 ke atas.`
@@ -855,8 +857,8 @@ function renderHome(app){
     <div class="kurbar"><b class="glab">Kurikulum</b>${Object.entries(KURS).map(([k,v])=>`<button class="kur ${S.kur===k?'on':''}" data-kur="${k}"><b>${v.short}</b><span>${k==='merdeka'?'Indonesia · 4 pelajaran':'Internasional · Math, Science, English'}</span></button>`).join('')}</div>
     <div class="grades">${Object.entries(K.mapel).map(([m,n])=>`<button class="chip ${S.mapel===m?'on':''}" data-m="${m}">${n}</button>`).join('')}</div>
     <div class="grades kel">${K.groups.map(([g,ks])=>`<span class="glab">${g}</span>${ks.map(kchip).join('')}`).join('')}</div>
-    <div class="grades" style="align-items:center"><b class="glab">Tingkat</b>${[1,2,3].map(l=>`<button class="chip lv${l} ${S.lv===l?'on':''}" data-lv="${l}">${LVNAME[l]}</button>`).join('')}</div>
-    <h2>${K.mapel[S.mapel]} · ${K.label(S.kelas)}${intl?` <span class="lvtag" style="background:var(--teal-soft);color:var(--teal)">${K.short}</span>`:''} <span style="color:var(--muted);font-weight:700;font-size:15px">· ${topics.filter(t=>!t.mix&&t.g!=='__mix').length} topik · ${LVNAME[S.lv]}</span></h2>
+    <div class="grades" style="align-items:center"><b class="glab">Tingkat</b>${[1,2,3].map(l=>`<button class="chip lv${l} ${S.lv===l?'on':''}" data-lv="${l}">${lvName(l,S.kur)}</button>`).join('')}</div>
+    <h2>${K.mapel[S.mapel]} · ${K.label(S.kelas)}${intl?` <span class="lvtag" style="background:var(--teal-soft);color:var(--teal)">${K.short}</span>`:''} <span style="color:var(--muted);font-weight:700;font-size:15px">· ${topics.filter(t=>!t.mix&&t.g!=='__mix').length} topik · ${lvName(S.lv,S.kur)}</span></h2>
     ${topics.length?`<div class="path">${list}</div>`:`<div class="empty">${empty}</div>`}`;
   app.querySelectorAll('[data-kur]').forEach(b=>b.onclick=()=>{S.kur=b.dataset.kur;S.mapel=Object.keys(KURS[S.kur].mapel)[0];save();render()});
   app.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{S.mapel=b.dataset.m;save();render()});
@@ -885,7 +887,7 @@ function renderQ(app){const s=sess,q=s.qs[s.i];
   app.innerHTML=`<div class="practice">
     <div class="phead"><button class="btn ghost" id="keluar">✕</button><div class="dots">${dots}</div></div>
     <div class="qcard">
-      <div class="qlabel">${mapelName(s.t)} · ${esc(s.t.name)}${q.from&&(s.t.mix||s.t.g==='__mix')?' · '+esc(q.from):''} · <span class="lvtag lv${s.lv}">${LVNAME[s.lv]}</span> · Soal ${s.i+1} dari ${s.qs.length}</div>
+      <div class="qlabel">${mapelName(s.t)} · ${esc(s.t.name)}${q.from&&(s.t.mix||s.t.g==='__mix')?' · '+esc(q.from):''} · <span class="lvtag lv${s.lv}">${lvName(s.lv,s.t.kur)}</span> · Soal ${s.i+1} dari ${s.qs.length}</div>
       <div class="qtext ${q.text?'small':''}">${q.q}</div>
       ${input}
       <div class="fb" id="fb"></div>
@@ -923,16 +925,16 @@ function finish(){const s=sess,c=s.res.filter(Boolean).length,N=s.qs.length,pc=c
 }
 function renderResult(app){const s=sess,N=s.qs.length;
   const msg=s.correct===N?'Luar biasa, semua benar!':s.correct/N>=.6?'Bagus! Sedikit lagi sempurna.':'Tidak apa-apa, ayo coba lagi. Lihat pembahasannya ya.';
-  const naik=s.stars===3&&s.lv<3?`<p style="font-weight:800;color:var(--teal)">Hebat! Coba tingkat <b>${LVNAME[s.lv+1]}</b>?</p>`:'';
+  const naik=s.stars===3&&s.lv<3?`<p style="font-weight:800;color:var(--teal)">Hebat! Coba tingkat <b>${lvName(s.lv+1,s.t.kur)}</b>?</p>`:'';
   app.innerHTML=`<div class="result">
-    <div class="qlabel">${mapelName(s.t)} · ${esc(s.t.name)} · ${(KURS[s.t.kur]||KURS.merdeka).label(s.t.kelas)} · ${LVNAME[s.lv]}</div>
+    <div class="qlabel">${mapelName(s.t)} · ${esc(s.t.name)} · ${(KURS[s.t.kur]||KURS.merdeka).label(s.t.kelas)} · ${lvName(s.lv,s.t.kur)}</div>
     <div class="stars" style="margin-top:10px">${[1,2,3].map(i=>`<span class="${i<=s.stars?'s':''}">★</span>`).join('')}</div>
     <div class="score">${s.correct} / ${N} benar</div>
     <p style="font-weight:700">${msg}</p>${naik}
     <div class="stat" style="display:inline-flex">+${s.correct*(10+(s.lv-1)*5)} XP</div>
     ${s.newMedals.map(m=>`<div class="newmedal">Medali baru! ${m.e} <b>${m.n}</b></div>`).join('')}
     <div style="display:flex;gap:12px;justify-content:center;margin-top:24px;flex-wrap:wrap">
-      <button class="btn ghost" id="home">Kembali ke topik</button>${naik?`<button class="btn ghost" id="up">Coba ${LVNAME[s.lv+1]}</button>`:''}<button class="btn" id="again">Latihan lagi</button></div>
+      <button class="btn ghost" id="home">Kembali ke topik</button>${naik?`<button class="btn ghost" id="up">Coba ${lvName(s.lv+1,s.t.kur)}</button>`:''}<button class="btn" id="again">Latihan lagi</button></div>
   </div>`;
   $('#home').onclick=()=>go('belajar');$('#again').onclick=()=>start(s.t.id);
   if(naik)$('#up').onclick=()=>{S.lv=s.lv+1;save();start(s.t.id)};
@@ -1032,11 +1034,11 @@ function renderTryout(app){
       <div class="tbox"><h3>Pengaturan</h3>
         <div class="grades"><b class="glab">Jumlah soal</b>${[10,20,30,40].map(x=>`<button class="chip ${TO.n===x?'on':''}" data-n="${x}">${x}</button>`).join('')}</div>
         <div class="grades"><b class="glab">Waktu</b>${[10,20,30,45,60,90].map(x=>`<button class="chip ${TO.menit===x?'on':''}" data-mn="${x}">${x} menit</button>`).join('')}</div>
-        <div class="grades" style="margin:0"><b class="glab">Tingkat</b>${[[0,'Campuran'],[1,'Mudah'],[2,'Sedang'],[3,'Sulit']].map(([l,nm])=>`<button class="chip ${l?'lv'+l:''} ${TO.lv===l?'on':''}" data-tl="${l}">${nm}</button>`).join('')}</div>
+        <div class="grades" style="margin:0"><b class="glab">Tingkat</b>${[0,1,2,3].map(l=>[l,lvName(l,S.kur)]).map(([l,nm])=>`<button class="chip ${l?'lv'+l:''} ${TO.lv===l?'on':''}" data-tl="${l}">${nm}</button>`).join('')}</div>
       </div>
       <div class="tbox" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
         <div style="flex:1;min-width:200px"><b style="font-size:18px">${n} soal · ${TO.menit} menit</b><br>
-          <span style="color:var(--muted);font-weight:700">${K.mapel[S.mapel]} · ${K.label(S.kelas)} · ${chosen.length} topik · ${TO.lv?LVNAME[TO.lv]:'Semua tingkat'}${n<TO.n&&chosen.length?` · soal yang tersedia hanya ${n}`:''}</span></div>
+          <span style="color:var(--muted);font-weight:700">${K.mapel[S.mapel]} · ${K.label(S.kelas)} · ${chosen.length} topik · ${TO.lv?lvName(TO.lv,S.kur):'Semua tingkat'}${n<TO.n&&chosen.length?` · soal yang tersedia hanya ${n}`:''}</span></div>
         <button class="btn" id="tmulai" ${!chosen.length||!n?'disabled':''}>Mulai tryout</button></div>
       ${hist?`<div><h2 style="margin-top:8px">Riwayat tryout</h2>${hist}</div>`:''}
     </div>`:`<div class="empty">${empty}</div>`}`;
@@ -1137,7 +1139,7 @@ function renderExamResult(app){
   const items=ex.qs.map((q,i)=>({q,i,r:ex.res[i]})).filter(x=>TO.rf==='all'||x.r!==true);
   const medals=ex.newMedals.map(id=>MEDALS.find(m=>m.id===id)).filter(Boolean);
   app.innerHTML=`<div class="result" style="max-width:720px">
-      <div class="qlabel">Hasil tryout · ${K.mapel[ex.mapel]} · ${K.label(ex.kelas)} · ${ex.lv?LVNAME[ex.lv]:'Semua tingkat'}</div>
+      <div class="qlabel">Hasil tryout · ${K.mapel[ex.mapel]} · ${K.label(ex.kelas)} · ${ex.lv?lvName(ex.lv,ex.kur):'Semua tingkat'}</div>
       <div class="grade" style="color:${col}">${ex.score}</div>
       <p style="font-weight:800;margin:6px 0">${msg}</p>
       ${ex.auto?`<p style="color:var(--bad);font-weight:800;margin:0">Waktu habis, jawaban dikumpulkan otomatis.</p>`:''}
