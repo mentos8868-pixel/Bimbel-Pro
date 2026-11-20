@@ -20,6 +20,8 @@ defineTypes(Player, {
   jenjang: "string",
   color: "string",
   avatar: "string",
+  negara: "string",   // kode negara anak ("" untuk orang tua)
+  kelas: "number",    // 1–12, 0 = belum diisi / orang tua
   x: "number",
   z: "number",
   ry: "number",
@@ -77,6 +79,8 @@ export class ArenaRoom extends Room {
     p.jenjang = a.role === "ortu" ? "Orang tua" : a.jenjang;
     p.color = WARNA.test(a.color || "") ? a.color : "#4f9cf0";
     p.avatar = avatarOr(a.avatar);
+    p.negara = a.role === "anak" ? a.negara || "" : "";
+    p.kelas = a.role === "anak" ? a.kelas || 0 : 0;
     // Muncul di sekitar alun-alun.
     const ang = Math.random() * Math.PI * 2;
     p.x = Math.cos(ang) * 3;

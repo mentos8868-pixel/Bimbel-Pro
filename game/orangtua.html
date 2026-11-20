@@ -69,12 +69,11 @@
           <h2>Tambah akun anak</h2>
           <div class="grid2">
             <label>Nama panggilan <input name="name" maxlength="16" required placeholder="Contoh: Budi" /></label>
-            <label>Jenjang
-              <select name="jenjang">
-                <option value="SD">SD</option>
-                <option value="SMP">SMP</option>
-                <option value="SMA">SMA</option>
-              </select>
+            <label>Kelas
+              <select name="kelas" class="pilih-kelas"></select>
+            </label>
+            <label>Negara
+              <select name="negara" class="pilih-negara"></select>
             </label>
             <label>PIN 4 angka (untuk masuk di perangkat keluarga)
               <input name="pin" inputmode="numeric" pattern="\d{4}" maxlength="4" required autocomplete="off" />
@@ -134,6 +133,12 @@
 
         <form class="settings">
           <h3>Pengaturan</h3>
+          <label>Kelas (tampil di papan nama avatar)
+            <select name="kelas" class="pilih-kelas"></select>
+          </label>
+          <label>Negara (benderanya tampil di papan nama avatar)
+            <select name="negara" class="pilih-negara"></select>
+          </label>
           <label>Batas waktu bermain per hari
             <select name="limitMin">
               <option value="15">15 menit</option>

@@ -5,6 +5,7 @@ import {
   MeshBuilder, StandardMaterial, Color3, Color4, DynamicTexture, TransformNode, Mesh,
 } from "@babylonjs/core";
 import { buildAvatar3d } from "./avatar3d.js";
+import { drawFlag } from "../../shared/negara.js";
 
 export const ARENA_RADIUS = 38;
 
@@ -19,7 +20,8 @@ function mat(scene, hex) {
 }
 
 // Papan tulisan (selalu menghadap kamera bila billboard = true).
-export function makeSign(scene, lines, { width = 4, height = 1.4, bg = "#ffffff", fg = "#1f2a37", billboard = true } = {}) {
+// flag (opsional) = kode negara; benderanya digambar di depan baris kedua.
+export function makeSign(scene, lines, { width = 4, height = 1.4, bg = "#ffffff", fg = "#1f2a37", billboard = true, flag = "" } = {}) {
   const texW = 512;
   const texH = Math.round((texW * height) / width);
   const tex = new DynamicTexture("signTex", { width: texW, height: texH }, scene, true);
@@ -41,7 +43,20 @@ export function makeSign(scene, lines, { width = 4, height = 1.4, bg = "#ffffff"
   lines.forEach((t, i) => {
     const size = i === 0 ? Math.round(texH / (n + 0.6)) : Math.round(texH / (n + 1.6));
     ctx.font = `bold ${size}px Nunito, Segoe UI, sans-serif`;
-    ctx.fillText(t, texW / 2, (texH / (n + 1)) * (i + 1), texW - 30);
+    const y = (texH / (n + 1)) * (i + 1);
+    if (flag && i === 1) {
+      // Bendera + teks, ditengahkan bersama.
+      const fh = Math.round(size * 0.9), fw = Math.round(fh * 1.5), gap = Math.round(size * 0.35);
+      const tw = Math.min(ctx.measureText(t).width, texW - 60 - fw - gap);
+      const x0 = (texW - (fw + gap + tw)) / 2;
+      drawFlag(ctx, flag, x0, y - fh / 2, fw, fh);
+      ctx.fillStyle = fg;
+      ctx.textAlign = "left";
+      ctx.fillText(t, x0 + fw + gap, y, tw);
+      ctx.textAlign = "center";
+      return;
+    }
+    ctx.fillText(t, texW / 2, y, texW - 30);
   });
   tex.update();
   const m = new StandardMaterial("signMat", scene);
@@ -232,10 +247,12 @@ export function showBubble(scene, avatar, text) {
 // Avatar lucu (lihat avatar3d.js) dengan papan nama di atas kepala.
 // sid (opsional) disimpan di mesh supaya avatar bisa diketuk untuk membuka profil.
 // body = simpul yang dinaikturunkan saat berjalan (posisi dasar y = 0).
-export function createAvatar(scene, { color, avatar, name, jenjang, sid }) {
+// Baris kedua papan nama: bendera negara + "Kelas N" (anak), atau jenjang bila kelas belum diisi.
+export function createAvatar(scene, { color, avatar, name, jenjang, negara = "", kelas = 0, sid }) {
   const root = new TransformNode("avatar", scene);
   const { bob, meshes, height } = buildAvatar3d(scene, root, avatar, color);
-  const tag = makeSign(scene, [name, jenjang], { width: 1.8, height: 0.6, bg: "rgba(255,255,255,0.9)" });
+  const sub = kelas ? `Kelas ${kelas}` : jenjang;
+  const tag = makeSign(scene, [name, sub], { width: 1.8, height: 0.6, bg: "rgba(255,255,255,0.9)", flag: negara });
   tag.position.y = height + 0.3;
   tag.parent = root;
   tag.billboardMode = Mesh.BILLBOARDMODE_ALL;

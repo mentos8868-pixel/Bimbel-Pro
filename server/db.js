@@ -78,6 +78,13 @@ for (const [table, def] of [["children", "beruang-putra"], ["parents", "beruang-
   }
 }
 
+// Kolom negara dan kelas anak (diisi orang tua; 0 = kelas belum diisi).
+{
+  const cols = db.prepare("PRAGMA table_info(children)").all().map((c) => c.name);
+  if (!cols.includes("negara")) db.exec("ALTER TABLE children ADD COLUMN negara TEXT NOT NULL DEFAULT 'ID'");
+  if (!cols.includes("kelas")) db.exec("ALTER TABLE children ADD COLUMN kelas INTEGER NOT NULL DEFAULT 0");
+}
+
 // Hari dihitung menurut waktu Indonesia Barat (UTC+7).
 export function today(now = Date.now()) {
   return new Date(now + 7 * 3600 * 1000).toISOString().slice(0, 10);
