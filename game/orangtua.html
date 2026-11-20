@@ -20,25 +20,62 @@
       <p id="memuat" class="muted">Memuat…</p>
 
       <!-- Belum masuk -->
-      <section id="auth" hidden>
-        <div class="tabs" role="tablist">
-          <button role="tab" data-tab="masuk" class="on">Masuk</button>
-          <button role="tab" data-tab="daftar">Daftar</button>
-        </div>
+      <section id="auth" class="auth" hidden>
+        <aside class="intro">
+          <div class="intro-family" id="intro-family"></div>
+          <h1>Belajar sambil bermain, orang tua tetap memegang kendali</h1>
+          <ul class="intro-points">
+            <li><span aria-hidden="true">⏱️</span> Atur batas waktu bermain anak per hari</li>
+            <li><span aria-hidden="true">📊</span> Lihat laporan permainan dan hasil belajar</li>
+            <li><span aria-hidden="true">🛡️</span> Pilih sendiri: chat, teman, dan lawan main</li>
+          </ul>
+        </aside>
+
+        <div class="auth-card">
+          <div class="tabs" role="tablist">
+            <button role="tab" data-tab="masuk" class="on">Masuk</button>
+            <button role="tab" data-tab="daftar">Daftar</button>
+          </div>
 
         <form id="form-masuk" class="panel">
-          <h1>Masuk</h1>
+          <h2>Masuk sebagai orang tua</h2>
           <label>Email <input type="email" name="email" autocomplete="email" required /></label>
-          <label>Kata sandi <input type="password" name="password" autocomplete="current-password" required /></label>
+          <label>Kata sandi
+            <span class="pw"><input type="password" name="password" autocomplete="current-password" required /><button type="button" class="pw-eye" aria-label="Tampilkan kata sandi">Lihat</button></span>
+          </label>
           <p class="error" hidden></p>
           <button class="primary" type="submit">Masuk</button>
+          <button type="button" class="link-btn" data-show="lupa">Lupa kata sandi?</button>
+        </form>
+
+        <form id="form-lupa" class="panel" hidden>
+          <h2>Lupa kata sandi</h2>
+          <p class="muted">Masukkan email akun orang tua. Kami kirim tautan untuk membuat kata sandi baru (berlaku 30 menit).</p>
+          <label>Email <input type="email" name="email" autocomplete="email" required /></label>
+          <p class="error" hidden></p>
+          <p class="notice" hidden></p>
+          <button class="primary" type="submit">Kirim tautan</button>
+          <button type="button" class="link-btn" data-show="masuk">← Kembali ke Masuk</button>
+        </form>
+
+        <form id="form-atur" class="panel" hidden>
+          <h2>Buat kata sandi baru</h2>
+          <label>Kata sandi baru (minimal 8 karakter)
+            <span class="pw"><input type="password" name="password" minlength="8" autocomplete="new-password" required /><button type="button" class="pw-eye" aria-label="Tampilkan kata sandi">Lihat</button></span>
+          </label>
+          <p class="muted">Setelah disimpan, akun orang tua akan keluar dari perangkat lain. Akun anak tidak terpengaruh.</p>
+          <p class="error" hidden></p>
+          <button class="primary" type="submit">Simpan dan masuk</button>
+          <button type="button" class="link-btn" data-show="masuk">← Kembali ke Masuk</button>
         </form>
 
         <form id="form-daftar" class="panel" hidden>
-          <h1>Buat akun orang tua</h1>
+          <h2>Buat akun orang tua</h2>
           <label>Nama (ditampilkan ke anak, misalnya "Bunda Sari") <input name="name" maxlength="40" required /></label>
           <label>Email <input type="email" name="email" autocomplete="email" required /></label>
-          <label>Kata sandi (minimal 8 karakter) <input type="password" name="password" minlength="8" autocomplete="new-password" required /></label>
+          <label>Kata sandi (minimal 8 karakter)
+            <span class="pw"><input type="password" name="password" minlength="8" autocomplete="new-password" required /><button type="button" class="pw-eye" aria-label="Tampilkan kata sandi">Lihat</button></span>
+          </label>
           <details class="privacy">
             <summary>Data apa yang disimpan?</summary>
             <ul>
@@ -57,6 +94,9 @@
           <p class="error" hidden></p>
           <button class="primary" type="submit">Buat akun</button>
         </form>
+
+          <p class="kid-link">Kamu anak? <a href="/">Masuk ke arena di sini</a></p>
+        </div>
       </section>
 
       <!-- Sudah masuk -->

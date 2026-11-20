@@ -61,12 +61,71 @@ function colorPicker(wrap, initial, onPick) {
 }
 
 // ---------------- masuk / daftar ----------------
-document.querySelectorAll(".tabs button").forEach((t) => {
-  t.onclick = () => {
-    document.querySelectorAll(".tabs button").forEach((x) => x.classList.toggle("on", x === t));
-    $("form-masuk").hidden = t.dataset.tab !== "masuk";
-    $("form-daftar").hidden = t.dataset.tab !== "daftar";
+// Hiasan perkenalan: satu keluarga avatar (ayah, ibu, dua anak).
+$("intro-family").innerHTML = ["beruang-ayah", "beruang-ibu", "beruang-putri", "beruang-putra"]
+  .map((id) => `<span class="fam">${avatarSvg(id, "#4f9cf0", { sized: true })}</span>`).join("");
+// Tombol "Lihat" untuk menampilkan/menyembunyikan kata sandi (membantu saat mengetik di HP).
+document.querySelectorAll(".pw-eye").forEach((b) => {
+  b.onclick = () => {
+    const inp = b.previousElementSibling;
+    const show = inp.type === "password";
+    inp.type = show ? "text" : "password";
+    b.textContent = show ? "Sembunyikan" : "Lihat";
+    b.setAttribute("aria-label", show ? "Sembunyikan kata sandi" : "Tampilkan kata sandi");
   };
+});
+// Tampilkan salah satu formulir: masuk | daftar | lupa | atur. Tab hanya terlihat untuk masuk/daftar.
+function showAuth(which) {
+  for (const k of ["masuk", "daftar", "lupa", "atur"]) $("form-" + k).hidden = k !== which;
+  document.querySelector(".tabs").hidden = which === "lupa" || which === "atur";
+  document.querySelectorAll(".tabs button").forEach((x) => x.classList.toggle("on", x.dataset.tab === which));
+}
+document.querySelectorAll(".tabs button").forEach((t) => { t.onclick = () => showAuth(t.dataset.tab); });
+document.querySelectorAll("[data-show]").forEach((b) => {
+  b.onclick = () => {
+    if (b.dataset.show === "lupa") $("form-lupa").email.value = $("form-masuk").email.value;
+    if (location.hash) history.replaceState(null, "", location.pathname);
+    showAuth(b.dataset.show);
+  };
+});
+
+$("form-lupa").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const notice = f.querySelector(".notice");
+  setErr(f, "");
+  notice.hidden = true;
+  busy(f, true);
+  try {
+    await api("POST", "lupa-sandi", { email: f.email.value });
+    notice.textContent = `Bila ${f.email.value.trim()} terdaftar, tautan sudah dikirim ke email tersebut. Periksa juga folder Spam.`;
+    notice.hidden = false;
+  } catch (x) { setErr(f, x.message); } finally { busy(f, false); }
+});
+
+// Tautan dari email: orangtua.html#atur=<token>. Token disimpan di memori lalu dihapus dari alamat.
+let resetToken = "";
+{
+  const m = location.hash.match(/^#atur=([\w-]+)$/);
+  if (m) {
+    resetToken = m[1];
+    history.replaceState(null, "", location.pathname);
+    showAuth("atur");
+  }
+}
+$("form-atur").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  setErr(f, "");
+  if (!resetToken) return setErr(f, "Tautan tidak lengkap. Minta tautan baru lewat \"Lupa kata sandi?\".");
+  busy(f, true);
+  try {
+    await api("POST", "atur-sandi", { token: resetToken, password: f.password.value });
+    resetToken = "";
+    f.reset();
+    showAuth("masuk");
+    await load();
+  } catch (x) { setErr(f, x.message); } finally { busy(f, false); }
 });
 
 $("form-masuk").addEventListener("submit", async (e) => {
@@ -331,7 +390,8 @@ async function load() {
     return;
   }
   $("memuat").hidden = true;
-  const masuk = !!me.ortu;
+  // Tautan atur ulang kata sandi tetap ditampilkan walaupun perangkat ini masih masuk.
+  const masuk = !!me.ortu && !resetToken;
   $("auth").hidden = masuk;
   $("dash").hidden = !masuk;
   $("top-nav").hidden = !masuk;

@@ -50,6 +50,35 @@ label.check input { width: 20px; height: 20px; margin-top: 2px; flex: none; }
 .row input { flex: 1; min-width: 160px; }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 
+/* ---------- layar masuk / daftar ---------- */
+.auth { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: center; min-height: calc(100vh - 110px); }
+.intro { display: flex; flex-direction: column; gap: 14px; }
+.intro h1 { font-size: 30px; line-height: 1.25; }
+.intro-family { display: flex; align-items: flex-end; gap: 2px; }
+.intro-family .fam { width: 84px; height: 84px; display: block; }
+.intro-family .fam svg { width: 100%; height: 100%; }
+.intro-points { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 17px; }
+.intro-points li { display: flex; gap: 10px; align-items: center; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+.auth-card { display: flex; flex-direction: column; gap: 0; width: 100%; max-width: 420px; justify-self: center; }
+.auth-card .panel { box-shadow: 0 8px 24px #1f2a3712; }
+.pw { display: flex; gap: 6px; }
+.pw input { flex: 1; min-width: 0; }
+.pw .pw-eye { flex: none; font-size: 14px; padding: 9px 10px; font-weight: 700; color: var(--primary); }
+.link-btn { background: none; border: none; padding: 4px; color: var(--primary); font-weight: 700; font-size: 15px; align-self: center; }
+.link-btn:hover { text-decoration: underline; }
+.notice { margin: 0; background: #eaf7ef; border: 1px solid #b7e2c6; border-radius: 10px; padding: 10px 12px; }
+.kid-link { text-align: center; margin: 14px 0 0; color: var(--muted); }
+.kid-link a { color: var(--primary); font-weight: 700; }
+@media (max-width: 720px) {
+  .auth { grid-template-columns: 1fr; gap: 16px; min-height: 0; align-items: start; }
+  .intro { gap: 10px; }
+  .intro h1 { font-size: 21px; }
+  .intro-family .fam { width: 54px; height: 54px; }
+  .intro-points { font-size: 15px; gap: 6px; }
+  .intro-points li { padding: 7px 10px; }
+  .auth-card { max-width: none; }
+}
+
 .tabs { display: flex; gap: 6px; margin-bottom: 8px; }
 .tabs button.on { background: var(--primary); color: #fff; border-color: var(--primary); }
 .privacy { background: #f7f9fb; border-radius: 10px; padding: 10px 12px; }
