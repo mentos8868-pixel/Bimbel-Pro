@@ -361,11 +361,18 @@ export async function handleApi(req, res) {
       }
       return send(200, out), true;
     }
-    // Ganti avatar orang tua sendiri (sebagai=ortu). Avatar anak hanya diubah orang tua lewat PATCH anak/:id.
+    // Ganti avatar sendiri: orang tua (sebagai=ortu) atau anak yang sedang masuk (sebagai=anak).
+    // Pilihan avatar hanya dari daftar tetap (keluarga hewan/robot), jadi aman dipilih anak sendiri.
+    // Orang tua tetap bisa menggantinya lewat PATCH anak/:id di dashboard.
     if (m === "POST" && path[0] === "avatar") {
       const avatar = avatarOr(body.avatar, "");
       if (!avatar) throw new ApiError(400, "Avatar tidak dikenal.");
-      if (body.sebagai !== "ortu") throw new ApiError(403, "Avatar anak hanya bisa dipilih orang tua.");
+      if (body.sebagai === "anak") {
+        if (!anak || !childRow(anak.child_id)) throw new ApiError(401, "Silakan masuk sebagai anak dulu.");
+        db.prepare("UPDATE children SET avatar = ? WHERE id = ?").run(avatar, anak.child_id);
+        return send(200, { ok: true, avatar }), true;
+      }
+      if (body.sebagai !== "ortu") throw new ApiError(400, "Pilih avatar untuk siapa.");
       db.prepare("UPDATE parents SET avatar = ? WHERE id = ?").run(avatar, needOrtu());
       return send(200, { ok: true, avatar }), true;
     }
