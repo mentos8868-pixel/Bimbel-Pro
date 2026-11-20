@@ -78,6 +78,9 @@ export class ArenaRoom extends Room {
       const p = this.state.players.get(client.sessionId);
       const a = client.auth;
       if (!p || a?.role !== "anak") return;
+      const now = Date.now();   // paling sering dua kali per detik
+      if (now - (client.userData?.avatarAt || 0) < 500) return;
+      client.userData = { ...client.userData, avatarAt: now };
       const c = db.prepare("SELECT aksesori_pakai, xp FROM children WHERE id = ?").get(a.childId);
       if (!c) return;
       p.aksesori = rapikanAksesori(c.aksesori_pakai).join(",");

@@ -1,5 +1,5 @@
 import { Vector3, Scalar, PointerEventTypes } from "@babylonjs/core";
-import { createArena, createAvatar, moveWithCollision, showBubble } from "./arena.js";
+import { createArena, createAvatar, disposeAvatar, moveWithCollision, showBubble } from "./arena.js";
 import { SocialUI } from "./social-ui.js";
 import {
   joinArena, findChessMatch, createChessTable, joinChessTable,
@@ -83,7 +83,7 @@ async function start(profile, playingAs) {
     const baru = createAvatar(scene, opsi);
     baru.root.position.copyFrom(lama.root.position);
     baru.root.rotation.copyFrom(lama.root.rotation);
-    lama.root.dispose(false, true);
+    disposeAvatar(lama);   // material bersama tidak ikut dibuang
     return baru;
   }
 
@@ -118,6 +118,15 @@ async function start(profile, playingAs) {
     room.state.players.onAdd((p, id) => {
       if (id === room.sessionId) {
         me.root.position.set(p.x, 0, p.z);
+        // Aksesori atau aura sendiri berubah di server (mis. naik level di Ruang Pintar): perbarui figur.
+        const cocokkan = () => {
+          if ((p.aksesori || "") === (profile.aksesori || "") && (p.aura || "") === (profile.aura || "")) return;
+          profile.aksesori = p.aksesori || "";
+          profile.aura = p.aura || "";
+          Object.assign(me, gantiAvatar(me, profile));
+        };
+        p.listen("aksesori", cocokkan);
+        p.listen("aura", cocokkan);
         return;
       }
       const opsi = () => ({ name: p.name, jenjang: p.jenjang, negara: p.negara, kelas: p.kelas, kurikulum: p.kurikulum, color: p.color, avatar: p.avatar, aksesori: p.aksesori, aura: p.aura, sid: id });
@@ -131,8 +140,18 @@ async function start(profile, playingAs) {
     });
     room.state.players.onRemove((_, id) => {
       const o = others.get(id);
-      if (o) { o.av.root.dispose(false, true); others.delete(id); }
+      if (o) { disposeAvatar(o.av); others.delete(id); }
     });
+    if (playingAs === "anak") {
+      let terakhir = 0;
+      const segarkan = () => {
+        if (!room || Date.now() - terakhir < 1500) return;
+        terakhir = Date.now();
+        room.send("segarkan-avatar");
+      };
+      // Kembali dari tab Ruang Pintar: ambil aura terbaru dari server.
+      window.addEventListener("focus", segarkan);
+    }
     room.onLeave((code) => {
       room = null;
       $("hud-status").textContent = "Offline";
@@ -310,7 +329,7 @@ async function start(profile, playingAs) {
 
   function useTable(t) {
     if (t.id === "toko") {
-      if (playingAs !== "anak") return toast("Toko Aksesori khusus untuk akun anak.");
+      if (playingAs !== "anak") return toast("Toko Avatar khusus untuk akun anak.");
       uiOpen = true;
       keys.clear();
       toko.open(profile);
@@ -359,7 +378,7 @@ async function start(profile, playingAs) {
 
   // ---------- Kamarku (dashboard anak) ----------
   // Tombol cepat memindahkan avatar ke depan ruangan, atau langsung membuka Toko.
-  const TUJUAN = { bimbel: { x: 0, z: 23, ry: 0 }, game: { x: 21, z: 0, ry: Math.PI / 2 } };
+  const TUJUAN = { bimbel: { x: 0, z: 25.5, ry: 0 }, game: { x: 21, z: 0, ry: Math.PI / 2 } };
   kamar = playingAs === "anak" ? new KamarkuUI({
     onClose: () => (uiOpen = false),
     onKe: (ke) => {

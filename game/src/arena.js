@@ -4,7 +4,7 @@ import {
   Engine, Scene, ArcRotateCamera, Vector3, HemisphericLight, DirectionalLight,
   MeshBuilder, StandardMaterial, Color3, Color4, DynamicTexture, TransformNode, Mesh,
 } from "@babylonjs/core";
-import { buildAvatar3d } from "./avatar3d.js";
+import { buildAvatar3d, buildManekin } from "./avatar3d.js";
 import { drawFlag, namaKelas } from "../../shared/negara.js";
 
 export const ARENA_RADIUS = 38;
@@ -139,30 +139,149 @@ function plainTable(scene, x, z, color, walls) {
   walls.push({ minX: x - 0.95, maxX: x + 0.95, minZ: z - 0.95, maxZ: z + 0.95 });
 }
 
-// Kios toko: meja konter menghadap selatan (ke alun-alun), tiang, atap kanopi bergaris, dan pajangan aksesori.
-function kios(scene, walls, x, z) {
-  box(scene, "kiosKonter", { w: 2.8, h: 0.95, d: 0.8, x, z, color: "#f7e1b5", walls });
-  box(scene, "kiosLis", { w: 2.9, h: 0.08, d: 0.9, x, y: 0.99, z, color: "#c98a4b" });
-  for (const sx of [-1.35, 1.35]) box(scene, "kiosTiang", { w: 0.14, h: 2.6, d: 0.14, x: x + sx, y: 1.3, z: z + 0.35, color: "#c98a4b" });
-  // Kanopi bergaris pink-putih, sedikit miring ke depan.
-  for (let i = 0; i < 6; i++) {
-    const s = box(scene, "kiosAtap", { w: 0.52, h: 0.08, d: 1.5, x: x - 1.3 + i * 0.52, y: 2.65, z: z - 0.05, color: i % 2 ? "#ffffff" : "#ff6f9a" });
-    s.rotation.x = -0.25;
+// ---------- Ruang kelas (Ruang Bimbel) ----------
+function tabung(scene, h, d, color, x, y, z) {
+  const m = MeshBuilder.CreateCylinder("kelas", { height: h, diameter: d, tessellation: 10 }, scene);
+  m.position.set(x, y, z);
+  m.material = mat(scene, color);
+  return m;
+}
+
+// Meja murid dengan kursi di sisi selatan (murid menghadap papan tulis di utara).
+function mejaMurid(scene, x, z, warnaKursi, walls) {
+  box(scene, "mejaMurid", { w: 1.3, h: 0.07, d: 0.75, x, y: 0.75, z, color: "#d9a66b" });
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(scene, "kakiMeja", { w: 0.07, h: 0.72, d: 0.07, x: x + sx * 0.56, y: 0.36, z: z + sz * 0.3, color: "#6d5036" });
+  box(scene, "bukuMeja", { w: 0.35, h: 0.04, d: 0.26, x: x - 0.25, y: 0.8, z: z + 0.05, color: "#4f9cf0" });
+  box(scene, "pensil", { w: 0.25, h: 0.03, d: 0.03, x: x + 0.2, y: 0.8, z: z + 0.1, color: "#f5c542" });
+  const cz = z - 0.7;
+  box(scene, "dudukKursi", { w: 0.5, h: 0.06, d: 0.48, x, y: 0.45, z: cz, color: warnaKursi });
+  box(scene, "sandaranKursi", { w: 0.5, h: 0.5, d: 0.06, x, y: 0.73, z: cz - 0.22, color: warnaKursi });
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(scene, "kakiKursi", { w: 0.05, h: 0.43, d: 0.05, x: x + sx * 0.2, y: 0.21, z: cz + sz * 0.19, color: "#5d6b7a" });
+  walls.push({ minX: x - 0.65, maxX: x + 0.65, minZ: cz - 0.3, maxZ: z + 0.38 });
+}
+
+// Papan tulis hijau berkaki dengan tulisan kapur.
+function papanTulis(scene, x, z, walls) {
+  for (const sx of [-1, 1]) box(scene, "kakiPapan", { w: 0.12, h: 2.9, d: 0.12, x: x + sx * 3.1, y: 1.45, z, color: "#8d6e4a" });
+  box(scene, "bingkaiPapan", { w: 6.3, h: 2.2, d: 0.1, x, y: 1.95, z: z + 0.02, color: "#8d6e4a" });
+  const papan = MeshBuilder.CreatePlane("papanTulis", { width: 6, height: 1.95 }, scene);
+  papan.position.set(x, 1.95, z - 0.04);
+  // Bidang Babylon menghadap -Z, yaitu ke selatan (ke murid), jadi tidak perlu diputar.
+  const tex = new DynamicTexture("tulisanPapan", { width: 768, height: 250 }, scene, true);
+  const ctx = tex.getContext();
+  ctx.fillStyle = "#2f5d3a"; ctx.fillRect(0, 0, 768, 250);
+  ctx.fillStyle = "#f4f1e8"; ctx.textAlign = "center";
+  ctx.font = "bold 54px sans-serif"; ctx.fillText("Selamat Belajar!", 384, 70);
+  ctx.font = "40px sans-serif";
+  ctx.fillText("2 + 3 = 5      A B C      H₂O", 384, 135);
+  ctx.fillText("½ + ¼ = ¾      △ □ ○", 384, 195);
+  ctx.fillStyle = "#f5c542"; ctx.font = "bold 34px sans-serif"; ctx.fillText("★", 60, 60); ctx.fillText("★", 708, 60);
+  tex.update();
+  const m = new StandardMaterial("papanMat", scene);
+  m.diffuseTexture = tex;
+  m.specularColor = new Color3(0.03, 0.03, 0.03);
+  papan.material = m;
+  box(scene, "tempatKapur", { w: 6, h: 0.06, d: 0.18, x, y: 0.95, z: z - 0.1, color: "#8d6e4a" });
+  box(scene, "kapur", { w: 0.18, h: 0.04, d: 0.04, x: x + 1.5, y: 1.0, z: z - 0.12, color: "#ffffff" });
+  box(scene, "penghapus", { w: 0.3, h: 0.08, d: 0.1, x: x - 1.6, y: 1.02, z: z - 0.12, color: "#3b2a05" });
+  walls.push({ minX: x - 3.25, maxX: x + 3.25, minZ: z - 0.2, maxZ: z + 0.15 });
+}
+
+// Rak buku berisi buku warna-warni.
+function rakBuku(scene, x, z, walls) {
+  box(scene, "rakBuku", { w: 0.5, h: 1.8, d: 1.8, x, y: 0.9, z, color: "#a87b51" });
+  const warna = ["#ef4f6e", "#4f9cf0", "#f5c542", "#5fc29a", "#9b7bd8", "#ff9f43"];
+  for (let r = 0; r < 3; r++) {
+    for (let i = 0; i < 7; i++) {
+      const h = 0.32 + ((i * 7 + r * 3) % 4) * 0.04;
+      box(scene, "buku", { w: 0.1, h, d: 0.2, x: x + 0.27, y: 0.25 + r * 0.55 + h / 2, z: z - 0.7 + i * 0.22, color: warna[(i + r) % warna.length] });
+    }
   }
-  // Pajangan: topi pesta, kacamata (dua cincin), dan pita.
-  const topi = MeshBuilder.CreateCylinder("kiosTopi", { height: 0.45, diameterTop: 0, diameterBottom: 0.3, tessellation: 12 }, scene);
-  topi.position.set(x - 0.9, 1.25, z);
-  topi.material = mat(scene, "#9b7bd8");
-  for (const dx of [-0.13, 0.13]) {
-    const r = MeshBuilder.CreateTorus("kiosKaca", { diameter: 0.22, thickness: 0.04, tessellation: 16 }, scene);
-    r.position.set(x + dx, 1.12, z);
-    r.rotation.x = Math.PI / 2;
-    r.material = mat(scene, "#2b2f3a");
+  walls.push({ minX: x - 0.25, maxX: x + 0.4, minZ: z - 0.9, maxZ: z + 0.9 });
+}
+
+function ruangKelas(scene, walls) {
+  // Papan tulis di depan kelas (utara), meja guru di depannya.
+  papanTulis(scene, 0, 30.2, walls);
+  const gx = 0, gz = 28.3;
+  box(scene, "mejaGuru", { w: 2.4, h: 0.85, d: 0.9, x: gx, y: 0.43, z: gz, color: "#b07a4f", walls });
+  box(scene, "mejaGuruAtas", { w: 2.5, h: 0.06, d: 1.0, x: gx, y: 0.88, z: gz, color: "#d9a66b" });
+  box(scene, "kursiGuru", { w: 0.6, h: 0.06, d: 0.55, x: gx, y: 0.5, z: gz + 0.9, color: "#5b6b7c" });
+  box(scene, "sandaranGuru", { w: 0.6, h: 0.6, d: 0.06, x: gx, y: 0.82, z: gz + 1.15, color: "#5b6b7c" });
+  // Di meja guru: bola dunia, tumpukan buku, apel.
+  tabung(scene, 0.25, 0.06, "#8d6e4a", gx - 0.8, 1.02, gz);
+  const bola = MeshBuilder.CreateSphere("bolaDunia", { diameter: 0.38, segments: 16 }, scene);
+  bola.position.set(gx - 0.8, 1.32, gz);
+  bola.material = mat(scene, "#4fb3f0");
+  box(scene, "benuaA", { w: 0.14, h: 0.14, d: 0.06, x: gx - 0.78, y: 1.36, z: gz - 0.17, color: "#5fc29a" });
+  for (let i = 0; i < 3; i++) box(scene, "bukuGuru", { w: 0.5, h: 0.07, d: 0.35, x: gx + 0.6, y: 0.95 + i * 0.07, z: gz, color: ["#ef4f6e", "#f5c542", "#4f9cf0"][i] });
+  const apel = MeshBuilder.CreateSphere("apel", { diameter: 0.18, segments: 10 }, scene);
+  apel.position.set(gx + 0.05, 1.0, gz - 0.2);
+  apel.material = mat(scene, "#e0453a");
+  // Meja dan kursi murid: 2 baris x 4 meja, lorong di tengah menuju meja guru.
+  const kursi = ["#4f9cf0", "#ef6f5e", "#5fc29a", "#f5a524"];
+  for (const z of [24.8, 22.2]) [-5.4, -2.7, 2.7, 5.4].forEach((x, i) => mejaMurid(scene, x, z, kursi[i], walls));
+  // Rak buku, tanaman, dan tempat sampah di sudut kelas.
+  rakBuku(scene, -7.45, 27.5, walls);
+  rakBuku(scene, -7.45, 24.8, walls);
+  for (const [x, z] of [[7.1, 30.1], [7.1, 20]]) {
+    tabung(scene, 0.5, 0.5, "#c97b4f", x, 0.25, z);
+    const daun = MeshBuilder.CreateSphere("daun", { diameter: 0.8, segments: 10 }, scene);
+    daun.position.set(x, 0.85, z);
+    daun.material = mat(scene, "#3e9b4f");
+    walls.push({ minX: x - 0.3, maxX: x + 0.3, minZ: z - 0.3, maxZ: z + 0.3 });
   }
-  const pita = MeshBuilder.CreateSphere("kiosPita", { diameter: 0.28, segments: 8 }, scene);
-  pita.scaling.set(1.4, 0.6, 0.6);
-  pita.position.set(x + 0.9, 1.12, z);
-  pita.material = mat(scene, "#ef6f5e");
+  tabung(scene, 0.45, 0.4, "#5d6b7a", -7.2, 0.23, 20);
+  // Meja guru adalah tempat membuka Ruang Pintar (tab baru); titik aksi di depan meja.
+  makeSign(scene, ["Ruang Pintar"], { width: 2.2, height: 0.6 }).position.set(gx, 1.7, gz - 0.7);
+  return { id: "bimbel", x: gx, z: gz - 1.3, label: "Ruang Pintar", action: "Belajar di Ruang Pintar", ready: true };
+}
+
+// Kios Toko Avatar: lapak beratap belang dengan manekin berhias aksesori. Bagian depan menghadap selatan.
+function kiosToko(scene, x, z, walls) {
+  const W = 3.4, D = 1.8;
+  const front = z - D / 2;
+  box(scene, "kiosLantai", { w: W + 0.4, h: 0.12, d: D + 0.4, x, y: 0.06, z, color: "#f3d9e4" });
+  box(scene, "kiosMeja", { w: W, h: 0.95, d: 0.6, x, y: 0.47, z: front + 0.3, color: "#ff8fb0" });
+  box(scene, "kiosMejaAtas", { w: W + 0.1, h: 0.08, d: 0.7, x, y: 0.98, z: front + 0.3, color: "#fff4f8" });
+  box(scene, "kiosBelakang", { w: W, h: 2.4, d: 0.15, x, y: 1.2, z: z + D / 2, color: "#ffd1e0" });
+  box(scene, "kiosRak", { w: W - 0.4, h: 0.08, d: 0.35, x, y: 1.65, z: z + D / 2 - 0.25, color: "#c97b9b" });
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const post = MeshBuilder.CreateCylinder("kiosTiang", { height: 2.7, diameter: 0.14, tessellation: 8 }, scene);
+    post.position.set(x + sx * (W / 2 - 0.05), 1.35, z + sz * (D / 2 - 0.05));
+    post.material = mat(scene, "#ffffff");
+  }
+  // Atap belang miring ke depan.
+  const atap = MeshBuilder.CreateBox("kiosAtap", { width: W + 0.6, height: 0.08, depth: D + 0.8 }, scene);
+  atap.position.set(x, 2.85, z - 0.15);
+  atap.rotation.x = -0.18;
+  const tex = new DynamicTexture("kiosBelang", { width: 256, height: 64 }, scene, false);
+  const ctx = tex.getContext();
+  for (let i = 0; i < 8; i++) { ctx.fillStyle = i % 2 ? "#ffffff" : "#ef4f6e"; ctx.fillRect(i * 32, 0, 32, 64); }
+  tex.update();
+  const am = new StandardMaterial("kiosAtapMat", scene);
+  am.diffuseTexture = tex;
+  am.specularColor = new Color3(0.05, 0.05, 0.05);
+  atap.material = am;
+  // Pajangan: manekin di meja dan di rak belakang.
+  const pajang = [
+    [-1.1, 1.02, front + 0.3, ["mahkota"]],
+    [0, 1.02, front + 0.3, ["topi-penyihir"]],
+    [1.1, 1.02, front + 0.3, ["pita", "kacamata"]],
+    [-0.7, 1.69, z + D / 2 - 0.25, ["topi-pesta", "kacamata-hitam"]],
+    [0.7, 1.69, z + D / 2 - 0.25, ["medali", "syal"]],
+  ];
+  for (const [dx, y, pz, aks] of pajang) {
+    const n = new TransformNode("manekin", scene);
+    n.position.set(x + dx, y, pz);
+    n.rotation.y = Math.PI;   // menghadap ke depan (selatan)
+    n.scaling.setAll(0.8);
+    buildManekin(scene, n, aks);
+  }
+  walls.push({ minX: x - W / 2 - 0.2, maxX: x + W / 2 + 0.2, minZ: front - 0.05, maxZ: z + D / 2 + 0.2 });
+  const s = makeSign(scene, ["Toko Avatar", "Topi · Pita · Kacamata"], { width: 3.2, height: 1.1, bg: "#ef4f6e", fg: "#ffffff" });
+  s.position.set(x, 3.75, z);
+  return { id: "toko", x, z: front - 0.9, label: "Toko Avatar", action: "Buka Toko Avatar", ready: true };
 }
 
 export function createArena(canvas) {
@@ -197,6 +316,8 @@ export function createArena(canvas) {
   plaza.material = mat(scene, "#e8dcc2");
   const plazaSign = makeSign(scene, ["Alun-alun", "Bimbel ke utara · Game ke timur"], { width: 5, height: 1.5 });
   plazaSign.position.set(0, 3, 0);
+  // Kios Toko Avatar di sisi barat laut alun-alun (terlihat dari tempat muncul).
+  const kios = kiosToko(scene, -5, 4.6, walls);
 
   // Jalan setapak
   box(scene, "pathN", { w: 3, h: 0.04, d: 11, x: 0, y: 0.02, z: 13.5, color: "#e8dcc2" });
@@ -208,15 +329,8 @@ export function createArena(canvas) {
   room(scene, walls, { cx: 0, cz: 25, w: 16, d: 12, door: "s", floor: "#fff3d6", wall: "#f2b134" });
   const bimbelSign = makeSign(scene, ["Ruang Bimbel", "Ruang Pintar"], { width: 5, height: 1.6, bg: "#f2b134", fg: "#3b2a05" });
   bimbelSign.position.set(0, 3.2, 18.6);
-  // Meja belajar: membuka aplikasi Ruang Pintar (game/public/bimbel) di tab baru.
-  const studyDesk = { id: "bimbel", x: 0, z: 25, label: "Ruang Pintar", action: "Belajar di Ruang Pintar", ready: true };
-  plainTable(scene, studyDesk.x, studyDesk.z, "#f2b134", walls);
-  makeSign(scene, ["Ruang Pintar"], { width: 2.6, height: 0.7 }).position.set(studyDesk.x, 2.3, studyDesk.z);
-
-  // Toko Aksesori (kios di pinggir alun-alun, barat laut): anak menukar bintang dengan aksesori avatar.
-  const toko = { id: "toko", x: -5.5, z: 5.2, label: "Toko Aksesori", action: "Buka Toko Aksesori", ready: true };
-  kios(scene, walls, toko.x, toko.z + 0.6);
-  makeSign(scene, ["Toko Aksesori", "Tukar bintang ★"], { width: 3.2, height: 1.1, bg: "#ff8fb1", fg: "#4a1024" }).position.set(toko.x, 3.6, toko.z + 0.6);
+  // Ruang kelas: papan tulis, meja guru (membuka Ruang Pintar di tab baru), meja-kursi murid, rak buku.
+  const studyDesk = ruangKelas(scene, walls);
 
   // Ruang Game (timur)
   room(scene, walls, { cx: 25, cz: 0, w: 14, d: 18, door: "w", floor: "#e3efff", wall: "#4f9cf0" });
@@ -253,7 +367,7 @@ export function createArena(canvas) {
   for (const [x, z] of [[-9, 9], [9, 9], [-9, -9], [9, -9]]) walls.push({ minX: x - 0.3, maxX: x + 0.3, minZ: z - 0.3, maxZ: z + 0.3 });
 
   window.addEventListener("resize", () => engine.resize());
-  return { engine, scene, camera, walls, tables: [...tables, studyDesk, toko] };
+  return { engine, scene, camera, walls, tables: [...tables, studyDesk, kios] };
 }
 
 // Gelembung chat di atas kepala avatar (hilang setelah 5 detik).
@@ -289,6 +403,19 @@ export function createAvatar(scene, { color, avatar, aksesori = "", aura = "", n
   tag.billboardMode = Mesh.BILLBOARDMODE_ALL;
   if (sid) for (const m of meshes) m.metadata = { sid };
   return { root, body: bob, height };
+}
+
+// Buang avatar (figur, papan nama, gelembung chat) tanpa menghapus material warna bersama
+// yang juga dipakai avatar lain.
+export function disposeAvatar(av) {
+  clearTimeout(av.bubbleTimer);
+  for (const m of av.root.getChildMeshes(false)) {
+    const mt = m.material;
+    m.dispose();
+    if (mt && !mt.metadata?.bersama) { mt.diffuseTexture?.dispose(); mt.dispose(); }
+  }
+  av.root.dispose();
+  av.bubble = null;
 }
 
 // Gerak dengan tabrakan sederhana terhadap dinding dan meja (geser di sepanjang dinding).
