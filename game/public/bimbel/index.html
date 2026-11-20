@@ -107,13 +107,12 @@
   .result .score{font-size:44px;font-weight:900;margin:8px 0}
   .newmedal{margin:16px auto 0;background:var(--accent-soft);border-radius:14px;padding:12px;font-weight:800;max-width:380px}
 
-  /* Shop & medals */
+  /* Medals */
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px}
   .item{background:var(--card);border:2px solid var(--line);border-radius:var(--r);padding:18px;text-align:center}
   .item .em{font-size:52px;line-height:1.2}
   .item h3{margin:6px 0;font-size:16px}
   .item.locked{opacity:.45;filter:grayscale(1)}
-  .price{display:inline-flex;align-items:center;gap:6px;font-weight:900;margin-bottom:10px}
 
   /* Report */
   .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:22px}
@@ -206,7 +205,6 @@
   <nav id="nav">
     <button data-v="belajar" class="on">Belajar</button>
     <button data-v="tryout">Tryout</button>
-    <button data-v="toko">Toko Hadiah</button>
     <button data-v="medali">Medali</button>
     <button data-v="laporan">Laporan Orang Tua</button>
   </nav>
@@ -796,7 +794,6 @@ const DEF={name:'',avatar:'🦊',owned:['🦊'],coins:0,xp:0,sessions:0,perfect:
 let S=Object.assign({},DEF,JSON.parse(localStorage.getItem('ruangpintar')||'{}'));
 const save=()=>localStorage.setItem('ruangpintar',JSON.stringify(S));
 
-const SHOP=[{e:'🦊',n:'Rubah',p:0},{e:'🐼',n:'Panda',p:50},{e:'🐯',n:'Harimau',p:80},{e:'🐙',n:'Gurita',p:120},{e:'🦉',n:'Burung Hantu',p:150},{e:'🚀',n:'Roket',p:200},{e:'🦖',n:'Dino',p:300},{e:'🦄',n:'Unicorn',p:400}];
 const MEDALS=[
   {id:'first',e:'🥉',n:'Langkah Pertama',d:'Selesaikan 1 sesi latihan',ok:s=>s.sessions>=1},
   {id:'perfect',e:'🎯',n:'Sempurna',d:'Semua soal benar dalam satu sesi',ok:s=>s.perfect>=1},
@@ -825,7 +822,7 @@ document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v
 
 function render(){header();const app=$('#app');
   if(sess){ return sess.done?renderResult(app):renderQ(app); }
-  ({belajar:renderHome,tryout:renderTryout,toko:renderShop,medali:renderMedals,laporan:renderReport})[view](app);
+  ({belajar:renderHome,tryout:renderTryout,medali:renderMedals,laporan:renderReport})[view](app);
 }
 function starsHTML(n){return `<span class="stars">${[1,2,3].map(i=>`<span class="${i<=n?'s':''}">★</span>`).join('')}</span>`}
 function renderHome(app){
@@ -934,16 +931,6 @@ function renderResult(app){const s=sess,N=s.qs.length;
   if(naik)$('#up').onclick=()=>{S.lv=s.lv+1;save();start(s.t.id)};
 }
 
-function renderShop(app){
-  app.innerHTML=`<h1>Toko Hadiah</h1><p class="sub">Tukar koin dari latihan dengan avatar baru. Koinmu: <b>${S.coins}</b> (tingkat Sulit memberi koin lebih banyak)</p>
-  <div class="grid">${SHOP.map(it=>{const own=S.owned.includes(it.e),use=S.avatar===it.e;
-    return `<div class="item"><div class="em">${it.e}</div><h3>${it.n}</h3>
-      ${own?`<div class="price" style="color:var(--ok)">Sudah dimiliki</div>`:`<div class="price"><span class="coin"></span>${it.p}</div>`}
-      <div>${use?`<button class="btn ghost" disabled>Dipakai</button>`:own?`<button class="btn ghost" data-use="${it.e}">Pakai</button>`
-        :`<button class="btn" data-buy="${it.e}" ${S.coins<it.p?'disabled':''}>Beli</button>`}</div></div>`}).join('')}</div>`;
-  app.querySelectorAll('[data-use]').forEach(b=>b.onclick=()=>{S.avatar=b.dataset.use;save();render()});
-  app.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{const it=SHOP.find(x=>x.e===b.dataset.buy);if(S.coins<it.p)return;S.coins-=it.p;S.owned.push(it.e);S.avatar=it.e;save();render()});
-}
 function renderMedals(app){
   app.innerHTML=`<h1>Medali</h1><p class="sub">${S.medals.length} dari ${MEDALS.length} medali sudah didapat.</p>
   <div class="grid">${MEDALS.map(m=>{const got=S.medals.includes(m.id);return `<div class="item ${got?'':'locked'}"><div class="em">${m.e}</div><h3>${m.n}</h3><p style="margin:0;color:var(--muted);font-size:14px">${m.d}</p></div>`}).join('')}</div>`;
