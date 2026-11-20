@@ -22,6 +22,7 @@ defineTypes(Player, {
   avatar: "string",
   negara: "string",   // kode negara anak ("" untuk orang tua)
   kelas: "number",    // 1–12, 0 = belum diisi / orang tua
+  kurikulum: "string", // nama kelas di papan nama mengikuti kurikulum (Kelas 4 / P4)
   x: "number",
   z: "number",
   ry: "number",
@@ -81,6 +82,7 @@ export class ArenaRoom extends Room {
     p.avatar = avatarOr(a.avatar);
     p.negara = a.role === "anak" ? a.negara || "" : "";
     p.kelas = a.role === "anak" ? a.kelas || 0 : 0;
+    p.kurikulum = a.role === "anak" ? a.kurikulum || "merdeka" : "";
     // Muncul di sekitar alun-alun.
     const ang = Math.random() * Math.PI * 2;
     p.x = Math.cos(ang) * 3;

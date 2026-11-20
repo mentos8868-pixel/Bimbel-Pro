@@ -15,6 +15,30 @@ export const negaraName = (id) => NEGARA.find((n) => n.id === id)?.name || "";
 // Kelas 1–12 menentukan jenjang (dipakai untuk mencari lawan sejenjang).
 export const jenjangDariKelas = (k) => (k <= 6 ? "SD" : k <= 9 ? "SMP" : "SMA");
 
+// Kurikulum yang dipilih orang tua, dan nama kelas menurut kurikulum itu.
+// Nilai kelas tetap 1–12; hanya namanya yang berbeda (Merdeka: Kelas 1 SD, Cambridge/Singapore: P1, ...).
+export const KURIKULUM = [
+  { id: "merdeka", name: "Kurikulum Merdeka" },
+  { id: "cam", name: "Cambridge International" },
+  { id: "sgp", name: "Singapore MOE" },
+];
+export const kurikulumName = (id) => (KURIKULUM.find((k) => k.id === id) || KURIKULUM[0]).name;
+// short = true: label ringkas untuk papan nama avatar ("Kelas 4", "P4", "S2", "JC1").
+export function namaKelas(k, kur = "merdeka", short = false) {
+  if (kur === "cam") {
+    if (k <= 6) return short ? `P${k}` : `Primary ${k} (P${k})`;
+    if (k <= 9) return short ? `Stage ${k}` : `Lower Secondary Stage ${k}`;
+    if (k <= 11) return short ? `IGCSE Y${k - 9}` : `IGCSE Year ${k - 9}`;
+    return short ? "AS Level" : "AS Level";
+  }
+  if (kur === "sgp") {
+    if (k <= 6) return short ? `P${k}` : `Primary ${k} (P${k})`;
+    if (k <= 10) return short ? `S${k - 6}` : `Secondary ${k - 6} (S${k - 6})`;
+    return short ? `JC${k - 10}` : `Junior College ${k - 10} (JC${k - 10})`;
+  }
+  return short ? `Kelas ${k}` : `Kelas ${k} ${jenjangDariKelas(k)}`;
+}
+
 // ---------- gambar bendera (ctx = CanvasRenderingContext2D) ----------
 function star(ctx, cx, cy, r, color, points = 5, inner = 0.4, rot = -Math.PI / 2) {
   ctx.fillStyle = color;

@@ -2,30 +2,35 @@
 import { api } from "./api.js";
 import { avatarPicker } from "./avatar-picker.js";
 import { avatarSvg } from "./avatar-svg.js";
-import { NEGARA, DEFAULT_NEGARA, negaraName, jenjangDariKelas } from "../../shared/negara.js";
+import { NEGARA, DEFAULT_NEGARA, negaraName, KURIKULUM, kurikulumName, namaKelas } from "../../shared/negara.js";
 
 const $ = (id) => document.getElementById(id);
-const KURIKULUM = [["merdeka", "Kurikulum Merdeka"], ["cam", "Cambridge International"], ["sgp", "Singapore MOE"]];
-const kurName = (k) => (KURIKULUM.find((x) => x[0] === k) || KURIKULUM[0])[1];
-// Isi pilihan kelas (1–12), kurikulum, dan negara pada sebuah formulir.
-function fillKelasNegara(root, kelas, negara, kurikulum = "merdeka") {
-  root.querySelectorAll(".pilih-kurikulum").forEach((s) => {
-    if (!s.options.length) for (const [id, nm] of KURIKULUM) s.add(new Option(nm, id));
-    s.value = kurikulum;
-  });
-  root.querySelectorAll(".pilih-kelas").forEach((s) => {
-    if (!s.options.length) {
-      if (!kelas) s.add(new Option("Pilih kelas", "", true, true));
-      for (let k = 1; k <= 12; k++) s.add(new Option(`Kelas ${k} (${jenjangDariKelas(k)})`, String(k)));
-    }
-    s.value = kelas ? String(kelas) : "";
-  });
+// Pilihan kelas mengikuti kurikulum: Merdeka "Kelas 1 SD" … "Kelas 12 SMA", Cambridge/Singapore "Primary 1 (P1)" ….
+function fillKelasOptions(sel, kur, kelas) {
+  sel.replaceChildren();
+  if (!kur) { sel.add(new Option("Pilih kurikulum dulu", "", true, true)); sel.disabled = true; return; }
+  sel.disabled = false;
+  sel.add(new Option("Pilih kelas", "", !kelas, !kelas));
+  for (let k = 1; k <= 12; k++) sel.add(new Option(namaKelas(k, kur), String(k)));
+  sel.value = kelas ? String(kelas) : "";
+}
+// Isi pilihan kurikulum (dipilih dulu), kelas, dan negara pada sebuah formulir.
+// kurikulum = "" untuk formulir anak baru: kelas baru bisa dipilih setelah kurikulum dipilih.
+function fillKelasNegara(root, kelas, negara, kurikulum = "") {
+  const kurSel = root.querySelector(".pilih-kurikulum"), kelSel = root.querySelector(".pilih-kelas");
+  if (!kurSel.options.length) {
+    kurSel.add(new Option("Pilih kurikulum", ""));
+    for (const k of KURIKULUM) kurSel.add(new Option(k.name, k.id));
+    kurSel.addEventListener("change", () => fillKelasOptions(kelSel, kurSel.value, Number(kelSel.value) || 0));
+  }
+  kurSel.value = kurikulum;
+  fillKelasOptions(kelSel, kurikulum, kelas);
   root.querySelectorAll(".pilih-negara").forEach((s) => {
     if (!s.options.length) for (const n of NEGARA) s.add(new Option(n.name, n.id));
     s.value = negara || DEFAULT_NEGARA;
   });
 }
-const kelasText = (c) => (c.kelas ? `Kelas ${c.kelas} (${c.jenjang})` : c.jenjang) + ` · ${negaraName(c.negara)} · ${kurName(c.kurikulum)}`;
+const kelasText = (c) => `${kurikulumName(c.kurikulum)} · ${c.kelas ? namaKelas(c.kelas, c.kurikulum) : c.jenjang} · ${negaraName(c.negara)}`;
 const COLORS = ["#4f9cf0", "#ef6f5e", "#f2b134", "#3e9b4f", "#9b7bd8", "#ec7fb5"];
 const GAME_NAME = { catur: "Catur", scramble: "Scramble", kartu: "Kartu Kilat" };
 const OUTCOME = { menang: "menang", kalah: "kalah", seri: "seri" };
@@ -103,6 +108,7 @@ $("form-anak").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
   setErr(f, "");
+  if (!f.kurikulum.value) return setErr(f, "Pilih kurikulum sekolah dulu.");
   if (!f.kelas.value) return setErr(f, "Pilih kelas anak.");
   if (!/^\d{4}$/.test(f.pin.value)) return setErr(f, "PIN harus 4 angka.");
   busy(f, true);

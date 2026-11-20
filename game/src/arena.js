@@ -5,7 +5,7 @@ import {
   MeshBuilder, StandardMaterial, Color3, Color4, DynamicTexture, TransformNode, Mesh,
 } from "@babylonjs/core";
 import { buildAvatar3d } from "./avatar3d.js";
-import { drawFlag } from "../../shared/negara.js";
+import { drawFlag, namaKelas } from "../../shared/negara.js";
 
 export const ARENA_RADIUS = 38;
 
@@ -248,10 +248,10 @@ export function showBubble(scene, avatar, text) {
 // sid (opsional) disimpan di mesh supaya avatar bisa diketuk untuk membuka profil.
 // body = simpul yang dinaikturunkan saat berjalan (posisi dasar y = 0).
 // Baris kedua papan nama: bendera negara + "Kelas N" (anak), atau jenjang bila kelas belum diisi.
-export function createAvatar(scene, { color, avatar, name, jenjang, negara = "", kelas = 0, sid }) {
+export function createAvatar(scene, { color, avatar, name, jenjang, negara = "", kelas = 0, kurikulum = "merdeka", sid }) {
   const root = new TransformNode("avatar", scene);
   const { bob, meshes, height } = buildAvatar3d(scene, root, avatar, color);
-  const sub = kelas ? `Kelas ${kelas}` : jenjang;
+  const sub = kelas ? namaKelas(kelas, kurikulum, true) : jenjang;
   const tag = makeSign(scene, [name, sub], { width: 1.8, height: 0.6, bg: "rgba(255,255,255,0.9)", flag: negara });
   tag.position.y = height + 0.3;
   tag.parent = root;

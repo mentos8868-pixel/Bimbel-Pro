@@ -113,7 +113,7 @@ export function playerFromSession(s) {
     if (!c) return null;
     return {
       role: "anak", childId: c.id, parentId: c.parent_id, name: c.name, jenjang: c.jenjang, color: c.color, avatar: avatarOr(c.avatar),
-      negara: negaraOr(c.negara), kelas: c.kelas || 0,
+      negara: negaraOr(c.negara), kelas: c.kelas || 0, kurikulum: KURIKULUM.includes(c.kurikulum) ? c.kurikulum : "merdeka",
       limitMin: c.limit_min, allowStrangers: !!c.allow_strangers,
     };
   }
