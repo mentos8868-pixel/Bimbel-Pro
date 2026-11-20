@@ -3,6 +3,7 @@
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from "node:crypto";
 import { db, today, lastDays } from "./db.js";
 import { avatarOr, DEFAULT_ORTU_AVATAR } from "../shared/avatars.js";
+import { avatarSvg } from "../shared/avatar-svg.js";
 import { parentView, parentDecide, unblock, purgeUid, notify, kick } from "./social.js";
 
 const DAY = 86400000;
@@ -289,14 +290,21 @@ export async function handleApi(req, res) {
       }
       return send(200, out), true;
     }
-    // Ganti avatar sendiri: anak yang sedang masuk, atau orang tua (sebagai=ortu).
+    // Ganti avatar orang tua sendiri (sebagai=ortu). Avatar anak hanya diubah orang tua lewat PATCH anak/:id.
     if (m === "POST" && path[0] === "avatar") {
       const avatar = avatarOr(body.avatar, "");
       if (!avatar) throw new ApiError(400, "Avatar tidak dikenal.");
-      if (body.sebagai === "ortu") db.prepare("UPDATE parents SET avatar = ? WHERE id = ?").run(avatar, needOrtu());
-      else if (anak) db.prepare("UPDATE children SET avatar = ? WHERE id = ?").run(avatar, anak.child_id);
-      else throw new ApiError(401, "Silakan masuk dulu.");
+      if (body.sebagai !== "ortu") throw new ApiError(403, "Avatar anak hanya bisa dipilih orang tua.");
+      db.prepare("UPDATE parents SET avatar = ? WHERE id = ?").run(avatar, needOrtu());
       return send(200, { ok: true, avatar }), true;
+    }
+    // Gambar avatar anak yang sedang masuk (dipakai Ruang Pintar).
+    if (m === "GET" && path[0] === "avatar.svg") {
+      const c = anak && childRow(anak.child_id);
+      if (!c) throw new ApiError(401, "Silakan masuk dulu.");
+      res.writeHead(200, { "Content-Type": "image/svg+xml; charset=utf-8", "Cache-Control": "no-store" });
+      res.end(avatarSvg(c.avatar, c.color));
+      return true;
     }
     if (m === "GET" && path[0] === "laporan") {
       return send(200, { children: report(needOrtu()) }), true;
