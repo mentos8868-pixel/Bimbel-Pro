@@ -4,6 +4,7 @@ import {
   Engine, Scene, ArcRotateCamera, Vector3, HemisphericLight, DirectionalLight,
   MeshBuilder, StandardMaterial, Color3, Color4, DynamicTexture, TransformNode, Mesh,
 } from "@babylonjs/core";
+import { buildAvatar3d } from "./avatar3d.js";
 
 export const ARENA_RADIUS = 38;
 
@@ -216,7 +217,7 @@ export function showBubble(scene, avatar, text) {
   if (cur.trim()) lines.push(cur.trim());
   const shown = lines.slice(0, 3);
   const b = makeSign(scene, shown, { width: 2.6, height: 0.42 * shown.length + 0.25, bg: "#fffbe6", fg: "#1f2a37" });
-  b.position.y = 2.85 + shown.length * 0.2;
+  b.position.y = (avatar.height ?? 2.2) + 0.65 + shown.length * 0.2;
   b.parent = avatar.root;
   b.billboardMode = Mesh.BILLBOARDMODE_ALL;
   avatar.bubble = b;
@@ -224,30 +225,18 @@ export function showBubble(scene, avatar, text) {
   avatar.bubbleTimer = setTimeout(() => { b.dispose(false, true); if (avatar.bubble === b) avatar.bubble = null; }, 5000);
 }
 
-// Avatar sederhana: badan, kepala, mata, dan papan nama.
+// Avatar lucu (lihat avatar3d.js) dengan papan nama di atas kepala.
 // sid (opsional) disimpan di mesh supaya avatar bisa diketuk untuk membuka profil.
-export function createAvatar(scene, { color, name, jenjang, sid }) {
+// body = simpul yang dinaikturunkan saat berjalan (posisi dasar y = 0).
+export function createAvatar(scene, { color, avatar, name, jenjang, sid }) {
   const root = new TransformNode("avatar", scene);
-  const body = MeshBuilder.CreateCapsule("body", { radius: 0.38, height: 1.25, tessellation: 10 }, scene);
-  body.position.y = 0.65;
-  body.material = mat(scene, color);
-  body.parent = root;
-  const head = MeshBuilder.CreateSphere("head", { diameter: 0.62, segments: 10 }, scene);
-  head.position.y = 1.55;
-  head.material = mat(scene, "#f1c9a5");
-  head.parent = root;
-  for (const sx of [-0.12, 0.12]) {
-    const eye = MeshBuilder.CreateSphere("eye", { diameter: 0.09, segments: 6 }, scene);
-    eye.position.set(sx, 1.6, 0.27);
-    eye.material = mat(scene, "#1f2a37");
-    eye.parent = root;
-  }
+  const { bob, meshes, height } = buildAvatar3d(scene, root, avatar, color);
   const tag = makeSign(scene, [name, jenjang], { width: 1.8, height: 0.6, bg: "rgba(255,255,255,0.9)" });
-  tag.position.y = 2.25;
+  tag.position.y = height + 0.3;
   tag.parent = root;
   tag.billboardMode = Mesh.BILLBOARDMODE_ALL;
-  if (sid) body.metadata = head.metadata = { sid };
-  return { root, body, head };
+  if (sid) for (const m of meshes) m.metadata = { sid };
+  return { root, body: bob, height };
 }
 
 // Gerak dengan tabrakan sederhana terhadap dinding dan meja (geser di sepanjang dinding).

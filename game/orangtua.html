@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dashboard Orang Tua</title>
     <link rel="stylesheet" href="/src/orangtua.css" />
+    <link rel="stylesheet" href="/src/avatar.css" />
   </head>
   <body>
     <header class="top">
@@ -42,7 +43,7 @@
             <summary>Data apa yang disimpan?</summary>
             <ul>
               <li>Orang tua: nama, email, dan kata sandi (disimpan dalam bentuk acak, tidak bisa dibaca).</li>
-              <li>Anak: nama panggilan, jenjang, warna avatar, dan PIN (disimpan dalam bentuk acak).</li>
+              <li>Anak: nama panggilan, jenjang, avatar beserta warnanya, dan PIN (disimpan dalam bentuk acak).</li>
               <li>Kegiatan anak: lama bermain per hari dan hasil permainan, untuk laporan di halaman ini.</li>
               <li>Tidak ada nama lengkap, sekolah, alamat, foto, atau lokasi anak.</li>
               <li>Orang tua bisa menghapus akun anak atau seluruh akun kapan saja, dan semua datanya ikut terhapus.</li>
@@ -79,10 +80,12 @@
               <input name="pin" inputmode="numeric" pattern="\d{4}" maxlength="4" required autocomplete="off" />
             </label>
             <div>
-              <div class="label">Warna avatar</div>
+              <div class="label">Warna aksesori (pita, topi, dasi, bunga)</div>
               <div class="colors" id="warna-baru"></div>
             </div>
           </div>
+          <div class="label">Avatar anak (satu keluarga: ayah, ibu, anak perempuan, anak laki-laki)</div>
+          <div id="avatar-baru"></div>
           <p class="error" hidden></p>
           <button class="primary" type="submit">Tambah anak</button>
         </form>
@@ -105,6 +108,12 @@
           <span class="dot"></span>
           <div><h2 class="nama"></h2><span class="muted jenjang"></span></div>
         </header>
+
+        <details class="av-edit">
+          <summary>Ganti avatar</summary>
+          <div class="av-edit-picker"></div>
+          <span class="av-saved muted" hidden>Avatar tersimpan ✓</span>
+        </details>
 
         <div class="today">
           <div class="today-label"><strong>Hari ini</strong> <span class="today-text"></span></div>

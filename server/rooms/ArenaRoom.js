@@ -3,6 +3,7 @@ import { authPlayer } from "../room-auth.js";
 import { addPlaySeconds, secondsToday } from "../accounts.js";
 import { setupSocial, socialJoin, socialLeave } from "./arena-social.js";
 import { uidOf } from "../social.js";
+import { avatarOr } from "../../shared/avatars.js";
 
 
 const { Room } = colyseus;
@@ -18,6 +19,7 @@ defineTypes(Player, {
   name: "string",
   jenjang: "string",
   color: "string",
+  avatar: "string",
   x: "number",
   z: "number",
   ry: "number",
@@ -74,6 +76,7 @@ export class ArenaRoom extends Room {
     p.name = a.name;
     p.jenjang = a.role === "ortu" ? "Orang tua" : a.jenjang;
     p.color = WARNA.test(a.color || "") ? a.color : "#4f9cf0";
+    p.avatar = avatarOr(a.avatar);
     // Muncul di sekitar alun-alun.
     const ang = Math.random() * Math.PI * 2;
     p.x = Math.cos(ang) * 3;

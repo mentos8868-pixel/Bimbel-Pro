@@ -2,6 +2,7 @@
 // batas waktu bermain, hasil permainan, dan laporan untuk orang tua.
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from "node:crypto";
 import { db, today, lastDays } from "./db.js";
+import { avatarOr, DEFAULT_ORTU_AVATAR } from "../shared/avatars.js";
 import { parentView, parentDecide, unblock, purgeUid, notify, kick } from "./social.js";
 
 const DAY = 86400000;
@@ -94,7 +95,7 @@ export function addPlaySeconds(childId, seconds, now = Date.now()) {
 
 function publicChild(c) {
   return {
-    id: c.id, name: c.name, jenjang: c.jenjang, color: c.color,
+    id: c.id, name: c.name, jenjang: c.jenjang, color: c.color, avatar: avatarOr(c.avatar),
     limitMin: c.limit_min, allowStrangers: !!c.allow_strangers, chat: c.chat, approveFriends: !!c.approve_friends,
     usedMin: Math.floor(secondsToday(c.id) / 60),
   };
@@ -107,13 +108,13 @@ export function playerFromSession(s) {
     const c = childRow(s.child_id);
     if (!c) return null;
     return {
-      role: "anak", childId: c.id, parentId: c.parent_id, name: c.name, jenjang: c.jenjang, color: c.color,
+      role: "anak", childId: c.id, parentId: c.parent_id, name: c.name, jenjang: c.jenjang, color: c.color, avatar: avatarOr(c.avatar),
       limitMin: c.limit_min, allowStrangers: !!c.allow_strangers,
     };
   }
   const p = db.prepare("SELECT * FROM parents WHERE id = ?").get(s.parent_id);
   if (!p) return null;
-  return { role: "ortu", parentId: p.id, name: p.name, jenjang: "Ortu", color: "#5b6b7c", limitMin: 0, allowStrangers: false };
+  return { role: "ortu", parentId: p.id, name: p.name, jenjang: "Ortu", color: "#5b6b7c", avatar: avatarOr(p.avatar, DEFAULT_ORTU_AVATAR), limitMin: 0, allowStrangers: false };
 }
 
 // ---------- tiket untuk masuk ruang game ----------
@@ -154,6 +155,7 @@ function validChildFields(b, partial) {
     out.jenjang = b.jenjang;
   }
   if (!partial || b.color !== undefined) out.color = WARNA.test(b.color || "") ? b.color : "#4f9cf0";
+  if (!partial || b.avatar !== undefined) out.avatar = avatarOr(b.avatar);
   if (!partial || b.pin !== undefined) {
     if (!/^\d{4}$/.test(String(b.pin ?? ""))) throw new ApiError(400, "PIN harus 4 angka.");
     out.pin_hash = hashSecret(b.pin);
@@ -277,8 +279,8 @@ export async function handleApi(req, res) {
     if (m === "GET" && path[0] === "saya") {
       const out = { ortu: null, anak: null, children: [] };
       if (ortu) {
-        const p = db.prepare("SELECT id, name, email FROM parents WHERE id = ?").get(ortu.parent_id);
-        out.ortu = p ? { name: p.name, email: p.email } : null;
+        const p = db.prepare("SELECT id, name, email, avatar FROM parents WHERE id = ?").get(ortu.parent_id);
+        out.ortu = p ? { name: p.name, email: p.email, avatar: avatarOr(p.avatar, DEFAULT_ORTU_AVATAR) } : null;
         out.children = db.prepare("SELECT * FROM children WHERE parent_id = ? ORDER BY id").all(ortu.parent_id).map(publicChild);
       }
       if (anak) {
@@ -286,6 +288,15 @@ export async function handleApi(req, res) {
         if (c) out.anak = publicChild(c);
       }
       return send(200, out), true;
+    }
+    // Ganti avatar sendiri: anak yang sedang masuk, atau orang tua (sebagai=ortu).
+    if (m === "POST" && path[0] === "avatar") {
+      const avatar = avatarOr(body.avatar, "");
+      if (!avatar) throw new ApiError(400, "Avatar tidak dikenal.");
+      if (body.sebagai === "ortu") db.prepare("UPDATE parents SET avatar = ? WHERE id = ?").run(avatar, needOrtu());
+      else if (anak) db.prepare("UPDATE children SET avatar = ? WHERE id = ?").run(avatar, anak.child_id);
+      else throw new ApiError(401, "Silakan masuk dulu.");
+      return send(200, { ok: true, avatar }), true;
     }
     if (m === "GET" && path[0] === "laporan") {
       return send(200, { children: report(needOrtu()) }), true;
@@ -334,9 +345,9 @@ export async function handleApi(req, res) {
       const n = db.prepare("SELECT COUNT(*) AS n FROM children WHERE parent_id = ?").get(pid).n;
       if (n >= 6) throw new ApiError(400, "Maksimal 6 akun anak.");
       const f = validChildFields(body, false);
-      const r = db.prepare(`INSERT INTO children (parent_id, name, jenjang, color, pin_hash, limit_min, allow_strangers, chat, created_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(pid, f.name, f.jenjang, f.color, f.pin_hash, f.limit_min ?? 60, f.allow_strangers ?? 0, f.chat ?? "mati", Date.now());
+      const r = db.prepare(`INSERT INTO children (parent_id, name, jenjang, color, avatar, pin_hash, limit_min, allow_strangers, chat, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(pid, f.name, f.jenjang, f.color, f.avatar, f.pin_hash, f.limit_min ?? 60, f.allow_strangers ?? 0, f.chat ?? "mati", Date.now());
       return send(200, { child: publicChild(childRow(Number(r.lastInsertRowid))) }), true;
     }
     if (path[0] === "anak" && path.length === 2 && path[1] === "keluar" && m === "POST") {

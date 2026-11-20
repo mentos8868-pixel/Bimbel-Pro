@@ -1,5 +1,8 @@
 // Layar masuk: anak (kode masuk atau PIN di perangkat keluarga), orang tua, atau tamu.
 import { api } from "./api.js";
+import { avatarPicker } from "./avatar-picker.js";
+import { avatarSvg } from "./avatar-svg.js";
+import { DEFAULT_ORTU_AVATAR } from "../../shared/avatars.js";
 
 const $ = (id) => document.getElementById(id);
 const COLORS = ["#4f9cf0", "#ef6f5e", "#f2b134", "#3e9b4f", "#9b7bd8", "#ec7fb5"];
@@ -22,13 +25,22 @@ function busy(el, on) {
   el.querySelectorAll("button").forEach((b) => (b.disabled = on));
 }
 
-const childProfile = (c) => ({ role: "anak", name: c.name, jenjang: c.jenjang, gameJenjang: c.jenjang, color: c.color, chat: c.chat });
+const childProfile = (c) => ({ role: "anak", name: c.name, jenjang: c.jenjang, gameJenjang: c.jenjang, color: c.color, avatar: c.avatar, chat: c.chat });
 
 // Memanggil onStart(profile, playingAs) saat pemain siap masuk arena.
 export function setupLogin(onStart) {
   let me = null;
   let pinChild = null;
   let ortuLevel = "SD";
+  // Avatar disimpan langsung saat dipilih (anak: akunnya sendiri, orang tua: sebagai=ortu).
+  const save = (body) => api("POST", "avatar", body).catch(() => {});
+  const kidPicker = avatarPicker($("siap-avatar"), {
+    onPick: (avatar) => { if (me?.anak) { me.anak.avatar = avatar; save({ avatar }); } },
+  });
+  const ortuPicker = avatarPicker($("ortu-avatar"), {
+    value: DEFAULT_ORTU_AVATAR, accent: "#5b6b7c",
+    onPick: (avatar) => { if (me?.ortu) { me.ortu.avatar = avatar; save({ avatar, sebagai: "ortu" }); } },
+  });
 
   const go = (step) => show(step);
   const refresh = async () => {
@@ -41,10 +53,15 @@ export function setupLogin(onStart) {
     if (me.anak) {
       $("siap-judul").textContent = `Halo, ${me.anak.name}!`;
       const sisa = me.anak.limitMin ? Math.max(0, me.anak.limitMin - me.anak.usedMin) : null;
+      kidPicker.setAccent(me.anak.color);
+      kidPicker.set(me.anak.avatar);
       $("siap-info").textContent = `${me.anak.jenjang}` + (sisa !== null ? ` · sisa waktu bermain hari ini ${sisa} menit` : "");
       return go("siap");
     }
-    if (me.ortu) return renderFamily();
+    if (me.ortu) {
+      ortuPicker.set(me.ortu.avatar || DEFAULT_ORTU_AVATAR);
+      return renderFamily();
+    }
     go("pilih");
   };
 
@@ -55,8 +72,8 @@ export function setupLogin(onStart) {
       const b = document.createElement("button");
       b.className = "kid";
       const dot = document.createElement("span");
-      dot.className = "dot";
-      dot.style.background = c.color;
+      dot.className = "dot av-face";
+      dot.innerHTML = avatarSvg(c.avatar, c.color);
       const n = document.createElement("strong");
       n.textContent = c.name;
       const s = document.createElement("small");
@@ -107,7 +124,7 @@ export function setupLogin(onStart) {
     }
     if (act === "main-ortu") {
       box().hidden = true;
-      onStart({ role: "ortu", name: me.ortu.name, jenjang: "Orang tua", gameJenjang: ortuLevel, color: "#5b6b7c" }, "ortu");
+      onStart({ role: "ortu", name: me.ortu.name, jenjang: "Orang tua", gameJenjang: ortuLevel, color: "#5b6b7c", avatar: ortuPicker.get() }, "ortu");
     }
   });
 
@@ -144,6 +161,7 @@ export function setupLogin(onStart) {
 
   // Tamu (tanpa akun): hanya lawan bot
   let chosenColor = COLORS[0];
+  const guestPicker = avatarPicker($("tamu-avatar"), { accent: chosenColor });
   const wrap = $("login-colors");
   for (const c of COLORS) {
     const b = document.createElement("button");
@@ -153,6 +171,7 @@ export function setupLogin(onStart) {
     b.className = c === chosenColor ? "on" : "";
     b.onclick = () => {
       chosenColor = c;
+      guestPicker.setAccent(c);
       wrap.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
     };
     wrap.appendChild(b);
@@ -164,7 +183,7 @@ export function setupLogin(onStart) {
     if (!name) return err("tamu", "Isi nama panggilan dulu.");
     const j = $("login-jenjang").value;
     box().hidden = true;
-    onStart({ role: "tamu", name, jenjang: j, gameJenjang: j, color: chosenColor }, null);
+    onStart({ role: "tamu", name, jenjang: j, gameJenjang: j, color: chosenColor, avatar: guestPicker.get() }, null);
   });
 
   refresh();
