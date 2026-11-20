@@ -8,9 +8,9 @@ import { rapikanAksesori } from "../shared/aksesori.js";
 import { handleToko } from "./toko.js";
 import { negaraOr, isNegara, jenjangDariKelas } from "../shared/negara.js";
 import { parentView, parentDecide, unblock, purgeUid, notify, kick } from "./social.js";
+import { sendMail, APP_URL } from "./mailer.js";
 
 const DAY = 86400000;
-import { sendMail, APP_URL } from "./mailer.js";
 const SESSION_MS = 30 * DAY;
 const JENJANG = ["SD", "SMP", "SMA"];
 const WARNA = /^#[0-9a-fA-F]{6}$/;
@@ -150,13 +150,9 @@ setInterval(() => {
   for (const [k, v] of attempts) if (v.until < now) attempts.delete(k);
   db.prepare("DELETE FROM sessions WHERE expires_at < ?").run(now);
   db.prepare("DELETE FROM login_codes WHERE expires_at < ?").run(now);
+  db.prepare("DELETE FROM password_resets WHERE expires_at < ?").run(now);
 }, 60000).unref();
 
-// ---------- validasi ----------
-const str = (v, max) => String(v ?? "").trim().slice(0, max);
-  db.prepare("DELETE FROM password_resets WHERE expires_at < ?").run(now);
-function validChildFields(b, partial) {
-  const out = {};
 const RESET_MS = 30 * 60000;
 // Buat token atur ulang kata sandi lalu kirim tautannya ke email orang tua.
 // Token ditaruh di bagian # alamat, sehingga tidak ikut terkirim ke server atau tercatat di log.
@@ -175,6 +171,10 @@ function sendResetLink(p) {
   }).catch((e) => console.error("Lupa kata sandi:", e.message));
 }
 
+// ---------- validasi ----------
+const str = (v, max) => String(v ?? "").trim().slice(0, max);
+function validChildFields(b, partial) {
+  const out = {};
   if (!partial || b.name !== undefined) {
     out.name = str(b.name, 16);
     if (!out.name) throw new ApiError(400, "Isi nama panggilan anak.");
@@ -314,10 +314,6 @@ export async function handleApi(req, res) {
       const token = createSession("ortu", p.id);
       return send(200, { ok: true }, { "Set-Cookie": cookie(COOKIE.ortu, token, SESSION_MS / 1000) }), true;
     }
-    if (m === "POST" && path[0] === "keluar") {
-      endSession(cookies[COOKIE.ortu]);
-      endSession(cookies[COOKIE.anak]);
-      return send(200, { ok: true }, { "Set-Cookie": [cookie(COOKIE.ortu, "", 0), cookie(COOKIE.anak, "", 0)] }), true;
     // Lupa kata sandi: jawabannya selalu sama, supaya tidak bisa dipakai untuk menebak email mana yang terdaftar.
     if (m === "POST" && path[0] === "lupa-sandi") {
       const email = str(body.email, 120).toLowerCase();
@@ -347,6 +343,10 @@ export async function handleApi(req, res) {
       const token = createSession("ortu", row.parent_id);
       return send(200, { ok: true }, { "Set-Cookie": cookie(COOKIE.ortu, token, SESSION_MS / 1000) }), true;
     }
+    if (m === "POST" && path[0] === "keluar") {
+      endSession(cookies[COOKIE.ortu]);
+      endSession(cookies[COOKIE.anak]);
+      return send(200, { ok: true }, { "Set-Cookie": [cookie(COOKIE.ortu, "", 0), cookie(COOKIE.anak, "", 0)] }), true;
     }
     if (m === "GET" && path[0] === "saya") {
       const out = { ortu: null, anak: null, children: [] };
