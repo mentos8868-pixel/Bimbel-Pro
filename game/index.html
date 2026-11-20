@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Arena Bimbel Pro</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="arena"></canvas>
+
+    <!-- Layar masuk -->
+    <div id="login" class="overlay">
+      <div class="card">
+        <!-- Memuat -->
+        <section data-step="muat"><p class="center muted">Memuat…</p></section>
+
+        <!-- Belum masuk -->
+        <section data-step="pilih" hidden>
+          <h1>Selamat datang!</h1>
+          <p class="muted">Siapa yang mau bermain?</p>
+          <button class="primary" data-go="kode">Saya anak: pakai kode masuk</button>
+          <a class="btn" href="/orangtua.html">Saya orang tua: masuk / daftar</a>
+          <button class="ghost" data-go="tamu">Coba tanpa akun (lawan bot saja)</button>
+        </section>
+
+        <!-- Anak masuk dengan kode dari orang tua -->
+        <form data-step="kode" id="form-kode" hidden>
+          <h2>Kode masuk</h2>
+          <p class="muted">Minta kode 6 huruf dari orang tua (dibuat di dashboard orang tua).</p>
+          <input id="kode-input" maxlength="6" autocomplete="off" class="code big-code" placeholder="KODE" />
+          <span class="error" hidden></span>
+          <button type="submit" class="primary">Masuk</button>
+          <button type="button" class="ghost" data-go="pilih">Kembali</button>
+        </form>
+
+        <!-- Perangkat keluarga: orang tua sudah masuk -->
+        <section data-step="keluarga" hidden>
+          <h2 id="keluarga-judul">Pilih pemain</h2>
+          <div id="anak-list" class="kids"></div>
+          <p id="anak-kosong" class="muted" hidden>Belum ada akun anak. Buat dulu di dashboard orang tua.</p>
+          <div class="row">
+            <button data-go="ortu">Main sebagai orang tua</button>
+            <a class="btn" href="/orangtua.html">Dashboard orang tua</a>
+          </div>
+          <button class="ghost" data-act="keluar">Keluar dari akun</button>
+        </section>
+
+        <!-- PIN anak -->
+        <form data-step="pin" id="form-pin" hidden>
+          <h2 id="pin-judul">Masukkan PIN</h2>
+          <input id="pin-input" inputmode="numeric" maxlength="4" autocomplete="off" class="code big-code" placeholder="••••" type="password" />
+          <span class="error" hidden></span>
+          <button type="submit" class="primary">Masuk</button>
+          <button type="button" class="ghost" data-go="keluarga">Kembali</button>
+        </form>
+
+        <!-- Orang tua memilih tingkat soal sebelum bermain -->
+        <section data-step="ortu" hidden>
+          <h2>Main sebagai orang tua</h2>
+          <p class="muted">Pilih tingkat soal yang sama dengan anak, lalu ajak anak bermain lewat kode meja.</p>
+          <div class="row toggle" id="ortu-level">
+            <button type="button" data-level="SD" class="on">SD</button>
+            <button type="button" data-level="SMP">SMP</button>
+            <button type="button" data-level="SMA">SMA</button>
+          </div>
+          <span class="error" hidden></span>
+          <button class="primary" data-act="main-ortu">Masuk ke arena</button>
+          <button class="ghost" data-go="keluarga">Kembali</button>
+        </section>
+
+        <!-- Anak sudah masuk di perangkat ini -->
+        <section data-step="siap" hidden>
+          <h1 id="siap-judul">Halo!</h1>
+          <p id="siap-info" class="muted"></p>
+          <span class="error" hidden></span>
+          <button class="primary" data-act="main-anak">Masuk ke arena</button>
+          <button class="ghost" data-act="ganti">Bukan kamu? Ganti pemain</button>
+        </section>
+
+        <!-- Tamu -->
+        <form data-step="tamu" id="form-tamu" hidden>
+          <h2>Coba tanpa akun</h2>
+          <p class="muted">Tanpa akun kamu bisa berjalan di arena dan melawan bot. Main online butuh akun dari orang tua.</p>
+          <label>Nama panggilan
+            <input id="login-name" maxlength="16" autocomplete="off" placeholder="Contoh: Budi" />
+          </label>
+          <label>Jenjang
+            <select id="login-jenjang">
+              <option value="SD">SD</option>
+              <option value="SMP">SMP</option>
+              <option value="SMA">SMA</option>
+            </select>
+          </label>
+          <div class="label">Warna baju</div>
+          <div id="login-colors" class="colors"></div>
+          <span class="error" hidden></span>
+          <button type="submit" class="primary">Masuk ke arena</button>
+          <button type="button" class="ghost" data-go="pilih">Kembali</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Waktu bermain habis -->
+    <div id="time-up" class="overlay" hidden>
+      <div class="card center">
+        <h1>Waktu bermain habis</h1>
+        <p id="time-up-text" class="muted">Waktu bermain hari ini sudah habis. Sampai jumpa besok!</p>
+        <button class="primary" onclick="location.reload()">Kembali ke awal</button>
+      </div>
+    </div>
+
+    <!-- Info di atas layar -->
+    <div id="hud" hidden>
+      <div id="hud-status" class="pill"></div>
+      <div id="hud-hint" class="pill muted">WASD / panah untuk berjalan</div>
+    </div>
+    <div id="social-btns" hidden>
+      <button id="btn-chat">Chat</button>
+      <button id="btn-teman">Teman <span id="teman-badge" class="badge" hidden></span></button>
+    </div>
+
+    <!-- Panel chat -->
+    <div id="chat-panel" class="panel-float" hidden>
+      <div class="panel-head"><strong>Chat arena</strong><button class="ghost x" data-close="chat-panel" aria-label="Tutup chat">✕</button></div>
+      <ul id="chat-log" class="chat-log"></ul>
+      <p id="chat-note" class="muted small"></p>
+      <div id="chat-presets" class="presets"></div>
+      <form id="chat-form" class="row" hidden>
+        <input id="chat-input" maxlength="80" autocomplete="off" placeholder="Tulis pesan…" />
+        <button class="primary" type="submit">Kirim</button>
+      </form>
+      <span id="chat-error" class="error" hidden></span>
+    </div>
+
+    <!-- Panel teman -->
+    <div id="teman-panel" class="panel-float right" hidden>
+      <div class="panel-head"><strong>Teman</strong><button class="ghost x" data-close="teman-panel" aria-label="Tutup teman">✕</button></div>
+      <p class="muted small">Ketuk avatar pemain lain di arena untuk menambah teman.</p>
+      <div id="teman-isi"></div>
+    </div>
+
+    <!-- Profil pemain lain -->
+    <div id="profil" class="overlay" hidden>
+      <div class="card">
+        <h2 id="profil-nama"></h2>
+        <p id="profil-info" class="muted"></p>
+        <button id="profil-teman" class="primary"></button>
+        <div class="label">Ada masalah dengan pemain ini?</div>
+        <div class="row">
+          <select id="profil-alasan" aria-label="Alasan laporan">
+            <option value="kasar">Kata-kata kasar</option>
+            <option value="ganggu">Mengganggu / mengejek</option>
+            <option value="pribadi">Meminta data pribadi</option>
+            <option value="lain">Lainnya</option>
+          </select>
+          <button id="profil-lapor">Laporkan</button>
+        </div>
+        <button id="profil-blokir" class="danger-text">Blokir</button>
+        <button class="ghost" data-close="profil">Tutup</button>
+      </div>
+    </div>
+
+    <!-- Pemberitahuan yang bisa ditindaklanjuti (undangan, permintaan teman) -->
+    <div id="notice" class="notice" hidden>
+      <p id="notice-text"></p>
+      <div class="row" id="notice-btns"></div>
+    </div>
+
+    <button id="action-btn" class="primary action" hidden></button>
+    <div id="toast" class="toast" hidden></div>
+    <div id="joystick" hidden><div id="joystick-knob"></div></div>
+
+    <!-- Menu meja catur -->
+    <div id="chess-menu" class="overlay" hidden>
+      <div class="card">
+        <h2>Meja catur</h2>
+        <button class="primary" data-mode="bot">Lawan bot</button>
+        <div class="row" id="bot-levels" hidden>
+          <button data-level="1">Pemula</button>
+          <button data-level="2">Menengah</button>
+          <button data-level="3">Mahir</button>
+        </div>
+        <button data-mode="cari">Cari lawan (online)</button>
+        <button data-mode="buat">Main dengan teman: buat kode meja</button>
+        <div class="row">
+          <input id="join-code" maxlength="4" placeholder="KODE" autocomplete="off" />
+          <button data-mode="gabung">Gabung</button>
+        </div>
+        <span id="chess-menu-error" class="error" hidden></span>
+        <button class="ghost" data-mode="tutup">Tutup</button>
+      </div>
+    </div>
+
+    <!-- Papan catur -->
+    <div id="chess" class="overlay" hidden>
+      <div class="card chess-card">
+        <div id="chess-top" class="chess-info"></div>
+        <div id="board"></div>
+        <div id="chess-bottom" class="chess-info"></div>
+        <div id="chess-status" class="chess-status"></div>
+        <div class="row">
+          <button id="chess-hint" hidden>Petunjuk</button>
+          <button id="chess-resign">Menyerah</button>
+          <button id="chess-close" class="ghost">Keluar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Menu meja scramble -->
+    <div id="scramble-menu" class="overlay" hidden>
+      <div class="card">
+        <h2>Meja scramble</h2>
+        <p class="muted">Susun huruf acak menjadi kata secepat mungkin.</p>
+        <div class="label">Bahasa</div>
+        <div class="row" id="scr-lang">
+          <button type="button" data-lang="ID" class="on">Indonesia</button>
+          <button type="button" data-lang="EN">English</button>
+        </div>
+        <button class="primary" data-mode="bot">Lawan bot</button>
+        <div class="row" id="scr-bot-levels" hidden>
+          <button data-level="1">Pemula</button>
+          <button data-level="2">Menengah</button>
+          <button data-level="3">Mahir</button>
+        </div>
+        <button data-mode="cari">Cari lawan (online)</button>
+        <button data-mode="buat">Main dengan teman: buat kode meja</button>
+        <div class="row">
+          <input id="scr-join-code" maxlength="4" placeholder="KODE" autocomplete="off" class="code" />
+          <button data-mode="gabung">Gabung</button>
+        </div>
+        <span id="scr-menu-error" class="error" hidden></span>
+        <button class="ghost" data-mode="tutup">Tutup</button>
+      </div>
+    </div>
+
+    <!-- Permainan scramble -->
+    <div id="scramble" class="overlay" hidden>
+      <div class="card scr-card">
+        <div class="chess-info"><span id="scr-round"></span><span id="scr-timer" class="timer"></span></div>
+        <div id="scr-wait" hidden>
+          <p id="scr-wait-text" class="center"></p>
+          <button id="scr-start" class="primary" hidden>Mulai sekarang</button>
+        </div>
+        <div id="scr-play">
+          <div id="scr-clue" class="clue"></div>
+          <div id="scr-answer" class="tiles answer"></div>
+          <div id="scr-tiles" class="tiles"></div>
+          <div class="row">
+            <button id="scr-clear">Hapus</button>
+            <button id="scr-submit" class="primary">Kirim</button>
+          </div>
+        </div>
+        <div id="scr-feedback" class="chess-status"></div>
+        <ol id="scr-scores" class="scores"></ol>
+        <div class="row">
+          <button id="scr-again" class="primary" hidden>Main lagi</button>
+          <button id="scr-close" class="ghost">Keluar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Menu meja Kartu Kilat -->
+    <div id="kartu-menu" class="overlay" hidden>
+      <div class="card">
+        <h2>Meja Kartu Kilat</h2>
+        <p class="muted">Habiskan kartumu! Cocokkan warna, atau hasil hitungannya.</p>
+        <div class="label">Jenis kartu</div>
+        <div class="row toggle" id="ktr-mode">
+          <button type="button" data-kmode="hitung" class="on">Hitung (asah otak)</button>
+          <button type="button" data-kmode="biasa">Angka biasa</button>
+        </div>
+        <button class="primary" data-mode="bot">Lawan bot</button>
+        <div id="ktr-bot-opts" hidden>
+          <div class="label">Jumlah lawan bot</div>
+          <div class="row toggle" id="ktr-bots">
+            <button type="button" data-bots="1">1</button>
+            <button type="button" data-bots="2" class="on">2</button>
+            <button type="button" data-bots="3">3</button>
+          </div>
+          <div class="label">Tingkat bot</div>
+          <div class="row">
+            <button data-level="1">Pemula</button>
+            <button data-level="2">Menengah</button>
+            <button data-level="3">Mahir</button>
+          </div>
+        </div>
+        <button data-mode="cari">Cari lawan (online)</button>
+        <button data-mode="buat">Main dengan teman: buat kode meja</button>
+        <div class="row">
+          <input id="ktr-join-code" maxlength="4" placeholder="KODE" autocomplete="off" class="code" />
+          <button data-mode="gabung">Gabung</button>
+        </div>
+        <span id="ktr-menu-error" class="error" hidden></span>
+        <button class="ghost" data-mode="tutup">Tutup</button>
+      </div>
+    </div>
+
+    <!-- Permainan Kartu Kilat -->
+    <div id="kartu" class="overlay" hidden>
+      <div class="card ktr-card">
+        <div id="ktr-opponents" class="opponents"></div>
+        <div id="ktr-wait" hidden>
+          <p id="ktr-wait-text" class="center"></p>
+          <button id="ktr-start" class="primary" hidden>Mulai sekarang</button>
+        </div>
+        <div id="ktr-table" class="table">
+          <button id="ktr-deck" class="kcard back" aria-label="Ambil kartu dari tumpukan"><span>Ambil</span><small id="ktr-deck-count"></small></button>
+          <div id="ktr-top"></div>
+          <div class="table-info">
+            <div id="ktr-color" class="pill"></div>
+            <div id="ktr-dir" class="muted"></div>
+            <div id="ktr-timer" class="timer"></div>
+          </div>
+        </div>
+        <div id="ktr-message" class="chess-status"></div>
+        <div id="ktr-turn" class="center"></div>
+        <div id="ktr-hand" class="hand"></div>
+        <div id="ktr-colors" class="row" hidden>
+          <button data-color="oranye" class="cbtn oranye">Matahari</button>
+          <button data-color="hijau" class="cbtn hijau">Daun</button>
+          <button data-color="biru" class="cbtn biru">Laut</button>
+          <button data-color="ungu" class="cbtn ungu">Anggur</button>
+        </div>
+        <div class="row">
+          <button id="ktr-pass" hidden>Lewati giliran</button>
+          <button id="ktr-again" class="primary" hidden>Main lagi</button>
+          <button id="ktr-close" class="ghost">Keluar</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "bimbel-pro",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Proyek parenting: arena 3D dengan ruang bimbel dan ruang game",
+  "scripts": {
+    "install:all": "npm install && npm install --prefix server && npm install --prefix game",
+    "dev": "concurrently -n server,game -c blue,green \"npm run dev --prefix server\" \"npm run dev --prefix game\""
+  },
+  "devDependencies": {
+    "concurrently": "10.0.7"
+  }
+}

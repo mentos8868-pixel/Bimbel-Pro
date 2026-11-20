@@ -1,0 +1,100 @@
+# Bimbel Pro — Arena
+
+Dunia 3D bergaya Roblox untuk proyek parenting: Alun-alun, Ruang Bimbel (segera hadir), dan Ruang Game dengan tiga game asah otak.
+Ada akun orang tua dan anak, batas waktu bermain, serta laporan untuk orang tua.
+Rencana dan desain ada di [rencana-kerja.md](rencana-kerja.md) dan [desain.md](desain.md).
+
+## Cara menjalankan
+
+Butuh Node.js (sudah terpasang: v26).
+
+```powershell
+npm run install:all
+```
+
+```powershell
+npm run dev
+```
+
+Lalu buka:
+- Arena: http://localhost:5173
+- Dashboard orang tua: http://localhost:5173/orangtua.html
+- Di HP/tablet yang tersambung ke Wi-Fi yang sama: http://ALAMAT-IP-LAPTOP:5173 (alamatnya muncul di terminal pada baris "Network")
+
+## Cara memakai akun
+
+1. **Orang tua** membuka dashboard, lalu mendaftar (nama, email, kata sandi, dan centang persetujuan data anak).
+2. Di dashboard, orang tua **menambah akun anak**: nama panggilan, jenjang, warna avatar, dan PIN 4 angka.
+3. Anak masuk dengan salah satu cara berikut:
+   - **Perangkat keluarga** (orang tua sudah masuk di browser itu): buka arena, pilih nama anak, lalu masukkan PIN.
+   - **Perangkat anak sendiri**: orang tua menekan "Buat kode masuk" di dashboard. Di perangkat anak, pilih "Saya anak: pakai kode masuk" lalu ketik kodenya. Kode berlaku 15 menit dan hanya sekali pakai.
+4. Orang tua juga bisa **main sebagai orang tua**: pilih tingkat soal, lalu ajak anak bermain lewat kode meja.
+5. **Tanpa akun** (mode tamu), pemain hanya bisa berjalan di arena dan melawan bot.
+
+## Isi folder
+
+| Folder | Isi |
+|--------|-----|
+| `game/` | Halaman browser: arena 3D (Babylon.js), layar masuk, tiga game, dan dashboard orang tua (`orangtua.html`) |
+| `server/` | API akun (`/api/...`), database SQLite, dan server multiplayer (Colyseus) |
+| `server/data/` | File database `bimbel.db`. Dibuat otomatis dan tidak dibagikan |
+| `shared/` | Kode yang dipakai bersama game dan server: daftar kata dan aturan Scramble, aturan Kartu Kilat dan bot-nya |
+| `.claude/agents/` | 14 agen dari Claude Code Game Studios (lisensi MIT, lihat file LICENSE di folder itu) |
+
+## Yang sudah bisa
+
+- **Akun dan keamanan anak**
+  - Akun orang tua dengan persetujuan data anak (UU PDP No. 27/2022). Kata sandi dan PIN disimpan dalam bentuk acak (scrypt)
+  - Maksimal 6 akun anak per orang tua
+  - Sesi disimpan di cookie HttpOnly. Ruang online hanya bisa dimasuki dengan tiket dari akun yang sudah masuk
+  - Salah kata sandi 5 kali, akun dikunci 15 menit. Salah PIN 5 kali, PIN dikunci 15 menit
+  - **Batas waktu bermain harian** dihitung server selama anak berada di arena: peringatan 5 menit sebelum habis, lalu anak otomatis dikeluarkan. Setelah itu anak tidak bisa masuk lagi sampai besok (hari dihitung WIB)
+  - **"Cari lawan" dengan pemain lain** mati secara bawaan. Orang tua bisa mengizinkannya, dan anak tetap hanya dipertemukan dengan yang sejenjang. Kode meja dan lawan bot selalu boleh
+  - Orang tua tidak bisa memakai "Cari lawan". Orang tua hanya bermain lewat kode meja bersama anak
+- **Chat dan pertemanan**
+  - Chat arena dengan tiga pilihan dari orang tua: **mati**, **pesan siap pakai** saja, atau **teks bebas yang disaring** (khusus SMP/SMA; untuk SD otomatis jadi siap pakai)
+  - Saringan menolak kata kasar (termasuk yang disamarkan, misalnya "4nj1ng"), nomor telepon, email, tautan, dan akun media sosial
+  - Setiap penerima hanya melihat pesan sesuai pengaturannya sendiri: anak dengan chat "siap pakai" tidak pernah melihat teks bebas pemain lain
+  - Batas kecepatan: paling banyak 5 pesan per 15 detik, dan jeda 1,5 detik antar-pesan
+  - Pesan muncul sebagai gelembung di atas avatar, dan ada juga riwayatnya di panel Chat
+  - Ketuk avatar pemain lain untuk membuka profilnya: **Tambah teman**, **Laporkan** (dengan alasan), atau **Blokir**
+  - Pertemanan hanya antar-anak. Secara bawaan perlu disetujui orang tua kedua anak, dan pengaturan ini bisa dimatikan
+  - Panel Teman: daftar teman (dengan tanda yang sedang di arena), permintaan masuk, dan "Undang ke mejaku" untuk meja dengan kode. Teman yang diundang cukup menekan "Gabung"
+  - Blokir: saling tidak melihat chat, dan pertemanan putus
+  - Pemain yang dilaporkan 3 pemain berbeda dalam 24 jam otomatis dibisukan chatnya selama 24 jam
+- **Dashboard orang tua**
+  - Waktu bermain hari ini dibanding batasnya, dan grafik 7 hari
+  - Statistik per game (main, menang, kalah, seri) dan 10 permainan terakhir
+  - Pengaturan batas waktu, izin bermain dengan pemain lain, chat, dan persetujuan pertemanan
+  - Setujui atau tolak permintaan teman, hapus pertemanan, dan buka blokir
+  - Buat kode masuk, ganti PIN, hapus akun anak, hapus seluruh akun (semua data ikut terhapus)
+- **Arena**
+  - Berjalan dengan WASD/panah di laptop, atau joystick layar di HP/tablet. Kamera bisa diputar dengan geser dan di-zoom
+  - Pemain lain terlihat secara online. Nama dan warna avatar diambil dari akun
+- **Meja catur**
+  - Lawan bot Pemula/Menengah/Mahir. Anak SD mendapat tombol Petunjuk
+  - Cari lawan sejenjang, atau main dengan teman memakai kode meja 4 huruf
+  - Langkah divalidasi di server
+- **Meja scramble** (susun kata)
+  - Bahasa Indonesia atau English, kata disesuaikan jenjang, dengan petunjuk berbahasa Indonesia
+  - 6 ronde × 30 detik. Poin = 5 + sisa waktu/3, ditambah bonus 3 untuk yang pertama benar
+  - Lawan bot, cari lawan (sejenjang dan sebahasa), atau kode meja untuk 2–4 pemain
+- **Meja Kartu Kilat** (permainan kartu buatan sendiri, aturan lengkap di [desain.md](desain.md))
+  - Cocokkan warna, atau hasil hitungan di kartu (mode Hitung, soal sesuai jenjang). Ada juga mode Angka biasa
+  - Lawan 1–3 bot, cari lawan sejenjang, atau kode meja untuk 2–4 pemain. Kartu di tangan hanya dikirim ke pemiliknya
+- Hasil setiap permainan anak (bot maupun online) tercatat untuk laporan orang tua
+- Lawan bot tetap bisa dimainkan walau server mati
+
+## Batasan prototipe (dikerjakan di tahap berikutnya)
+
+- Email orang tua belum diverifikasi, dan belum ada fitur "lupa kata sandi"
+- Hasil permainan dikirim oleh browser, jadi anak yang paham teknis bisa memalsukan laporannya. Waktu bermain dihitung server, jadi tidak bisa dipalsukan
+- Chat baru ada di arena, belum ada di dalam meja game
+- Laporan pemain tersimpan di database, tapi belum ada panel moderator untuk meninjaunya. Saat akun dihapus, laporan tentang akun itu juga ikut terhapus
+- Saringan kata masih berupa daftar sederhana dan perlu terus ditambah
+- Blokir belum mencegah dua pemain bertemu di meja "Cari lawan"
+- Cookie belum memakai tanda `Secure`, karena saat ini masih HTTP lokal. Wajib HTTPS sebelum dipakai di internet
+- Promosi pion selalu menjadi ratu
+- Daftar kata Scramble masih ±22–24 kata per jenjang per bahasa, dan perlu ditambah serta diperiksa guru
+- Server memakai Colyseus 0.15 yang sudah lama. `npm audit` melaporkan 12 masalah di paket server, jadi harus ditingkatkan sebelum dipakai di internet
+- Ukuran file game masih besar (±6,4 MB) karena seluruh Babylon.js ikut, dan nanti perlu dirampingkan

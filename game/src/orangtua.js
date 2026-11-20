@@ -1,0 +1,292 @@
+// Dashboard orang tua: masuk/daftar, laporan per anak, pengaturan, kode masuk, dan hapus data.
+import { api } from "./api.js";
+
+const $ = (id) => document.getElementById(id);
+const COLORS = ["#4f9cf0", "#ef6f5e", "#f2b134", "#3e9b4f", "#9b7bd8", "#ec7fb5"];
+const GAME_NAME = { catur: "Catur", scramble: "Scramble", kartu: "Kartu Kilat" };
+const OUTCOME = { menang: "menang", kalah: "kalah", seri: "seri" };
+const HARI = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+
+const setErr = (root, text) => {
+  const e = root.querySelector(".error");
+  e.textContent = text || "";
+  e.hidden = !text;
+};
+const busy = (form, on) => form.querySelectorAll("button").forEach((b) => (b.disabled = on));
+
+function colorPicker(wrap, initial, onPick) {
+  let chosen = initial;
+  wrap.replaceChildren(...COLORS.map((c) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.style.background = c;
+    b.setAttribute("aria-label", "Warna " + c);
+    b.className = c === chosen ? "on" : "";
+    b.onclick = () => {
+      chosen = c;
+      wrap.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+      onPick(c);
+    };
+    return b;
+  }));
+}
+
+// ---------------- masuk / daftar ----------------
+document.querySelectorAll(".tabs button").forEach((t) => {
+  t.onclick = () => {
+    document.querySelectorAll(".tabs button").forEach((x) => x.classList.toggle("on", x === t));
+    $("form-masuk").hidden = t.dataset.tab !== "masuk";
+    $("form-daftar").hidden = t.dataset.tab !== "daftar";
+  };
+});
+
+$("form-masuk").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  setErr(f, "");
+  busy(f, true);
+  try {
+    await api("POST", "masuk", { email: f.email.value, password: f.password.value });
+    f.reset();
+    await load();
+  } catch (x) { setErr(f, x.message); } finally { busy(f, false); }
+});
+
+$("form-daftar").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  setErr(f, "");
+  if (!f.consent.checked) return setErr(f, "Centang persetujuan orang tua dulu.");
+  busy(f, true);
+  try {
+    await api("POST", "daftar", { name: f.name.value, email: f.email.value, password: f.password.value, consent: true });
+    f.reset();
+    await load();
+  } catch (x) { setErr(f, x.message); } finally { busy(f, false); }
+});
+
+$("btn-keluar").onclick = async () => {
+  await api("POST", "keluar").catch(() => {});
+  load();
+};
+
+// ---------------- tambah anak ----------------
+let newColor = COLORS[0];
+colorPicker($("warna-baru"), newColor, (c) => (newColor = c));
+$("form-anak").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  setErr(f, "");
+  if (!/^\d{4}$/.test(f.pin.value)) return setErr(f, "PIN harus 4 angka.");
+  busy(f, true);
+  try {
+    await api("POST", "anak", { name: f.name.value, jenjang: f.jenjang.value, pin: f.pin.value, color: newColor });
+    f.reset();
+    await load();
+  } catch (x) { setErr(f, x.message); } finally { busy(f, false); }
+});
+
+// ---------------- hapus akun ----------------
+$("form-hapus-akun").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const box = e.target.closest("details");
+  setErr(box, "");
+  if (!confirm("Hapus akun orang tua beserta semua akun anak dan riwayatnya? Ini tidak bisa dibatalkan.")) return;
+  try {
+    await api("DELETE", "akun", { password: e.target.password.value });
+    load();
+  } catch (x) { setErr(box, x.message); }
+});
+
+// ---------------- kartu per anak ----------------
+function li(text, buttons) {
+  const el = document.createElement("li");
+  const span = document.createElement("span");
+  span.textContent = text;
+  const btns = document.createElement("span");
+  btns.className = "row";
+  for (const [label, cls, fn] of buttons) {
+    const b = document.createElement("button");
+    b.textContent = label;
+    if (cls) b.className = cls;
+    b.onclick = fn;
+    btns.appendChild(b);
+  }
+  el.append(span, btns);
+  return el;
+}
+
+function renderSocial(el, c, soc) {
+  const run = async (fn) => {
+    setErr(el, "");
+    try { await fn(); load(); } catch (x) { setErr(el, x.message); }
+  };
+  const approvals = el.querySelector(".approvals");
+  approvals.replaceChildren(...(soc?.approvals || []).map((a) => {
+    const row = li(
+      a.direction === "masuk"
+        ? `${a.name} (${a.jenjang}) ingin berteman dengan ${c.name}` + (a.childAccepted ? "" : " — belum dijawab anak")
+        : `${c.name} ingin berteman dengan ${a.name} (${a.jenjang})` + (a.childAccepted ? "" : " — menunggu jawaban teman"),
+      [["Setujui", "primary", () => run(() => api("POST", `teman/${a.id}/setujui`))],
+       ["Tolak", "", () => run(() => api("POST", `teman/${a.id}/tolak`))]],
+    );
+    row.className = "approval";
+    return row;
+  }));
+  const friends = el.querySelector(".friends");
+  const list = soc?.friends || [];
+  friends.replaceChildren(...(list.length ? list.map((f) => li(`${f.name} (${f.jenjang})`, [
+    ["Hapus pertemanan", "ghost danger-text", () => confirm(`Hapus pertemanan ${c.name} dengan ${f.name}?`) && run(() => api("DELETE", `teman/${f.id}`))],
+  ])) : [Object.assign(document.createElement("li"), { textContent: "Belum ada teman." })]));
+  const blocks = soc?.blocks || [];
+  el.querySelector(".blocks-box").hidden = !blocks.length;
+  el.querySelector(".blocks").replaceChildren(...blocks.map((b) => li(b.name, [
+    ["Buka blokir", "", () => run(() => api("DELETE", "blokir", { childId: c.id, uid: b.uid }))],
+  ])));
+}
+
+function renderKid(c, soc) {
+  const el = $("tpl-anak").content.firstElementChild.cloneNode(true);
+  el.querySelector(".dot").style.background = c.color;
+  el.querySelector(".nama").textContent = c.name;
+  el.querySelector(".jenjang").textContent = c.jenjang;
+
+  const used = c.week.at(-1)?.minutes ?? c.usedMin;
+  const fill = el.querySelector(".bar-fill");
+  if (c.limitMin) {
+    el.querySelector(".today-text").textContent = `${used} dari ${c.limitMin} menit`;
+    const pct = Math.min(100, (used / c.limitMin) * 100);
+    fill.style.width = pct + "%";
+    fill.classList.toggle("warn", pct >= 75 && pct < 100);
+    fill.classList.toggle("full", pct >= 100);
+  } else {
+    el.querySelector(".today-text").textContent = `${used} menit (tanpa batas)`;
+    fill.style.width = "0%";
+  }
+
+  const max = Math.max(30, ...c.week.map((d) => d.minutes));
+  el.querySelector(".week").replaceChildren(...c.week.map((d) => {
+    const col = document.createElement("div");
+    col.className = "col";
+    const val = document.createElement("span");
+    val.className = "val";
+    val.textContent = d.minutes;
+    const stick = document.createElement("span");
+    stick.className = "stick";
+    stick.style.height = `${Math.round((d.minutes / max) * 70)}px`;
+    const day = document.createElement("span");
+    day.className = "day";
+    day.textContent = HARI[new Date(d.day + "T12:00:00+07:00").getDay()];
+    col.title = `${d.day}: ${d.minutes} menit`;
+    col.append(val, stick, day);
+    return col;
+  }));
+
+  el.querySelector(".stats tbody").replaceChildren(...Object.entries(c.stats).map(([g, s]) => {
+    const tr = document.createElement("tr");
+    for (const v of [GAME_NAME[g], s.main, s.menang, s.kalah, s.seri]) {
+      const td = document.createElement("td");
+      td.textContent = v;
+      tr.appendChild(td);
+    }
+    return tr;
+  }));
+
+  const recent = el.querySelector(".recent");
+  if (!c.recent.length) {
+    const li = document.createElement("li");
+    li.textContent = "Belum ada permainan.";
+    recent.appendChild(li);
+  }
+  for (const r of c.recent) {
+    const li = document.createElement("li");
+    const when = new Date(r.at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+    li.textContent = `${GAME_NAME[r.game]} (${r.mode === "bot" ? "lawan bot" : "online"}): ${OUTCOME[r.outcome]}`
+      + (r.game === "scramble" ? `, ${r.score} poin` : "") + ` · ${when}`;
+    recent.appendChild(li);
+  }
+
+  // Pengaturan
+  const s = el.querySelector(".settings");
+  s.limitMin.value = String(c.limitMin);
+  if (![...s.limitMin.options].some((o) => o.value === String(c.limitMin))) {
+    s.limitMin.add(new Option(`${c.limitMin} menit`, String(c.limitMin), true, true));
+  }
+  s.allowStrangers.checked = c.allowStrangers;
+  s.chat.value = c.chat;
+  s.approveFriends.checked = c.approveFriends;
+  renderSocial(el, c, soc);
+  if (c.jenjang === "SD") s.chat.querySelector('[value="bebas"]').disabled = true;
+  s.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    setErr(el, "");
+    busy(s, true);
+    try {
+      await api("PATCH", `anak/${c.id}`, {
+        limitMin: Number(s.limitMin.value), allowStrangers: s.allowStrangers.checked, chat: s.chat.value,
+        approveFriends: s.approveFriends.checked,
+      });
+      const ok = s.querySelector(".saved");
+      ok.hidden = false;
+      setTimeout(() => (ok.hidden = true), 2000);
+    } catch (x) { setErr(el, x.message); } finally { busy(s, false); }
+  });
+
+  el.querySelector(".btn-kode").onclick = async () => {
+    setErr(el, "");
+    try {
+      const r = await api("POST", `anak/${c.id}/kode`);
+      const until = new Date(r.expiresAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+      const box = el.querySelector(".kode-box");
+      box.replaceChildren();
+      const strong = document.createElement("strong");
+      strong.textContent = r.code;
+      box.append(`Kode masuk untuk ${c.name}: `, strong,
+        ` — berlaku sekali sampai pukul ${until}. Di HP/tablet anak, buka arena lalu pilih "Saya anak: pakai kode masuk".`);
+      box.hidden = false;
+    } catch (x) { setErr(el, x.message); }
+  };
+  el.querySelector(".btn-pin").onclick = async () => {
+    const pin = prompt(`PIN baru untuk ${c.name} (4 angka):`);
+    if (pin === null) return;
+    if (!/^\d{4}$/.test(pin)) return setErr(el, "PIN harus 4 angka.");
+    try {
+      await api("PATCH", `anak/${c.id}`, { pin });
+      setErr(el, "");
+      alert("PIN sudah diganti.");
+    } catch (x) { setErr(el, x.message); }
+  };
+  el.querySelector(".btn-hapus").onclick = async () => {
+    if (!confirm(`Hapus akun ${c.name} beserta laporan dan riwayatnya? Ini tidak bisa dibatalkan.`)) return;
+    try {
+      await api("DELETE", `anak/${c.id}`);
+      load();
+    } catch (x) { setErr(el, x.message); }
+  };
+  return el;
+}
+
+// ---------------- muat ----------------
+async function load() {
+  $("memuat").hidden = false;
+  let me;
+  try {
+    me = await api("GET", "saya");
+  } catch (x) {
+    $("memuat").textContent = x.message;
+    return;
+  }
+  $("memuat").hidden = true;
+  const masuk = !!me.ortu;
+  $("auth").hidden = masuk;
+  $("dash").hidden = !masuk;
+  $("top-nav").hidden = !masuk;
+  if (!masuk) return;
+  $("halo").textContent = `Halo, ${me.ortu.name}!`;
+  const [{ children }, social] = await Promise.all([api("GET", "laporan"), api("GET", "teman")]);
+  const byId = Object.fromEntries(social.children.map((s) => [s.childId, s]));
+  $("kids").replaceChildren(...children.map((c) => renderKid(c, byId[c.id])));
+  $("form-anak").querySelector("h2").textContent = children.length ? "Tambah akun anak" : "Mulai dengan menambah akun anak";
+}
+
+load();
