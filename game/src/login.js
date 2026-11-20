@@ -1,11 +1,10 @@
-// Layar masuk: anak (kode masuk atau PIN di perangkat keluarga), orang tua, atau tamu.
+// Layar masuk: anak (kode masuk atau PIN di perangkat keluarga) atau orang tua. Tanpa akun tidak bisa masuk.
 import { api } from "./api.js";
 import { avatarPicker } from "./avatar-picker.js";
 import { avatarSvg } from "./avatar-svg.js";
 import { DEFAULT_ORTU_AVATAR } from "../../shared/avatars.js";
 
 const $ = (id) => document.getElementById(id);
-const COLORS = ["#4f9cf0", "#ef6f5e", "#f2b134", "#3e9b4f", "#9b7bd8", "#ec7fb5"];
 const box = () => $("login");
 
 function show(step) {
@@ -32,11 +31,9 @@ export function setupLogin(onStart) {
   let me = null;
   let pinChild = null;
   let ortuLevel = "SD";
-  // Avatar disimpan langsung saat dipilih (anak: akunnya sendiri, orang tua: sebagai=ortu).
+  // Avatar anak hanya dipilih orang tua (dashboard); di sini anak hanya melihatnya.
+  // Avatar orang tua disimpan langsung saat dipilih (sebagai=ortu).
   const save = (body) => api("POST", "avatar", body).catch(() => {});
-  const kidPicker = avatarPicker($("siap-avatar"), {
-    onPick: (avatar) => { if (me?.anak) { me.anak.avatar = avatar; save({ avatar }); } },
-  });
   const ortuPicker = avatarPicker($("ortu-avatar"), {
     value: DEFAULT_ORTU_AVATAR, accent: "#5b6b7c",
     onPick: (avatar) => { if (me?.ortu) { me.ortu.avatar = avatar; save({ avatar, sebagai: "ortu" }); } },
@@ -53,8 +50,7 @@ export function setupLogin(onStart) {
     if (me.anak) {
       $("siap-judul").textContent = `Halo, ${me.anak.name}!`;
       const sisa = me.anak.limitMin ? Math.max(0, me.anak.limitMin - me.anak.usedMin) : null;
-      kidPicker.setAccent(me.anak.color);
-      kidPicker.set(me.anak.avatar);
+      $("siap-avatar").innerHTML = avatarSvg(me.anak.avatar, me.anak.color);
       $("siap-info").textContent = `${me.anak.jenjang}` + (sisa !== null ? ` · sisa waktu bermain hari ini ${sisa} menit` : "");
       return go("siap");
     }
@@ -157,33 +153,6 @@ export function setupLogin(onStart) {
       err("pin", x.message);
       $("pin-input").value = "";
     } finally { busy(e.target, false); }
-  });
-
-  // Tamu (tanpa akun): hanya lawan bot
-  let chosenColor = COLORS[0];
-  const guestPicker = avatarPicker($("tamu-avatar"), { accent: chosenColor });
-  const wrap = $("login-colors");
-  for (const c of COLORS) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.style.background = c;
-    b.setAttribute("aria-label", "Warna " + c);
-    b.className = c === chosenColor ? "on" : "";
-    b.onclick = () => {
-      chosenColor = c;
-      guestPicker.setAccent(c);
-      wrap.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
-    };
-    wrap.appendChild(b);
-  }
-  $("login-name").addEventListener("input", () => err("tamu", ""));
-  $("form-tamu").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const name = $("login-name").value.trim().slice(0, 16);
-    if (!name) return err("tamu", "Isi nama panggilan dulu.");
-    const j = $("login-jenjang").value;
-    box().hidden = true;
-    onStart({ role: "tamu", name, jenjang: j, gameJenjang: j, color: chosenColor, avatar: guestPicker.get() }, null);
   });
 
   refresh();

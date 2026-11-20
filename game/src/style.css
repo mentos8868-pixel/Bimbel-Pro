@@ -189,6 +189,8 @@ a.btn {
   border: 2px solid var(--border); border-radius: 16px; background: #fff;
 }
 .kid .dot { width: 44px; height: 44px; border-radius: 50%; }
+.siap-avatar { width: 96px; height: 96px; margin: 4px auto 10px; }
+.siap-avatar svg { width: 100%; height: 100%; display: block; }
 .kid small { color: var(--muted); font-weight: 700; }
 .colors { display: flex; gap: 8px; flex-wrap: wrap; }
 .colors button { width: 40px; height: 40px; padding: 0; border-radius: 50%; border: 3px solid transparent; }

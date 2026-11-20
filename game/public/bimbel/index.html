@@ -28,7 +28,8 @@
   .spacer{flex:1}
   .stat{display:flex;align-items:center;gap:6px;font-weight:800;background:var(--bg);border:2px solid var(--line);padding:4px 12px;border-radius:99px}
   .me{display:flex;align-items:center;gap:8px;font-weight:800}
-  .ava{width:38px;height:38px;border-radius:50%;background:var(--accent-soft);display:grid;place-items:center;font-size:22px;border:2px solid var(--accent)}
+  .ava{width:38px;height:38px;border-radius:50%;background:var(--accent-soft);display:grid;place-items:center;font-size:22px;border:2px solid var(--accent);overflow:hidden}
+  .ava img{width:100%;height:100%;display:block}
   nav{max-width:1040px;margin:0 auto;padding:0 20px;display:flex;gap:4px;overflow-x:auto}
   nav button{background:none;border:0;padding:10px 14px;font-weight:800;color:var(--muted);border-bottom:4px solid transparent}
   nav button.on{color:var(--ink);border-bottom-color:var(--accent)}
@@ -198,7 +199,7 @@
   <div class="top-in">
     <div class="brand">Ruang<b>Pintar</b><span class="tag">CONTOH</span></div>
     <div class="spacer"></div>
-    <div class="me"><div class="ava" id="ava">🦊</div><span id="uname">Murid</span></div>
+    <div class="me"><div class="ava" id="ava"></div><span id="uname">Murid</span></div>
   </div>
   <nav id="nav">
     <button data-v="belajar" class="on">Belajar</button>
@@ -803,8 +804,11 @@ function buildSession(t,n){
 /* ============ Penyimpanan (di browser) ============ */
 const JUMLAH_SOAL=10;   // jumlah soal tetap untuk setiap sesi latihan
 const DEF={name:'',avatar:'🦊',owned:['🦊'],xp:0,sessions:0,perfect:0,medals:[],topics:{},history:[],tryouts:[],kelas:4,lv:2,mapel:'mat',kur:'merdeka'};
-let S=Object.assign({},DEF,JSON.parse(localStorage.getItem('ruangpintar')||'{}'));
-const save=()=>localStorage.setItem('ruangpintar',JSON.stringify(S));
+/* Ruang Pintar hanya untuk akun anak yang dibuat orang tua (lihat mulai()).
+   Progres disimpan per anak: kunci ruangpintar_a<id anak>. */
+let AKUN=null, SKEY=null;
+let S=Object.assign({},DEF);
+const save=()=>{if(SKEY)localStorage.setItem(SKEY,JSON.stringify(S))};
 
 const MEDALS=[
   {id:'first',e:'🥉',n:'Langkah Pertama',d:'Selesaikan 1 sesi latihan',ok:s=>s.sessions>=1},
@@ -823,7 +827,7 @@ const level=()=>Math.floor(S.xp/100)+1;
 /* ============ Tampilan ============ */
 let view='belajar', sess=null;
 function header(){
-  $('#ava').textContent=S.avatar; $('#uname').textContent=S.name||'Murid';
+  $('#uname').textContent=S.name||'Murid';
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===view));
 }
 function go(v){
@@ -969,11 +973,11 @@ function renderReport(app){
     ${strong.length?` Sudah kuat di: ${strong.map(r=>esc(r.t.name)+' ('+LVNAME[r.lv]+')').join(', ')}.`:''}</div>
   ${thBlock}
   <p style="margin-top:18px"><button class="btn ghost" id="reset">Hapus semua data (mulai dari awal)</button></p>`;
-  $('#reset').onclick=()=>{if(confirm('Hapus semua progres dan medali?')){localStorage.removeItem('ruangpintar');clearInterval(exTimer);ex=null;exSave();S=Object.assign({},DEF,{owned:['🦊'],medals:[],topics:{},history:[],tryouts:[]});go('belajar');onboard()}};
+  $('#reset').onclick=()=>{if(confirm('Hapus semua progres dan medali?')){localStorage.removeItem(SKEY);clearInterval(exTimer);ex=null;exSave();S=Object.assign({},DEF,{medals:[],topics:{},history:[],tryouts:[],name:AKUN.name});go('belajar');onboard()}};
 }
 
 /* ============ Tryout / Mode Ujian ============ */
-const EXKEY='ruangpintar_ujian';
+let EXKEY='ruangpintar_ujian';   // diganti per anak di mulai()
 let ex=null, exTimer=null;
 const TO={sel:null,key:'',n:20,menit:30,lv:0,rf:'all'};          // lv 0 = campuran semua tingkat
 const fmtT=s=>{s=Math.max(0,Math.ceil(s));return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`};
@@ -1172,24 +1176,48 @@ function renderExamResult(app){
   $('#eback').onclick=()=>{ex=null;render();window.scrollTo(0,0)};
   $('#eagain').onclick=()=>{S.kur=ex.kur;S.mapel=ex.mapel;S.kelas=ex.kelas;ex=null;save();startExam()};
 }
-/* lanjutkan tryout yang belum selesai (mis. setelah halaman di-refresh) */
-try{const sx=JSON.parse(localStorage.getItem(EXKEY)||'null');if(sx&&!sx.done&&sx.qs&&sx.qs.length){ex=sx;view='tryout'}}catch(e){}
-
-/* ============ Kenalan dulu ============ */
-function onboard(){if(S.name)return;
+/* ============ Kenalan dulu (nama dan avatar dari akun; anak hanya memilih kurikulum dan kelas) ============ */
+function onboard(){if(S.siap)return;
   const m=document.createElement('div');m.className='modal';
-  m.innerHTML=`<div class="mbox"><h2>Selamat datang di Ruang Pintar!</h2><p style="margin:0;color:var(--muted)">Siapa namamu?</p>
-    <input id="nm" placeholder="Nama panggilan" maxlength="20"><p style="margin:0 0 8px;font-weight:800">Pilih avatar awal</p>
-    <div class="avapick">${['🦊','🐱','🐶'].map((e,i)=>`<button class="${i===0?'on':''}" data-a="${e}">${e}</button>`).join('')}</div>
+  m.innerHTML=`<div class="mbox"><h2>Halo, ${esc(S.name)}! Selamat datang di Ruang Pintar</h2>
+    <p style="margin:0 0 14px;color:var(--muted)">Nama dan avatarmu diatur oleh orang tua.</p>
     <p style="margin:0 0 8px;font-weight:800">Kurikulum sekolahmu</p><select id="kr" style="font:inherit;font-size:18px;padding:8px;border-radius:10px;border:3px solid var(--line);width:100%;margin-bottom:12px">${Object.entries(KURS).map(([k,v])=>`<option value="${k}">${v.name}</option>`).join('')}</select>
     <p style="margin:0 0 8px;font-weight:800">Kelas berapa?</p><select id="kl" style="font:inherit;font-size:18px;padding:8px;border-radius:10px;border:3px solid var(--line);width:100%;margin-bottom:16px">${[...Array(12).keys()].map(i=>`<option value="${i+1}" ${i+1===4?'selected':''}>Kelas ${i+1} ${jenjang(i+1)}</option>`).join('')}</select>
     <button class="btn" id="go" style="width:100%">Mulai belajar</button></div>`;
-  document.body.appendChild(m);let av='🦊';
-  m.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{av=b.dataset.a;m.querySelectorAll('[data-a]').forEach(x=>x.classList.toggle('on',x===b))});
-  const done=()=>{const n=$('#nm').value.trim();if(!n){$('#nm').focus();return}S.name=n;S.avatar=av;S.kelas=+$('#kl').value;S.kur=$('#kr').value;S.mapel=Object.keys(KURS[S.kur].mapel)[0];if(!S.owned.includes(av))S.owned.push(av);save();m.remove();render()};
-  $('#go').onclick=done;$('#nm').onkeydown=e=>{if(e.key==='Enter')done()};setTimeout(()=>$('#nm').focus(),50);
+  document.body.appendChild(m);
+  $('#go').onclick=()=>{S.siap=true;S.kelas=+$('#kl').value;S.kur=$('#kr').value;S.mapel=Object.keys(KURS[S.kur].mapel)[0];save();m.remove();render()};
 }
-render();onboard();
+
+/* ============ Masuk: wajib akun anak dari orang tua ============ */
+function gerbang(me){
+  const m=document.createElement('div');m.className='modal';m.id='gerbang';
+  const isi=me===null
+    ?`<h2>Tidak bisa memeriksa akun</h2><p>Ruang Pintar perlu tersambung ke server Bimbel Pro. Periksa koneksi, lalu coba lagi.</p>
+      <button class="btn" id="lagi" style="width:100%">Coba lagi</button>`
+    :me.ortu
+    ?`<h2>Pilih akun anak dulu</h2><p>Ruang Pintar dipakai dengan akun anak. Buka halaman masuk, pilih nama anak, lalu masukkan PIN-nya.</p>
+      <a class="btn" href="/" style="display:block;text-align:center;text-decoration:none;margin-bottom:10px">Ke halaman masuk</a>
+      <a class="btn ghost" href="/orangtua.html" style="display:block;text-align:center;text-decoration:none">Dashboard orang tua</a>`
+    :`<h2>Masuk dulu, ya</h2><p>Ruang Pintar hanya untuk anak yang sudah punya akun dari orang tua.</p>
+      <p style="color:var(--muted)"><b>Anak:</b> masuk dengan kode dari orang tua.<br><b>Orang tua:</b> daftar, lalu buat akun anak di dashboard.</p>
+      <a class="btn" href="/" style="display:block;text-align:center;text-decoration:none;margin-bottom:10px">Ke halaman masuk</a>
+      <a class="btn ghost" href="/orangtua.html" style="display:block;text-align:center;text-decoration:none">Dashboard orang tua</a>`;
+  m.innerHTML=`<div class="mbox">${isi}</div>`;document.body.appendChild(m);
+  const l=$('#lagi');if(l)l.onclick=()=>location.reload();
+}
+async function mulai(){
+  let me=null;
+  try{const r=await fetch('/api/saya',{credentials:'same-origin'});if(r.ok)me=await r.json()}catch(e){}
+  if(!me||!me.anak){$('#app').innerHTML='';return gerbang(me)}
+  AKUN=me.anak;SKEY=`ruangpintar_a${AKUN.id}`;EXKEY=`ruangpintar_ujian_a${AKUN.id}`;
+  try{S=Object.assign({},DEF,JSON.parse(localStorage.getItem(SKEY)||'{}'))}catch(e){S=Object.assign({},DEF)}
+  S.name=AKUN.name;
+  $('#ava').innerHTML=`<img src="/api/avatar.svg?v=${encodeURIComponent(AKUN.avatar+AKUN.color)}" alt="Avatar ${esc(AKUN.name)}">`;
+  /* lanjutkan tryout yang belum selesai (mis. setelah halaman di-refresh) */
+  try{const sx=JSON.parse(localStorage.getItem(EXKEY)||'null');if(sx&&!sx.done&&sx.qs&&sx.qs.length){ex=sx;view='tryout'}}catch(e){}
+  render();onboard();
+}
+mulai();
 </script>
 </body>
 </html>

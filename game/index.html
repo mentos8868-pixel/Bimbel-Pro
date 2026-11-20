@@ -22,7 +22,7 @@
           <p class="muted">Siapa yang mau bermain?</p>
           <button class="primary" data-go="kode">Saya anak: pakai kode masuk</button>
           <a class="btn" href="/orangtua.html">Saya orang tua: masuk / daftar</a>
-          <button class="ghost" data-go="tamu">Coba tanpa akun (lawan bot saja)</button>
+          <p class="muted">Belum punya akun? Orang tua mendaftar dulu, lalu membuat akun anak di dashboard orang tua.</p>
         </section>
 
         <!-- Anak masuk dengan kode dari orang tua -->
@@ -76,35 +76,13 @@
         <section data-step="siap" hidden>
           <h1 id="siap-judul">Halo!</h1>
           <p id="siap-info" class="muted"></p>
-          <div class="label">Pilih avatarmu</div>
-          <div id="siap-avatar"></div>
+          <div class="label">Avatarmu (dipilih orang tua)</div>
+          <div id="siap-avatar" class="siap-avatar av-face"></div>
           <span class="error" hidden></span>
           <button class="primary" data-act="main-anak">Masuk ke arena</button>
           <button class="ghost" data-act="ganti">Bukan kamu? Ganti pemain</button>
         </section>
 
-        <!-- Tamu -->
-        <form data-step="tamu" id="form-tamu" hidden>
-          <h2>Coba tanpa akun</h2>
-          <p class="muted">Tanpa akun kamu bisa berjalan di arena dan melawan bot. Main online butuh akun dari orang tua.</p>
-          <label>Nama panggilan
-            <input id="login-name" maxlength="16" autocomplete="off" placeholder="Contoh: Budi" />
-          </label>
-          <label>Jenjang
-            <select id="login-jenjang">
-              <option value="SD">SD</option>
-              <option value="SMP">SMP</option>
-              <option value="SMA">SMA</option>
-            </select>
-          </label>
-          <div class="label">Pilih avatar</div>
-          <div id="tamu-avatar"></div>
-          <div class="label">Warna aksesori (pita, topi, dasi, bunga)</div>
-          <div id="login-colors" class="colors"></div>
-          <span class="error" hidden></span>
-          <button type="submit" class="primary">Masuk ke arena</button>
-          <button type="button" class="ghost" data-go="pilih">Kembali</button>
-        </form>
       </div>
     </div>
 
