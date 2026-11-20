@@ -966,7 +966,7 @@ function renderReport(app){
     ${strong.length?` Sudah kuat di: ${strong.map(r=>esc(r.t.name)+' ('+LVNAME[r.lv]+')').join(', ')}.`:''}</div>
   ${thBlock}
   <p style="margin-top:18px"><button class="btn ghost" id="reset">Hapus semua data (mulai dari awal)</button></p>`;
-  $('#reset').onclick=()=>{if(confirm('Hapus semua progres dan medali?')){localStorage.removeItem(SKEY);clearInterval(exTimer);ex=null;exSave();S=Object.assign({},DEF,{medals:[],topics:{},history:[],tryouts:[]});pakaiAkun();save();go('belajar')}};
+  $('#reset').onclick=()=>{if(confirm('Hapus semua progres dan medali?')){localStorage.removeItem(SKEY);clearInterval(exTimer);ex=null;exSave();S=Object.assign({},DEF,{medals:[],topics:{},history:[],tryouts:[],tryoutHari:S.tryoutHari});/* jatah tryout hari ini tidak ikut terhapus */pakaiAkun();save();go('belajar')}};
 }
 
 /* ============ Tryout / Mode Ujian ============ */
@@ -976,6 +976,17 @@ const TO={n:30,menit:60,lv:0,rf:'all'};          // lv 0 = acak: 70% sulit, 20% 
 const TO_N=[30,50],TO_MENIT=[60,90];
 const mixShort=kur=>kur&&kur!=='merdeka'?'Random':'Acak';
 const mixLong=kur=>kur&&kur!=='merdeka'?'Random: 70% Hard · 20% Medium · 10% Easy':'Acak: 70% Sulit · 20% Sedang · 10% Mudah';
+// Tryout hanya 1x sehari per pelajaran (dihitung sejak tryout dimulai, jadi membatalkan tetap memakai jatah).
+const hariIni=()=>{const d=new Date();return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`};
+const sudahTryout=(kur,mapel)=>(S.tryoutHari||{})[`${kur}|${mapel}`]===hariIni();
+// Bintang tryout dari jumlah soal yang tidak benar.
+// 30 soal: 30 benar = 3, 27–29 = 2, 21–26 = 1. 50 soal: 50 = 5, 47–49 = 4, 44–46 = 3, 41–43 = 2, 35–40 = 1.
+function tryoutStars(correct,n,target){
+  const max=(target||(n>=40?50:30))===50?5:3,miss=n-correct;
+  const batas=max===5?[0,3,6,9,15]:[0,3,9];   // salah maksimal untuk max, max-1, ... bintang
+  const i=batas.findIndex(b=>miss<=b);return {stars:i<0?0:max-i,max};
+}
+const starsOf=(n,max)=>`<span class="stars">${Array.from({length:max},(_,i)=>`<span class="${i<n?'s':''}">★</span>`).join('')}</span>`;
 // Daftar tingkat untuk n soal: 70% sulit (3), 20% sedang (2), sisanya mudah (1), urutan diacak.
 function mixLevels(n){const h=Math.round(n*.7),m=Math.round(n*.2);return shuffle([...Array(h).fill(3),...Array(m).fill(2),...Array(Math.max(0,n-h-m)).fill(1)])}
 const fmtT=s=>{s=Math.max(0,Math.ceil(s));return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`};
@@ -1006,11 +1017,11 @@ function buildExam(topics,n){
 
 function tryoutHist(limit){
   const h=(S.tryouts||[]).slice(0,limit);if(!h.length)return '';
-  return `<div style="overflow-x:auto"><table><thead><tr><th>Tanggal</th><th>Pelajaran</th><th>Nilai</th><th>Benar</th><th>Waktu</th></tr></thead><tbody>
+  return `<div style="overflow-x:auto"><table><thead><tr><th>Tanggal</th><th>Pelajaran</th><th>Nilai</th><th>Bintang</th><th>Benar</th><th>Waktu</th></tr></thead><tbody>
   ${h.map(t=>{const K=KURS[t.kur]||KURS.merdeka,cls=t.score<60?'lo':t.score<75?'mid':'hi';
     return `<tr><td>${new Date(t.d).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</td>
     <td><span style="color:var(--muted);font-size:13px">${K.short} · ${K.label(t.kelas)}</span><br><b>${K.mapel[t.mapel]||t.mapel}</b></td>
-    <td><span class="pill ${cls}" style="font-size:15px">${t.score}</span></td><td>${t.c} / ${t.n}</td><td>${fmtT(t.used)} <span style="color:var(--muted)">/ ${t.menit} mnt</span></td></tr>`}).join('')}
+    <td><span class="pill ${cls}" style="font-size:15px">${t.score}</span></td><td>${t.max?starsOf(t.stars,t.max):'–'}</td><td>${t.c} / ${t.n}</td><td>${fmtT(t.used)} <span style="color:var(--muted)">/ ${t.menit} mnt</span></td></tr>`}).join('')}
   </tbody></table></div>`;
 }
 
@@ -1018,6 +1029,7 @@ function renderTryout(app){
   if(ex)return ex.done?renderExamResult(app):renderExam(app);
   const K=KURS[S.kur]||KURS.merdeka;if(!K.mapel[S.mapel])S.mapel=Object.keys(K.mapel)[0];
   const tops=tryoutTopics(),chosen=tops;   // tryout selalu memakai semua topik kelas ini
+  const sudah=sudahTryout(S.kur,S.mapel);
   const avail=chosen.some(t=>!t.bank)?Infinity:chosen.reduce((a,t)=>a+t.bank.length,0);
   const n=Math.min(TO.n,avail);
   const empty=`Belum ada soal ${K.mapel[S.mapel]} untuk ${K.label(S.kelas)}. Pilih kelas atau pelajaran lain.`;
@@ -1035,7 +1047,9 @@ function renderTryout(app){
       <div class="tbox" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
         <div style="flex:1;min-width:200px"><b style="font-size:18px">${n} soal · ${TO.menit} menit</b><br>
           <span style="color:var(--muted);font-weight:700">${K.mapel[S.mapel]} · ${K.label(S.kelas)} · ${chosen.length} topik · ${mixShort(S.kur)}${n<TO.n&&chosen.length?` · soal yang tersedia hanya ${n}`:''}</span></div>
-        <button class="btn" id="tmulai" ${!chosen.length||!n?'disabled':''}>Mulai tryout</button></div>
+        ${sudah?`<span style="font-weight:800;color:var(--muted)">Tryout ${K.mapel[S.mapel]} hari ini sudah dikerjakan. Coba lagi besok.</span>`
+          :`<button class="btn" id="tmulai" ${!chosen.length||!n?'disabled':''}>Mulai tryout</button>`}</div>
+      <p style="margin:0;color:var(--muted);font-size:14px">Tryout bisa dikerjakan 1x sehari untuk tiap pelajaran. Bintang: ${TO.n===50?'50 benar = 5★, 47–49 = 4★, 44–46 = 3★, 41–43 = 2★, 35–40 = 1★':'30 benar = 3★, 27–29 = 2★, 21–26 = 1★'}.</p>
       ${hist?`<div><h2 style="margin-top:8px">Riwayat tryout</h2>${hist}</div>`:''}
     </div>`:`<div class="empty">${empty}</div>`}`;
   app.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{S.mapel=b.dataset.m;save();render()});
@@ -1045,10 +1059,12 @@ function renderTryout(app){
 }
 
 function startExam(){
+  if(sudahTryout(S.kur,S.mapel)){alert('Tryout pelajaran ini hari ini sudah dikerjakan. Coba lagi besok, ya.');return}
   const qs=buildExam(tryoutTopics(),TO.n);
   if(!qs.length){alert('Belum ada soal untuk kelas ini.');return}
+  S.tryoutHari=Object.assign({},S.tryoutHari,{[`${S.kur}|${S.mapel}`]:hariIni()});save();
   const now=Date.now();
-  ex={kur:S.kur,mapel:S.mapel,kelas:S.kelas,lv:TO.lv,menit:TO.menit,qs,ans:qs.map(()=>null),flag:qs.map(()=>false),i:0,start:now,end:now+TO.menit*60000,done:false};
+  ex={kur:S.kur,mapel:S.mapel,kelas:S.kelas,lv:TO.lv,target:TO.n,menit:TO.menit,qs,ans:qs.map(()=>null),flag:qs.map(()=>false),i:0,start:now,end:now+TO.menit*60000,done:false};
   TO.rf='all';exSave();render();window.scrollTo(0,0);
 }
 function startTimer(){
@@ -1100,7 +1116,7 @@ function renderExam(app){
   $('#eflag').onclick=()=>{ex.flag[ex.i]=!ex.flag[ex.i];exSave();render()};
   app.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>move(+b.dataset.go));
   [$('#esub'),$('#esub2')].forEach(b=>b&&(b.onclick=()=>submitExam(false)));
-  $('#ebatal').onclick=()=>{if(confirm('Batalkan tryout? Jawabanmu tidak akan disimpan.')){clearInterval(exTimer);ex=null;exSave();render()}};
+  $('#ebatal').onclick=()=>{if(confirm('Batalkan tryout? Jawabanmu tidak akan disimpan, dan jatah tryout pelajaran ini hari ini tetap terpakai.')){clearInterval(exTimer);ex=null;exSave();render()}};
   startTimer();
 }
 function submitExam(auto){
@@ -1113,9 +1129,10 @@ function submitExam(auto){
   ex.score=Math.round(ex.correct/ex.qs.length*100);
   ex.used=Math.min(ex.menit*60,Math.round((Date.now()-ex.start)/1000));
   ex.auto=auto;ex.done=true;ex.xp=ex.correct*10;
+  Object.assign(ex,tryoutStars(ex.correct,ex.qs.length,ex.target));
   const before=new Set(S.medals);
   S.xp+=ex.xp;
-  S.tryouts=[{d:new Date().toISOString(),kur:ex.kur,mapel:ex.mapel,kelas:ex.kelas,lv:ex.lv,score:ex.score,c:ex.correct,n:ex.qs.length,used:ex.used,menit:ex.menit}].concat(S.tryouts||[]).slice(0,30);
+  S.tryouts=[{d:new Date().toISOString(),kur:ex.kur,mapel:ex.mapel,kelas:ex.kelas,lv:ex.lv,score:ex.score,c:ex.correct,n:ex.qs.length,used:ex.used,menit:ex.menit,stars:ex.stars,max:ex.max}].concat(S.tryouts||[]).slice(0,30);
   MEDALS.forEach(m=>{if(!before.has(m.id)&&m.ok(S))S.medals.push(m.id)});
   ex.newMedals=S.medals.filter(m=>!before.has(m));
   save();exSave();view='tryout';sess=null;render();window.scrollTo(0,0);
@@ -1132,6 +1149,7 @@ function renderExamResult(app){
   app.innerHTML=`<div class="result" style="max-width:720px">
       <div class="qlabel">Hasil tryout · ${K.mapel[ex.mapel]} · ${K.label(ex.kelas)} · ${ex.lv?lvName(ex.lv,ex.kur):mixShort(ex.kur)}</div>
       <div class="grade" style="color:${col}">${ex.score}</div>
+      ${ex.max?starsOf(ex.stars,ex.max):''}
       <p style="font-weight:800;margin:6px 0">${msg}</p>
       ${ex.auto?`<p style="color:var(--bad);font-weight:800;margin:0">Waktu habis, jawaban dikumpulkan otomatis.</p>`:''}
       <div class="summary" style="margin:18px 0 12px;text-align:left">
@@ -1158,10 +1176,9 @@ function renderExamResult(app){
         <ol class="steps">${(q.steps||[]).map(x=>`<li>${x}</li>`).join('')}</ol>
       </div>`).join('')||`<div class="empty">Semua jawaban benar. Tidak ada yang perlu dibahas. 🎉</div>`}</div>
     <div style="display:flex;gap:12px;justify-content:center;margin-top:24px;flex-wrap:wrap">
-      <button class="btn ghost" id="eback">Kembali ke pengaturan</button><button class="btn" id="eagain">Tryout lagi</button></div>`;
+      <button class="btn" id="eback">Kembali ke Tryout</button></div>`;
   app.querySelectorAll('[data-rf]').forEach(b=>b.onclick=()=>{TO.rf=b.dataset.rf;render()});
   $('#eback').onclick=()=>{ex=null;render();window.scrollTo(0,0)};
-  $('#eagain').onclick=()=>{S.kur=ex.kur;S.mapel=ex.mapel;S.kelas=ex.kelas;ex=null;save();startExam()};
 }
 /* ============ Akun: nama, avatar, kurikulum, dan kelas semuanya dari orang tua ============ */
 function pakaiAkun(){
