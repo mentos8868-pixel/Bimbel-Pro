@@ -155,12 +155,6 @@
   .tsetup{display:grid;gap:14px}
   .tbox{background:var(--card);border:2px solid var(--line);border-radius:var(--r);padding:16px 18px}
   .tbox h3{margin:0 0 10px;font-size:16px;font-weight:900;display:flex;gap:12px;align-items:baseline}
-  .tbox h3 .linkbtn{margin:0;font-size:14px;color:var(--teal)}
-  .tlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px}
-  .tlist label{display:flex;gap:10px;align-items:flex-start;border:2px solid var(--line);border-radius:12px;padding:10px 12px;font-weight:800;cursor:pointer}
-  .tlist label:has(input:checked){border-color:var(--teal);background:var(--teal-soft)}
-  .tlist input{width:20px;height:20px;margin-top:3px;accent-color:var(--teal);flex:none}
-  .tlist small{display:block;color:var(--muted);font-weight:600}
   .timer{font-weight:900;font-variant-numeric:tabular-nums;background:var(--ink);color:#fff;border-radius:12px;padding:6px 14px;font-size:20px;white-space:nowrap}
   .timer.warn{background:var(--bad);animation:pulse 1s infinite}
   @keyframes pulse{50%{opacity:.7}}
@@ -978,7 +972,7 @@ function renderReport(app){
 /* ============ Tryout / Mode Ujian ============ */
 let EXKEY='ruangpintar_ujian';   // diganti per anak di mulai()
 let ex=null, exTimer=null;
-const TO={sel:null,key:'',n:20,menit:30,lv:0,rf:'all'};          // lv 0 = campuran semua tingkat
+const TO={n:20,menit:30,lv:0,rf:'all'};          // lv 0 = campuran semua tingkat
 const fmtT=s=>{s=Math.max(0,Math.ceil(s));return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`};
 const isAns=a=>a!==null&&a!==undefined&&String(a).trim()!=='';
 function exSave(){try{ex&&!ex.done?localStorage.setItem(EXKEY,JSON.stringify(ex)):localStorage.removeItem(EXKEY)}catch(e){}}
@@ -1018,20 +1012,16 @@ function tryoutHist(limit){
 function renderTryout(app){
   if(ex)return ex.done?renderExamResult(app):renderExam(app);
   const K=KURS[S.kur]||KURS.merdeka;if(!K.mapel[S.mapel])S.mapel=Object.keys(K.mapel)[0];
-  const tops=tryoutTopics(),key=`${S.kur}|${S.mapel}|${S.kelas}`;
-  if(!TO.sel||TO.key!==key){TO.sel=new Set(tops.map(t=>t.id));TO.key=key}
-  const chosen=tops.filter(t=>TO.sel.has(t.id));
+  const tops=tryoutTopics(),chosen=tops;   // tryout selalu memakai semua topik kelas ini
   const avail=chosen.some(t=>!t.bank)?Infinity:chosen.reduce((a,t)=>a+t.bank.length,0);
   const n=Math.min(TO.n,avail);
   const empty=`Belum ada soal ${K.mapel[S.mapel]} untuk ${K.label(S.kelas)}. Pilih kelas atau pelajaran lain.`;
   const hist=tryoutHist(5);
   app.innerHTML=`<h1>Tryout</h1>
-    <p class="sub">Simulasi ujian: soal campuran dari beberapa topik dengan batas waktu. Jawaban dan pembahasan baru ditampilkan setelah tryout dikumpulkan.</p>
+    <p class="sub">Simulasi ujian: soal campuran dari semua topik kelas ini dengan batas waktu. Jawaban dan pembahasan baru ditampilkan setelah tryout dikumpulkan.</p>
     ${aturOrtu()}
     <div class="grades">${Object.entries(K.mapel).map(([m,nm])=>`<button class="chip ${S.mapel===m?'on':''}" data-m="${m}">${nm}</button>`).join('')}</div>
     ${tops.length?`<div class="tsetup">
-      <div class="tbox"><h3>Topik yang diujikan <button class="linkbtn" id="tall">${chosen.length===tops.length?'Kosongkan':'Pilih semua'}</button></h3>
-        <div class="tlist">${tops.map(t=>`<label><input type="checkbox" data-sel="${t.id}" ${TO.sel.has(t.id)?'checked':''}><span>${esc(t.name)}<small>${t.bank?t.bank.length+' soal tersedia':'Soal dibuat otomatis'}</small></span></label>`).join('')}</div></div>
       <div class="tbox"><h3>Pengaturan</h3>
         <div class="grades"><b class="glab">Jumlah soal</b>${[10,20,30,40].map(x=>`<button class="chip ${TO.n===x?'on':''}" data-n="${x}">${x}</button>`).join('')}</div>
         <div class="grades"><b class="glab">Waktu</b>${[10,20,30,45,60,90].map(x=>`<button class="chip ${TO.menit===x?'on':''}" data-mn="${x}">${x} menit</button>`).join('')}</div>
@@ -1047,14 +1037,12 @@ function renderTryout(app){
   app.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{TO.n=+b.dataset.n;render()});
   app.querySelectorAll('[data-mn]').forEach(b=>b.onclick=()=>{TO.menit=+b.dataset.mn;render()});
   app.querySelectorAll('[data-tl]').forEach(b=>b.onclick=()=>{TO.lv=+b.dataset.tl;render()});
-  app.querySelectorAll('[data-sel]').forEach(c=>c.onchange=()=>{c.checked?TO.sel.add(c.dataset.sel):TO.sel.delete(c.dataset.sel);render()});
-  const all=$('#tall');if(all)all.onclick=()=>{TO.sel=chosen.length===tops.length?new Set():new Set(tops.map(t=>t.id));render()};
   const m=$('#tmulai');if(m)m.onclick=startExam;
 }
 
 function startExam(){
-  const qs=buildExam(tryoutTopics().filter(t=>TO.sel.has(t.id)),TO.n,TO.lv);
-  if(!qs.length){alert('Belum ada soal untuk topik yang dipilih.');return}
+  const qs=buildExam(tryoutTopics(),TO.n,TO.lv);
+  if(!qs.length){alert('Belum ada soal untuk kelas ini.');return}
   const now=Date.now();
   ex={kur:S.kur,mapel:S.mapel,kelas:S.kelas,lv:TO.lv,menit:TO.menit,qs,ans:qs.map(()=>null),flag:qs.map(()=>false),i:0,start:now,end:now+TO.menit*60000,done:false};
   TO.rf='all';exSave();render();window.scrollTo(0,0);
