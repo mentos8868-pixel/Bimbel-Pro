@@ -1,5 +1,7 @@
 // Dashboard orang tua: masuk/daftar, laporan per anak, pengaturan, kode masuk, dan hapus data.
 import { api } from "./api.js";
+import { avatarPicker } from "./avatar-picker.js";
+import { avatarSvg } from "./avatar-svg.js";
 
 const $ = (id) => document.getElementById(id);
 const COLORS = ["#4f9cf0", "#ef6f5e", "#f2b134", "#3e9b4f", "#9b7bd8", "#ec7fb5"];
@@ -72,7 +74,8 @@ $("btn-keluar").onclick = async () => {
 
 // ---------------- tambah anak ----------------
 let newColor = COLORS[0];
-colorPicker($("warna-baru"), newColor, (c) => (newColor = c));
+const newAvatar = avatarPicker($("avatar-baru"), { accent: newColor });
+colorPicker($("warna-baru"), newColor, (c) => { newColor = c; newAvatar.setAccent(c); });
 $("form-anak").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
@@ -80,7 +83,7 @@ $("form-anak").addEventListener("submit", async (e) => {
   if (!/^\d{4}$/.test(f.pin.value)) return setErr(f, "PIN harus 4 angka.");
   busy(f, true);
   try {
-    await api("POST", "anak", { name: f.name.value, jenjang: f.jenjang.value, pin: f.pin.value, color: newColor });
+    await api("POST", "anak", { name: f.name.value, jenjang: f.jenjang.value, pin: f.pin.value, color: newColor, avatar: newAvatar.get() });
     f.reset();
     await load();
   } catch (x) { setErr(f, x.message); } finally { busy(f, false); }
@@ -147,7 +150,22 @@ function renderSocial(el, c, soc) {
 
 function renderKid(c, soc) {
   const el = $("tpl-anak").content.firstElementChild.cloneNode(true);
-  el.querySelector(".dot").style.background = c.color;
+  const dot = el.querySelector(".dot");
+  dot.classList.add("av-face");
+  dot.innerHTML = avatarSvg(c.avatar, c.color);
+  avatarPicker(el.querySelector(".av-edit-picker"), {
+    value: c.avatar, accent: c.color,
+    onPick: async (avatar) => {
+      setErr(el, "");
+      try {
+        await api("PATCH", `anak/${c.id}`, { avatar });
+        dot.innerHTML = avatarSvg(avatar, c.color);
+        const ok = el.querySelector(".av-saved");
+        ok.hidden = false;
+        setTimeout(() => (ok.hidden = true), 2000);
+      } catch (x) { setErr(el, x.message); }
+    },
+  });
   el.querySelector(".nama").textContent = c.name;
   el.querySelector(".jenjang").textContent = c.jenjang;
 

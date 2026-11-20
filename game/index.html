@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Arena Bimbel Pro</title>
     <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="/src/avatar.css" />
   </head>
   <body>
     <canvas id="arena"></canvas>
@@ -59,6 +60,8 @@
         <section data-step="ortu" hidden>
           <h2>Main sebagai orang tua</h2>
           <p class="muted">Pilih tingkat soal yang sama dengan anak, lalu ajak anak bermain lewat kode meja.</p>
+          <div class="label">Avatar orang tua</div>
+          <div id="ortu-avatar"></div>
           <div class="row toggle" id="ortu-level">
             <button type="button" data-level="SD" class="on">SD</button>
             <button type="button" data-level="SMP">SMP</button>
@@ -73,6 +76,8 @@
         <section data-step="siap" hidden>
           <h1 id="siap-judul">Halo!</h1>
           <p id="siap-info" class="muted"></p>
+          <div class="label">Pilih avatarmu</div>
+          <div id="siap-avatar"></div>
           <span class="error" hidden></span>
           <button class="primary" data-act="main-anak">Masuk ke arena</button>
           <button class="ghost" data-act="ganti">Bukan kamu? Ganti pemain</button>
@@ -92,7 +97,9 @@
               <option value="SMA">SMA</option>
             </select>
           </label>
-          <div class="label">Warna baju</div>
+          <div class="label">Pilih avatar</div>
+          <div id="tamu-avatar"></div>
+          <div class="label">Warna aksesori (pita, topi, dasi, bunga)</div>
           <div id="login-colors" class="colors"></div>
           <span class="error" hidden></span>
           <button type="submit" class="primary">Masuk ke arena</button>

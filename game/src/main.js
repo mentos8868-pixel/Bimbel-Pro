@@ -105,7 +105,7 @@ async function start(profile, playingAs) {
         me.root.position.set(p.x, 0, p.z);
         return;
       }
-      const av = createAvatar(scene, { name: p.name, jenjang: p.jenjang, color: p.color, sid: id });
+      const av = createAvatar(scene, { name: p.name, jenjang: p.jenjang, color: p.color, avatar: p.avatar, sid: id });
       av.root.position.set(p.x, 0, p.z);
       others.set(id, { av, p });
     });
@@ -344,9 +344,9 @@ async function start(profile, playingAs) {
       const target = Math.atan2(dir.x, dir.z);
       me.root.rotation.y = Scalar.LerpAngle(me.root.rotation.y, target, 0.25);
       walkT += dt * 10;
-      me.body.position.y = 0.65 + Math.abs(Math.sin(walkT)) * 0.08;
+      me.body.position.y = Math.abs(Math.sin(walkT)) * 0.08;
     } else {
-      me.body.position.y = 0.65;
+      me.body.position.y = 0;
     }
     camera.target.copyFrom(pos.add(new Vector3(0, 1, 0)));
 
@@ -366,7 +366,7 @@ async function start(profile, playingAs) {
       rp.x = Scalar.Lerp(rp.x, p.x, 0.2);
       rp.z = Scalar.Lerp(rp.z, p.z, 0.2);
       av.root.rotation.y = Scalar.LerpAngle(av.root.rotation.y, p.ry, 0.2);
-      av.body.position.y = moving ? 0.65 + Math.abs(Math.sin(performance.now() / 100)) * 0.08 : 0.65;
+      av.body.position.y = moving ? Math.abs(Math.sin(performance.now() / 100)) * 0.08 : 0;
     }
 
     // Meja terdekat

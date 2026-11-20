@@ -71,6 +71,13 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS results_child ON results(child_id, created_at);
 `);
 
+// Kolom avatar (database lama ditingkatkan otomatis).
+for (const [table, def] of [["children", "beruang-putra"], ["parents", "beruang-ayah"]]) {
+  if (!db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === "avatar")) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN avatar TEXT NOT NULL DEFAULT '${def}'`);
+  }
+}
+
 // Hari dihitung menurut waktu Indonesia Barat (UTC+7).
 export function today(now = Date.now()) {
   return new Date(now + 7 * 3600 * 1000).toISOString().slice(0, 10);
