@@ -183,7 +183,7 @@ function renderKid(c, soc) {
   const el = $("tpl-anak").content.firstElementChild.cloneNode(true);
   const dot = el.querySelector(".dot");
   dot.classList.add("av-face");
-  dot.innerHTML = avatarSvg(c.avatar, c.color);
+  dot.innerHTML = avatarSvg(c.avatar, c.color, { aksesori: c.aksesori });
   avatarPicker(el.querySelector(".av-edit-picker"), {
     value: c.avatar, accent: c.color,
     onPick: async (avatar) => {

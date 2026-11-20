@@ -248,9 +248,9 @@ export function showBubble(scene, avatar, text) {
 // sid (opsional) disimpan di mesh supaya avatar bisa diketuk untuk membuka profil.
 // body = simpul yang dinaikturunkan saat berjalan (posisi dasar y = 0).
 // Baris kedua papan nama: bendera negara + "Kelas N" (anak), atau jenjang bila kelas belum diisi.
-export function createAvatar(scene, { color, avatar, name, jenjang, negara = "", kelas = 0, kurikulum = "merdeka", sid }) {
+export function createAvatar(scene, { color, avatar, aksesori = "", name, jenjang, negara = "", kelas = 0, kurikulum = "merdeka", sid }) {
   const root = new TransformNode("avatar", scene);
-  const { bob, meshes, height } = buildAvatar3d(scene, root, avatar, color);
+  const { bob, meshes, height } = buildAvatar3d(scene, root, avatar, color, aksesori);
   const sub = kelas ? namaKelas(kelas, kurikulum, true) : jenjang;
   const tag = makeSign(scene, [name, sub], { width: 1.8, height: 0.6, bg: "rgba(255,255,255,0.9)", flag: negara });
   tag.position.y = height + 0.3;

@@ -24,7 +24,7 @@ function busy(el, on) {
   el.querySelectorAll("button").forEach((b) => (b.disabled = on));
 }
 
-const childProfile = (c) => ({ role: "anak", name: c.name, jenjang: c.jenjang, gameJenjang: c.jenjang, negara: c.negara, kelas: c.kelas, kurikulum: c.kurikulum, color: c.color, avatar: c.avatar, chat: c.chat });
+const childProfile = (c) => ({ role: "anak", name: c.name, jenjang: c.jenjang, gameJenjang: c.jenjang, negara: c.negara, kelas: c.kelas, kurikulum: c.kurikulum, color: c.color, avatar: c.avatar, aksesori: c.aksesori, chat: c.chat });
 
 // Memanggil onStart(profile, playingAs) saat pemain siap masuk arena.
 export function setupLogin(onStart) {
@@ -50,7 +50,7 @@ export function setupLogin(onStart) {
     if (me.anak) {
       $("siap-judul").textContent = `Halo, ${me.anak.name}!`;
       const sisa = me.anak.limitMin ? Math.max(0, me.anak.limitMin - me.anak.usedMin) : null;
-      $("siap-avatar").innerHTML = avatarSvg(me.anak.avatar, me.anak.color);
+      $("siap-avatar").innerHTML = avatarSvg(me.anak.avatar, me.anak.color, { aksesori: me.anak.aksesori });
       $("siap-info").textContent = `${me.anak.jenjang}` + (sisa !== null ? ` · sisa waktu bermain hari ini ${sisa} menit` : "");
       return go("siap");
     }
@@ -69,7 +69,7 @@ export function setupLogin(onStart) {
       b.className = "kid";
       const dot = document.createElement("span");
       dot.className = "dot av-face";
-      dot.innerHTML = avatarSvg(c.avatar, c.color);
+      dot.innerHTML = avatarSvg(c.avatar, c.color, { aksesori: c.aksesori });
       const n = document.createElement("strong");
       n.textContent = c.name;
       const s = document.createElement("small");
