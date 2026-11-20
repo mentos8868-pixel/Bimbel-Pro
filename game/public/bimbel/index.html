@@ -1214,6 +1214,8 @@ async function tokoApi(method,path,body){
   const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Gagal menghubungi server.');return j;
 }
 function setToko(j){TOKO=Object.assign(TOKO||{},{bintang:j.bintang,punya:j.punya,pakai:j.pakai},j.items?{items:j.items}:{});header()}
+// Beri tahu arena (tab lain) supaya avatar 3D langsung memakai aksesori baru.
+function kabariArena(){try{new BroadcastChannel('bimbel-avatar').postMessage('aksesori')}catch(e){}}
 // Kirim bintang terbaik ke server; saldo hanya bertambah kalau bintang terbaik naik.
 async function kirimBintang(items){
   items=items.filter(i=>i.bintang>0);if(!items.length||!AKUN)return;
@@ -1237,9 +1239,9 @@ function renderToko(app){
     ${Object.keys(SLOTN).map(sl=>`<h2>${SLOTN[sl]}</h2><div class="tgrid">${TOKO.items.filter(a=>a.slot===sl).map(kartu).join('')}</div>`).join('')}`;
   app.querySelectorAll('[data-beli]').forEach(b=>b.onclick=async()=>{const a=TOKO.items.find(x=>x.id===b.dataset.beli);
     if(!confirm(`Beli ${a.name} seharga ${a.harga} bintang?`))return;b.disabled=true;
-    try{setToko(await tokoApi('POST','toko/beli',{id:a.id}));setToko(await tokoApi('POST','toko/pakai',{id:a.id,pakai:true}));segarkanAvatar()}catch(e){alert(e.message)}render()});
+    try{setToko(await tokoApi('POST','toko/beli',{id:a.id}));setToko(await tokoApi('POST','toko/pakai',{id:a.id,pakai:true}));segarkanAvatar();kabariArena()}catch(e){alert(e.message)}render()});
   app.querySelectorAll('[data-pakai]').forEach(b=>b.onclick=async()=>{b.disabled=true;
-    try{setToko(await tokoApi('POST','toko/pakai',{id:b.dataset.pakai,pakai:b.dataset.on==='1'}));segarkanAvatar()}catch(e){alert(e.message)}render()});
+    try{setToko(await tokoApi('POST','toko/pakai',{id:b.dataset.pakai,pakai:b.dataset.on==='1'}));segarkanAvatar();kabariArena()}catch(e){alert(e.message)}render()});
 }
 /* ============ Akun: nama, avatar, kurikulum, dan kelas semuanya dari orang tua ============ */
 function pakaiAkun(){
@@ -1279,6 +1281,7 @@ async function mulai(){
   /* saldo bintang Toko; bintang lama dari latihan ikut dikirim (server hanya menambah yang naik) */
   tokoApi('GET','toko').then(j=>{setToko(j);segarkanAvatar();kirimBintang(Object.entries(S.topics).map(([k,t])=>({kunci:k,bintang:t.best||0})))}).catch(()=>{});
   /* lanjutkan tryout yang belum selesai (mis. setelah halaman di-refresh) */
+  if(location.hash==='#toko')view='toko';   /* dibuka dari kios Toko Avatar di alun-alun */
   try{const sx=JSON.parse(localStorage.getItem(EXKEY)||'null');if(sx&&!sx.done&&sx.qs&&sx.qs.length){ex=sx;view='tryout'}}catch(e){}
   render();
 }

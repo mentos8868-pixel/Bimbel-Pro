@@ -12,6 +12,7 @@ function mat(scene, hex) {
   const m = new StandardMaterial("av" + hex, scene);
   m.diffuseColor = Color3.FromHexString(hex);
   m.specularColor = new Color3(0.08, 0.08, 0.08);
+  m.metadata = { bersama: true };   // dipakai banyak avatar: jangan dibuang bersama satu avatar
   mats.set(key, m);
   return m;
 }
@@ -218,6 +219,16 @@ function buildAksesori(k, id, h) {
       k.rod(0.04, 0.17, "#f5c542", [0, h.neck - 0.17, z + 0.38], [half, 0, 0]);
       break;
   }
+}
+
+// Kepala manekin untuk pajangan kios Toko Avatar, memakai aksesori dari Toko.
+export function buildManekin(scene, parent, aksesori = []) {
+  const k = kit(scene, parent);
+  const h = { y: 0.55, r: 0.25, z: 0, front: 0.25, neck: 0.3, eye: { y: 0.6, z: 0.21, gap: 0.09 } };
+  k.rod(0.3, 0.06, "#8d6e4a", [0, 0.15, 0]);
+  k.rod(0.05, 0.28, "#8d6e4a", [0, 0.02, 0]);
+  k.ball(0.5, "#f6ead8", [0, h.y, 0]);
+  for (const id of rapikanAksesori(aksesori)) buildAksesori(k, id, h);
 }
 
 // Membuat figur di bawah induk; mengembalikan { fig, bob, height }.

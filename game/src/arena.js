@@ -4,7 +4,7 @@ import {
   Engine, Scene, ArcRotateCamera, Vector3, HemisphericLight, DirectionalLight,
   MeshBuilder, StandardMaterial, Color3, Color4, DynamicTexture, TransformNode, Mesh,
 } from "@babylonjs/core";
-import { buildAvatar3d } from "./avatar3d.js";
+import { buildAvatar3d, buildManekin } from "./avatar3d.js";
 import { drawFlag, namaKelas } from "../../shared/negara.js";
 
 export const ARENA_RADIUS = 38;
@@ -139,6 +139,53 @@ function plainTable(scene, x, z, color, walls) {
   walls.push({ minX: x - 0.95, maxX: x + 0.95, minZ: z - 0.95, maxZ: z + 0.95 });
 }
 
+// Kios Toko Avatar: lapak beratap belang dengan manekin berhias aksesori. Bagian depan menghadap selatan.
+function kiosToko(scene, x, z, walls) {
+  const W = 3.4, D = 1.8;
+  const front = z - D / 2;
+  box(scene, "kiosLantai", { w: W + 0.4, h: 0.12, d: D + 0.4, x, y: 0.06, z, color: "#f3d9e4" });
+  box(scene, "kiosMeja", { w: W, h: 0.95, d: 0.6, x, y: 0.47, z: front + 0.3, color: "#ff8fb0" });
+  box(scene, "kiosMejaAtas", { w: W + 0.1, h: 0.08, d: 0.7, x, y: 0.98, z: front + 0.3, color: "#fff4f8" });
+  box(scene, "kiosBelakang", { w: W, h: 2.4, d: 0.15, x, y: 1.2, z: z + D / 2, color: "#ffd1e0" });
+  box(scene, "kiosRak", { w: W - 0.4, h: 0.08, d: 0.35, x, y: 1.65, z: z + D / 2 - 0.25, color: "#c97b9b" });
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const post = MeshBuilder.CreateCylinder("kiosTiang", { height: 2.7, diameter: 0.14, tessellation: 8 }, scene);
+    post.position.set(x + sx * (W / 2 - 0.05), 1.35, z + sz * (D / 2 - 0.05));
+    post.material = mat(scene, "#ffffff");
+  }
+  // Atap belang miring ke depan.
+  const atap = MeshBuilder.CreateBox("kiosAtap", { width: W + 0.6, height: 0.08, depth: D + 0.8 }, scene);
+  atap.position.set(x, 2.85, z - 0.15);
+  atap.rotation.x = -0.18;
+  const tex = new DynamicTexture("kiosBelang", { width: 256, height: 64 }, scene, false);
+  const ctx = tex.getContext();
+  for (let i = 0; i < 8; i++) { ctx.fillStyle = i % 2 ? "#ffffff" : "#ef4f6e"; ctx.fillRect(i * 32, 0, 32, 64); }
+  tex.update();
+  const am = new StandardMaterial("kiosAtapMat", scene);
+  am.diffuseTexture = tex;
+  am.specularColor = new Color3(0.05, 0.05, 0.05);
+  atap.material = am;
+  // Pajangan: manekin di meja dan di rak belakang.
+  const pajang = [
+    [-1.1, 1.02, front + 0.3, ["mahkota"]],
+    [0, 1.02, front + 0.3, ["topi-penyihir"]],
+    [1.1, 1.02, front + 0.3, ["pita", "kacamata"]],
+    [-0.7, 1.69, z + D / 2 - 0.25, ["topi-pesta", "kacamata-hitam"]],
+    [0.7, 1.69, z + D / 2 - 0.25, ["medali", "syal"]],
+  ];
+  for (const [dx, y, pz, aks] of pajang) {
+    const n = new TransformNode("manekin", scene);
+    n.position.set(x + dx, y, pz);
+    n.rotation.y = Math.PI;   // menghadap ke depan (selatan)
+    n.scaling.setAll(0.8);
+    buildManekin(scene, n, aks);
+  }
+  walls.push({ minX: x - W / 2 - 0.2, maxX: x + W / 2 + 0.2, minZ: front - 0.05, maxZ: z + D / 2 + 0.2 });
+  const s = makeSign(scene, ["Toko Avatar", "Topi · Pita · Kacamata"], { width: 3.2, height: 1.1, bg: "#ef4f6e", fg: "#ffffff" });
+  s.position.set(x, 3.75, z);
+  return { id: "toko", x, z: front - 0.9, label: "Toko Avatar", action: "Buka Toko Avatar", ready: true };
+}
+
 export function createArena(canvas) {
   const engine = new Engine(canvas, true, { preserveDrawingBuffer: false, stencil: false }, true);
   const scene = new Scene(engine);
@@ -171,6 +218,8 @@ export function createArena(canvas) {
   plaza.material = mat(scene, "#e8dcc2");
   const plazaSign = makeSign(scene, ["Alun-alun", "Bimbel ke utara · Game ke timur"], { width: 5, height: 1.5 });
   plazaSign.position.set(0, 3, 0);
+  // Kios Toko Avatar di sisi barat laut alun-alun (terlihat dari tempat muncul).
+  const kios = kiosToko(scene, -5, 4.6, walls);
 
   // Jalan setapak
   box(scene, "pathN", { w: 3, h: 0.04, d: 11, x: 0, y: 0.02, z: 13.5, color: "#e8dcc2" });
@@ -222,7 +271,7 @@ export function createArena(canvas) {
   for (const [x, z] of [[-9, 9], [9, 9], [-9, -9], [9, -9]]) walls.push({ minX: x - 0.3, maxX: x + 0.3, minZ: z - 0.3, maxZ: z + 0.3 });
 
   window.addEventListener("resize", () => engine.resize());
-  return { engine, scene, camera, walls, tables: [...tables, studyDesk] };
+  return { engine, scene, camera, walls, tables: [...tables, studyDesk, kios] };
 }
 
 // Gelembung chat di atas kepala avatar (hilang setelah 5 detik).
@@ -258,6 +307,19 @@ export function createAvatar(scene, { color, avatar, aksesori = "", name, jenjan
   tag.billboardMode = Mesh.BILLBOARDMODE_ALL;
   if (sid) for (const m of meshes) m.metadata = { sid };
   return { root, body: bob, height };
+}
+
+// Buang avatar (figur, papan nama, gelembung chat) tanpa menghapus material warna bersama
+// yang juga dipakai avatar lain.
+export function disposeAvatar(av) {
+  clearTimeout(av.bubbleTimer);
+  for (const m of av.root.getChildMeshes(false)) {
+    const mt = m.material;
+    m.dispose();
+    if (mt && !mt.metadata?.bersama) { mt.diffuseTexture?.dispose(); mt.dispose(); }
+  }
+  av.root.dispose();
+  av.bubble = null;
 }
 
 // Gerak dengan tabrakan sederhana terhadap dinding dan meja (geser di sepanjang dinding).
