@@ -1,5 +1,5 @@
 import { Vector3, Scalar, PointerEventTypes } from "@babylonjs/core";
-import { createArena, createAvatar, moveWithCollision, showBubble } from "./arena.js";
+import { createArena, createAvatar, disposeAvatar, moveWithCollision, showBubble } from "./arena.js";
 import { SocialUI } from "./social-ui.js";
 import {
   joinArena, findChessMatch, createChessTable, joinChessTable,
@@ -75,6 +75,14 @@ async function start(profile, playingAs) {
   setPlayingAs(playingAs);
   const { engine, scene, camera, walls, tables } = createArena($("arena"));
   const me = createAvatar(scene, profile);
+  // Bangun ulang figur avatar (mis. setelah aksesori diganti di Toko) tanpa memindahkan posisinya.
+  const gantiFigur = (av, props) => {
+    const baru = createAvatar(scene, props);
+    baru.root.position.copyFrom(av.root.position);
+    baru.root.rotation.y = av.root.rotation.y;
+    disposeAvatar(av);
+    Object.assign(av, baru);
+  };
   me.root.position.set(0, 0, -3);
 
   $("hud").hidden = false;
@@ -103,16 +111,39 @@ async function start(profile, playingAs) {
     room.state.players.onAdd((p, id) => {
       if (id === room.sessionId) {
         me.root.position.set(p.x, 0, p.z);
+        let kini = p.aksesori || "";
+        p.listen("aksesori", (v) => {
+          if ((v || "") === kini) return;
+          kini = v || "";
+          gantiFigur(me, { ...profile, aksesori: kini });
+        });
         return;
       }
-      const av = createAvatar(scene, { name: p.name, jenjang: p.jenjang, negara: p.negara, kelas: p.kelas, kurikulum: p.kurikulum, color: p.color, avatar: p.avatar, aksesori: p.aksesori, sid: id });
+      const props = () => ({ name: p.name, jenjang: p.jenjang, negara: p.negara, kelas: p.kelas, kurikulum: p.kurikulum, color: p.color, avatar: p.avatar, aksesori: p.aksesori, sid: id });
+      const av = createAvatar(scene, props());
       av.root.position.set(p.x, 0, p.z);
       others.set(id, { av, p });
+      let kini = p.aksesori || "";
+      p.listen("aksesori", (v) => {
+        if ((v || "") === kini || !others.has(id)) return;
+        kini = v || "";
+        gantiFigur(av, props());
+      });
     });
     room.state.players.onRemove((_, id) => {
       const o = others.get(id);
-      if (o) { o.av.root.dispose(false, true); others.delete(id); }
+      if (o) { disposeAvatar(o.av); others.delete(id); }
     });
+    if (playingAs === "anak") {
+      let terakhir = 0;
+      const segarkan = () => {
+        if (!room || Date.now() - terakhir < 1500) return;
+        terakhir = Date.now();
+        room.send("segarkan-aksesori");
+      };
+      if ("BroadcastChannel" in window) new BroadcastChannel("bimbel-avatar").onmessage = segarkan;
+      window.addEventListener("focus", segarkan);
+    }
     room.onLeave((code) => {
       room = null;
       $("hud-status").textContent = "Offline";
@@ -289,6 +320,11 @@ async function start(profile, playingAs) {
   }
 
   function useTable(t) {
+    if (t.id === "toko") {
+      if (playingAs !== "anak") return toast("Toko Avatar untuk akun anak. Masuk sebagai anak untuk berbelanja.");
+      window.open("/bimbel/index.html#toko", "_blank", "noopener");
+      return;
+    }
     if (t.id === "bimbel") {
       // Tab baru, supaya sesi arena tetap tersambung.
       window.open("/bimbel/index.html", "_blank", "noopener");

@@ -4,6 +4,8 @@ import { addPlaySeconds, secondsToday } from "../accounts.js";
 import { setupSocial, socialJoin, socialLeave } from "./arena-social.js";
 import { uidOf } from "../social.js";
 import { avatarOr } from "../../shared/avatars.js";
+import { rapikanAksesori } from "../../shared/aksesori.js";
+import { db } from "../db.js";
 
 
 const { Room } = colyseus;
@@ -51,6 +53,18 @@ export class ArenaRoom extends Room {
     }, 15000);
 
     setupSocial(this);
+
+    // Anak membeli/memakai aksesori di Toko: baca ulang dari database (bukan dari pesan klien).
+    this.onMessage("segarkan-aksesori", (client) => {
+      const a = client.auth, p = this.state.players.get(client.sessionId);
+      if (!p || a?.role !== "anak") return;
+      const now = Date.now();
+      if (now - (client.userData?.aksesoriAt || 0) < 1000) return;
+      client.userData = { ...client.userData, aksesoriAt: now };
+      const row = db.prepare("SELECT aksesori_pakai FROM children WHERE id = ?").get(a.childId);
+      const baru = rapikanAksesori(row?.aksesori_pakai).join(",");
+      if (row && p.aksesori !== baru) p.aksesori = baru;
+    });
 
     this.onMessage("move", (client, data = {}) => {
       const p = this.state.players.get(client.sessionId);
