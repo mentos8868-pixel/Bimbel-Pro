@@ -155,12 +155,6 @@
   .tsetup{display:grid;gap:14px}
   .tbox{background:var(--card);border:2px solid var(--line);border-radius:var(--r);padding:16px 18px}
   .tbox h3{margin:0 0 10px;font-size:16px;font-weight:900;display:flex;gap:12px;align-items:baseline}
-  .tbox h3 .linkbtn{margin:0;font-size:14px;color:var(--teal)}
-  .tlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px}
-  .tlist label{display:flex;gap:10px;align-items:flex-start;border:2px solid var(--line);border-radius:12px;padding:10px 12px;font-weight:800;cursor:pointer}
-  .tlist label:has(input:checked){border-color:var(--teal);background:var(--teal-soft)}
-  .tlist input{width:20px;height:20px;margin-top:3px;accent-color:var(--teal);flex:none}
-  .tlist small{display:block;color:var(--muted);font-weight:600}
   .timer{font-weight:900;font-variant-numeric:tabular-nums;background:var(--ink);color:#fff;border-radius:12px;padding:6px 14px;font-size:20px;white-space:nowrap}
   .timer.warn{background:var(--bad);animation:pulse 1s infinite}
   @keyframes pulse{50%{opacity:.7}}
@@ -978,29 +972,34 @@ function renderReport(app){
 /* ============ Tryout / Mode Ujian ============ */
 let EXKEY='ruangpintar_ujian';   // diganti per anak di mulai()
 let ex=null, exTimer=null;
-const TO={sel:null,key:'',n:20,menit:30,lv:0,rf:'all'};          // lv 0 = campuran semua tingkat
+const TO={n:30,menit:60,lv:0,rf:'all'};          // lv 0 = acak: 70% sulit, 20% sedang, 10% mudah
+const TO_N=[30,50],TO_MENIT=[60,90];
+const mixShort=kur=>kur&&kur!=='merdeka'?'Random':'Acak';
+const mixLong=kur=>kur&&kur!=='merdeka'?'Random: 70% Hard · 20% Medium · 10% Easy':'Acak: 70% Sulit · 20% Sedang · 10% Mudah';
+// Daftar tingkat untuk n soal: 70% sulit (3), 20% sedang (2), sisanya mudah (1), urutan diacak.
+function mixLevels(n){const h=Math.round(n*.7),m=Math.round(n*.2);return shuffle([...Array(h).fill(3),...Array(m).fill(2),...Array(Math.max(0,n-h-m)).fill(1)])}
 const fmtT=s=>{s=Math.max(0,Math.ceil(s));return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`};
 const isAns=a=>a!==null&&a!==undefined&&String(a).trim()!=='';
 function exSave(){try{ex&&!ex.done?localStorage.setItem(EXKEY,JSON.stringify(ex)):localStorage.removeItem(EXKEY)}catch(e){}}
 const tryoutTopics=()=>topicsFor(S.mapel,S.kelas).filter(t=>!t.mix&&t.g!=='__mix');
 
-function buildExam(topics,n,lv){
-  const pools=topics.map(t=>{
-    if(!t.bank)return {t,gen:true};
-    let b=shuffle(t.bank.slice());if(lv)b=b.filter(s=>s.lv===lv).concat(b.filter(s=>s.lv!==lv));
-    return {t,bank:b,i:0};
-  });
-  const qs=[],seen=new Set();let guard=0;
-  while(qs.length<n&&guard++<n*10){
-    let any=false;
-    for(const p of shuffle(pools.slice())){
-      if(qs.length>=n)break;
-      let q;
-      if(p.gen){LV=lv||R(1,3);try{q=makeQ(p.t)}catch(e){continue}if(seen.has(q.q))continue;q.lv=LV}
-      else{if(p.i>=p.bank.length)continue;const s=p.bank[p.i++];q=bankQ(s);q.lv=s.lv}
-      seen.add(q.q);q.topic=p.t.name;qs.push(q);any=true;
+// Soal tryout dari semua topik secara bergiliran, mengikuti komposisi tingkat mixLevels().
+// Bila satu tingkat habis (bank soal terbatas), dipakai tingkat terdekat.
+function buildExam(topics,n){
+  const pools=shuffle(topics.map(t=>t.bank?{t,bank:{1:shuffle(t.bank.filter(s=>s.lv===1)),2:shuffle(t.bank.filter(s=>s.lv===2)),3:shuffle(t.bank.filter(s=>s.lv===3))}}:{t,gen:true}));
+  const qs=[],seen=new Set();let k=0;
+  const take=(p,lv)=>{
+    if(p.gen){for(let tr=0;tr<5;tr++){LV=lv;let q;try{q=makeQ(p.t)}catch(e){return null}if(!seen.has(q.q)){q.lv=lv;return q}}return null}
+    const b=p.bank[lv];while(b.length){const s=b.pop(),q=bankQ(s);if(!seen.has(q.q)){q.lv=s.lv;return q}}return null;
+  };
+  for(const lv of mixLevels(n)){
+    let q=null;
+    for(const l of [3,2,1].sort((a,b)=>Math.abs(a-lv)-Math.abs(b-lv))){
+      for(let j=0;j<pools.length&&!q;j++){const p=pools[(k+j)%pools.length];q=take(p,l);if(q){q.topic=p.t.name;k=(k+j+1)%pools.length}}
+      if(q)break;
     }
-    if(!any&&pools.every(p=>!p.gen))break;
+    if(!q)break;
+    seen.add(q.q);qs.push(q);
   }
   return shuffle(qs);
 }
@@ -1018,43 +1017,36 @@ function tryoutHist(limit){
 function renderTryout(app){
   if(ex)return ex.done?renderExamResult(app):renderExam(app);
   const K=KURS[S.kur]||KURS.merdeka;if(!K.mapel[S.mapel])S.mapel=Object.keys(K.mapel)[0];
-  const tops=tryoutTopics(),key=`${S.kur}|${S.mapel}|${S.kelas}`;
-  if(!TO.sel||TO.key!==key){TO.sel=new Set(tops.map(t=>t.id));TO.key=key}
-  const chosen=tops.filter(t=>TO.sel.has(t.id));
+  const tops=tryoutTopics(),chosen=tops;   // tryout selalu memakai semua topik kelas ini
   const avail=chosen.some(t=>!t.bank)?Infinity:chosen.reduce((a,t)=>a+t.bank.length,0);
   const n=Math.min(TO.n,avail);
   const empty=`Belum ada soal ${K.mapel[S.mapel]} untuk ${K.label(S.kelas)}. Pilih kelas atau pelajaran lain.`;
   const hist=tryoutHist(5);
   app.innerHTML=`<h1>Tryout</h1>
-    <p class="sub">Simulasi ujian: soal campuran dari beberapa topik dengan batas waktu. Jawaban dan pembahasan baru ditampilkan setelah tryout dikumpulkan.</p>
+    <p class="sub">Simulasi ujian: soal campuran dari semua topik kelas ini dengan batas waktu. Jawaban dan pembahasan baru ditampilkan setelah tryout dikumpulkan.</p>
     ${aturOrtu()}
     <div class="grades">${Object.entries(K.mapel).map(([m,nm])=>`<button class="chip ${S.mapel===m?'on':''}" data-m="${m}">${nm}</button>`).join('')}</div>
     ${tops.length?`<div class="tsetup">
-      <div class="tbox"><h3>Topik yang diujikan <button class="linkbtn" id="tall">${chosen.length===tops.length?'Kosongkan':'Pilih semua'}</button></h3>
-        <div class="tlist">${tops.map(t=>`<label><input type="checkbox" data-sel="${t.id}" ${TO.sel.has(t.id)?'checked':''}><span>${esc(t.name)}<small>${t.bank?t.bank.length+' soal tersedia':'Soal dibuat otomatis'}</small></span></label>`).join('')}</div></div>
       <div class="tbox"><h3>Pengaturan</h3>
-        <div class="grades"><b class="glab">Jumlah soal</b>${[10,20,30,40].map(x=>`<button class="chip ${TO.n===x?'on':''}" data-n="${x}">${x}</button>`).join('')}</div>
-        <div class="grades"><b class="glab">Waktu</b>${[10,20,30,45,60,90].map(x=>`<button class="chip ${TO.menit===x?'on':''}" data-mn="${x}">${x} menit</button>`).join('')}</div>
-        <div class="grades" style="margin:0"><b class="glab">Tingkat</b>${[0,1,2,3].map(l=>[l,lvName(l,S.kur)]).map(([l,nm])=>`<button class="chip ${l?'lv'+l:''} ${TO.lv===l?'on':''}" data-tl="${l}">${nm}</button>`).join('')}</div>
+        <div class="grades"><b class="glab">Jumlah soal</b>${TO_N.map(x=>`<button class="chip ${TO.n===x?'on':''}" data-n="${x}">${x}</button>`).join('')}</div>
+        <div class="grades"><b class="glab">Waktu</b>${TO_MENIT.map(x=>`<button class="chip ${TO.menit===x?'on':''}" data-mn="${x}">${x} menit</button>`).join('')}</div>
+        <div class="grades" style="margin:0"><b class="glab">Tingkat</b><span class="chip on" style="cursor:default">${mixLong(S.kur)}</span></div>
       </div>
       <div class="tbox" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
         <div style="flex:1;min-width:200px"><b style="font-size:18px">${n} soal · ${TO.menit} menit</b><br>
-          <span style="color:var(--muted);font-weight:700">${K.mapel[S.mapel]} · ${K.label(S.kelas)} · ${chosen.length} topik · ${TO.lv?lvName(TO.lv,S.kur):'Semua tingkat'}${n<TO.n&&chosen.length?` · soal yang tersedia hanya ${n}`:''}</span></div>
+          <span style="color:var(--muted);font-weight:700">${K.mapel[S.mapel]} · ${K.label(S.kelas)} · ${chosen.length} topik · ${mixShort(S.kur)}${n<TO.n&&chosen.length?` · soal yang tersedia hanya ${n}`:''}</span></div>
         <button class="btn" id="tmulai" ${!chosen.length||!n?'disabled':''}>Mulai tryout</button></div>
       ${hist?`<div><h2 style="margin-top:8px">Riwayat tryout</h2>${hist}</div>`:''}
     </div>`:`<div class="empty">${empty}</div>`}`;
   app.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{S.mapel=b.dataset.m;save();render()});
   app.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{TO.n=+b.dataset.n;render()});
   app.querySelectorAll('[data-mn]').forEach(b=>b.onclick=()=>{TO.menit=+b.dataset.mn;render()});
-  app.querySelectorAll('[data-tl]').forEach(b=>b.onclick=()=>{TO.lv=+b.dataset.tl;render()});
-  app.querySelectorAll('[data-sel]').forEach(c=>c.onchange=()=>{c.checked?TO.sel.add(c.dataset.sel):TO.sel.delete(c.dataset.sel);render()});
-  const all=$('#tall');if(all)all.onclick=()=>{TO.sel=chosen.length===tops.length?new Set():new Set(tops.map(t=>t.id));render()};
   const m=$('#tmulai');if(m)m.onclick=startExam;
 }
 
 function startExam(){
-  const qs=buildExam(tryoutTopics().filter(t=>TO.sel.has(t.id)),TO.n,TO.lv);
-  if(!qs.length){alert('Belum ada soal untuk topik yang dipilih.');return}
+  const qs=buildExam(tryoutTopics(),TO.n);
+  if(!qs.length){alert('Belum ada soal untuk kelas ini.');return}
   const now=Date.now();
   ex={kur:S.kur,mapel:S.mapel,kelas:S.kelas,lv:TO.lv,menit:TO.menit,qs,ans:qs.map(()=>null),flag:qs.map(()=>false),i:0,start:now,end:now+TO.menit*60000,done:false};
   TO.rf='all';exSave();render();window.scrollTo(0,0);
@@ -1138,7 +1130,7 @@ function renderExamResult(app){
   const items=ex.qs.map((q,i)=>({q,i,r:ex.res[i]})).filter(x=>TO.rf==='all'||x.r!==true);
   const medals=ex.newMedals.map(id=>MEDALS.find(m=>m.id===id)).filter(Boolean);
   app.innerHTML=`<div class="result" style="max-width:720px">
-      <div class="qlabel">Hasil tryout · ${K.mapel[ex.mapel]} · ${K.label(ex.kelas)} · ${ex.lv?lvName(ex.lv,ex.kur):'Semua tingkat'}</div>
+      <div class="qlabel">Hasil tryout · ${K.mapel[ex.mapel]} · ${K.label(ex.kelas)} · ${ex.lv?lvName(ex.lv,ex.kur):mixShort(ex.kur)}</div>
       <div class="grade" style="color:${col}">${ex.score}</div>
       <p style="font-weight:800;margin:6px 0">${msg}</p>
       ${ex.auto?`<p style="color:var(--bad);font-weight:800;margin:0">Waktu habis, jawaban dikumpulkan otomatis.</p>`:''}
