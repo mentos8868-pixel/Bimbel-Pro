@@ -83,6 +83,8 @@ for (const [table, def] of [["children", "beruang-putra"], ["parents", "beruang-
   const cols = db.prepare("PRAGMA table_info(children)").all().map((c) => c.name);
   if (!cols.includes("negara")) db.exec("ALTER TABLE children ADD COLUMN negara TEXT NOT NULL DEFAULT 'ID'");
   if (!cols.includes("kelas")) db.exec("ALTER TABLE children ADD COLUMN kelas INTEGER NOT NULL DEFAULT 0");
+  // Kurikulum Ruang Pintar yang dipilih orang tua: merdeka | cam | sgp.
+  if (!cols.includes("kurikulum")) db.exec("ALTER TABLE children ADD COLUMN kurikulum TEXT NOT NULL DEFAULT 'merdeka'");
 }
 
 // Hari dihitung menurut waktu Indonesia Barat (UTC+7).
