@@ -4,6 +4,8 @@ import { randomBytes, scryptSync, timingSafeEqual, createHash } from "node:crypt
 import { db, today, lastDays } from "./db.js";
 import { avatarOr, DEFAULT_ORTU_AVATAR } from "../shared/avatars.js";
 import { avatarSvg } from "../shared/avatar-svg.js";
+import { rapikanAksesori } from "../shared/aksesori.js";
+import { handleToko } from "./toko.js";
 import { negaraOr, isNegara, jenjangDariKelas } from "../shared/negara.js";
 import { parentView, parentDecide, unblock, purgeUid, notify, kick } from "./social.js";
 
@@ -100,6 +102,7 @@ function publicChild(c) {
   return {
     id: c.id, name: c.name, jenjang: c.jenjang, color: c.color, avatar: avatarOr(c.avatar),
     negara: negaraOr(c.negara), kelas: c.kelas || 0, kurikulum: KURIKULUM.includes(c.kurikulum) ? c.kurikulum : "merdeka",
+    aksesori: rapikanAksesori(c.aksesori_pakai).join(","),
     limitMin: c.limit_min, allowStrangers: !!c.allow_strangers, chat: c.chat, approveFriends: !!c.approve_friends,
     usedMin: Math.floor(secondsToday(c.id) / 60),
   };
@@ -114,6 +117,7 @@ export function playerFromSession(s) {
     return {
       role: "anak", childId: c.id, parentId: c.parent_id, name: c.name, jenjang: c.jenjang, color: c.color, avatar: avatarOr(c.avatar),
       negara: negaraOr(c.negara), kelas: c.kelas || 0, kurikulum: KURIKULUM.includes(c.kurikulum) ? c.kurikulum : "merdeka",
+      aksesori: rapikanAksesori(c.aksesori_pakai).join(","),
       limitMin: c.limit_min, allowStrangers: !!c.allow_strangers,
     };
   }
@@ -321,7 +325,10 @@ export async function handleApi(req, res) {
       const c = anak && childRow(anak.child_id);
       if (!c) throw new ApiError(401, "Silakan masuk dulu.");
       res.writeHead(200, { "Content-Type": "image/svg+xml; charset=utf-8", "Cache-Control": "no-store" });
-      res.end(avatarSvg(c.avatar, c.color));
+      // ?coba=<id>: pratinjau di Toko, aksesori itu menggantikan yang dipakai di tempat yang sama.
+      const coba = url.searchParams.get("coba");
+      const pakai = coba ? [...rapikanAksesori(c.aksesori_pakai), coba] : c.aksesori_pakai;
+      res.end(avatarSvg(c.avatar, c.color, { aksesori: pakai }));
       return true;
     }
     if (m === "GET" && path[0] === "laporan") {
@@ -464,6 +471,9 @@ export async function handleApi(req, res) {
         .run(anak.child_id, game, mode, outcome, score, Date.now());
       return send(200, { ok: true }), true;
     }
+
+    // --- toko aksesori (anak) ---
+    if (handleToko({ m, path, body, anak, send, ApiError })) return true;
 
     throw new ApiError(404, "Alamat tidak ditemukan.");
   } catch (e) {
