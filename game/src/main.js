@@ -105,7 +105,7 @@ async function start(profile, playingAs) {
         me.root.position.set(p.x, 0, p.z);
         return;
       }
-      const av = createAvatar(scene, { name: p.name, jenjang: p.jenjang, negara: p.negara, kelas: p.kelas, kurikulum: p.kurikulum, color: p.color, avatar: p.avatar, sid: id });
+      const av = createAvatar(scene, { name: p.name, jenjang: p.jenjang, negara: p.negara, kelas: p.kelas, kurikulum: p.kurikulum, color: p.color, avatar: p.avatar, aksesori: p.aksesori, sid: id });
       av.root.position.set(p.x, 0, p.z);
       others.set(id, { av, p });
     });

@@ -92,6 +92,10 @@ for (const [table, def] of [["children", "beruang-putra"], ["parents", "beruang-
   if (!cols.includes("kelas")) db.exec("ALTER TABLE children ADD COLUMN kelas INTEGER NOT NULL DEFAULT 0");
   // Kurikulum Ruang Pintar yang dipilih orang tua: merdeka | cam | sgp.
   if (!cols.includes("kurikulum")) db.exec("ALTER TABLE children ADD COLUMN kurikulum TEXT NOT NULL DEFAULT 'merdeka'");
+  // Toko aksesori: saldo bintang, aksesori yang dimiliki dan yang dipakai (id dipisah koma).
+  if (!cols.includes("bintang")) db.exec("ALTER TABLE children ADD COLUMN bintang INTEGER NOT NULL DEFAULT 0");
+  if (!cols.includes("aksesori_punya")) db.exec("ALTER TABLE children ADD COLUMN aksesori_punya TEXT NOT NULL DEFAULT ''");
+  if (!cols.includes("aksesori_pakai")) db.exec("ALTER TABLE children ADD COLUMN aksesori_pakai TEXT NOT NULL DEFAULT ''");
 }
 
 // Hari dihitung menurut waktu Indonesia Barat (UTC+7).

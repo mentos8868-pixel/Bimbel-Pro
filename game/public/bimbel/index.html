@@ -28,6 +28,15 @@
   .spacer{flex:1}
   .stat{display:flex;align-items:center;gap:6px;font-weight:800;background:var(--bg);border:2px solid var(--line);padding:4px 12px;border-radius:99px}
   .me{display:flex;align-items:center;gap:8px;font-weight:800}
+  .saldo{font-weight:900;color:#B7860B;background:#FFF4D1;border-radius:999px;padding:4px 10px;font-size:15px;white-space:nowrap}
+  .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:8px}
+  .titem{background:var(--card);border:2px solid var(--line);border-radius:var(--r);padding:12px;text-align:center;display:flex;flex-direction:column;gap:6px}
+  .titem.pakai{border-color:var(--ok);background:var(--ok-soft)}
+  .titem img{width:110px;height:110px;margin:0 auto;display:block}
+  .titem b{font-size:16px}.titem .harga{color:#B7860B;font-weight:900}
+  .titem .btn{padding:8px 12px;font-size:15px}
+  .tpreview{display:flex;gap:18px;align-items:center;background:var(--card);border:2px solid var(--line);border-radius:var(--r);padding:14px 18px;margin-bottom:18px;flex-wrap:wrap}
+  .tpreview img{width:120px;height:120px}
   .ava{width:38px;height:38px;border-radius:50%;background:var(--accent-soft);display:grid;place-items:center;font-size:22px;border:2px solid var(--accent);overflow:hidden}
   .ava img{width:100%;height:100%;display:block}
   nav{max-width:1040px;margin:0 auto;padding:0 20px;display:flex;gap:4px;overflow-x:auto}
@@ -193,12 +202,13 @@
   <div class="top-in">
     <div class="brand">Ruang<b>Pintar</b><span class="tag">CONTOH</span></div>
     <div class="spacer"></div>
-    <div class="me"><div class="ava" id="ava"></div><span id="uname">Murid</span></div>
+    <div class="me"><span class="saldo" id="saldo" title="Bintang untuk Toko" hidden></span><div class="ava" id="ava"></div><span id="uname">Murid</span></div>
   </div>
   <nav id="nav">
     <button data-v="belajar" class="on">Belajar</button>
     <button data-v="tryout">Tryout</button>
     <button data-v="medali">Medali</button>
+    <button data-v="toko">Toko</button>
     <button data-v="laporan">Laporan Orang Tua</button>
   </nav>
 </header>
@@ -822,17 +832,30 @@ const level=()=>Math.floor(S.xp/100)+1;
 let view='belajar', sess=null;
 function header(){
   $('#uname').textContent=S.name||'Murid';
+  const sl=$('#saldo');if(sl){sl.hidden=!TOKO;if(TOKO)sl.textContent=`★ ${TOKO.bintang}`}
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===view));
 }
-function go(v){
-  if(ex&&!ex.done&&view==='tryout'&&v!=='tryout'&&!confirm('Tryout masih berjalan dan waktunya terus berjalan. Tetap pindah halaman?'))return;
+// Kotak konfirmasi di halaman. Dipakai sebagai ganti confirm() bawaan browser, karena di sebagian
+// browser (aplikasi, webview tablet, atau bila dialog diblokir) confirm() langsung menjawab "batal"
+// tanpa muncul, sehingga tombol seperti "Kumpulkan jawaban" tampak tidak berfungsi.
+function tanya(pesan,okLabel,lanjut){
+  tutupTanya();
+  const m=document.createElement('div');m.className='modal';m.id='tanya';
+  m.innerHTML=`<div class="mbox" role="dialog" aria-modal="true"><p style="margin:0 0 18px;font-weight:700;white-space:pre-line">${esc(pesan)}</p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap"><button class="btn ghost" data-t="0">Batal</button><button class="btn ok" data-t="1">${esc(okLabel)}</button></div></div>`;
+  m.onclick=e=>{const b=e.target.closest('[data-t]');if(!b&&e.target!==m)return;tutupTanya();if(b&&b.dataset.t==='1')lanjut()};
+  document.body.appendChild(m);m.querySelector('[data-t="1"]').focus();
+}
+function tutupTanya(){const m=$('#tanya');if(m)m.remove()}
+function go(v,paksa){
+  if(!paksa&&ex&&!ex.done&&view==='tryout'&&v!=='tryout'){tanya('Tryout masih berjalan dan waktunya terus berjalan. Tetap pindah halaman?','Ya, pindah',()=>go(v,true));return}
   if(ex&&ex.done)ex=null;
   view=v;sess=null;render();window.scrollTo(0,0)}
 document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));
 
 function render(){header();const app=$('#app');
   if(sess){ return sess.done?renderResult(app):renderQ(app); }
-  ({belajar:renderHome,tryout:renderTryout,medali:renderMedals,laporan:renderReport})[view](app);
+  ({belajar:renderHome,tryout:renderTryout,medali:renderMedals,toko:renderToko,laporan:renderReport})[view](app);
 }
 function starsHTML(n){return `<span class="stars">${[1,2,3].map(i=>`<span class="${i<=n?'s':''}">★</span>`).join('')}</span>`}
 /* Kurikulum dan kelas diatur orang tua di dashboard; anak hanya melihatnya. */
@@ -914,6 +937,7 @@ function finish(){const s=sess,c=s.res.filter(Boolean).length,N=s.qs.length,pc=c
   const before=new Set(S.medals),key=`${s.t.id}|${s.lv}`;
   const t=S.topics[key]||{best:0,att:0,ok:0,ses:0};
   t.att+=N;t.ok+=c;t.ses++;t.best=Math.max(t.best,stars);S.topics[key]=t;
+  kirimBintang([{kunci:key,bintang:t.best}]);
   S.xp+=c*(10+(s.lv-1)*5);S.sessions++;if(c===N&&N>=5)S.perfect++;
   S.history.unshift({d:new Date().toISOString(),id:key,c,n:N});S.history=S.history.slice(0,50);
   MEDALS.forEach(m=>{if(!before.has(m.id)&&m.ok(S))S.medals.push(m.id)});
@@ -1116,27 +1140,29 @@ function renderExam(app){
   $('#eflag').onclick=()=>{ex.flag[ex.i]=!ex.flag[ex.i];exSave();render()};
   app.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>move(+b.dataset.go));
   [$('#esub'),$('#esub2')].forEach(b=>b&&(b.onclick=()=>submitExam(false)));
-  $('#ebatal').onclick=()=>{if(confirm('Batalkan tryout? Jawabanmu tidak akan disimpan, dan jatah tryout pelajaran ini hari ini tetap terpakai.')){clearInterval(exTimer);ex=null;exSave();render()}};
+  $('#ebatal').onclick=()=>tanya('Batalkan tryout? Jawabanmu tidak akan disimpan, dan jatah tryout pelajaran ini hari ini tetap terpakai.','Ya, batalkan',
+    ()=>{if(!ex||ex.done)return;clearInterval(exTimer);ex=null;exSave();render()});
   startTimer();
 }
-function submitExam(auto){
+function submitExam(auto,yakin){
   if(!ex||ex.done)return;
-  if(!auto){const kosong=ex.ans.filter(a=>!isAns(a)).length,ragu=ex.flag.filter(Boolean).length;
-    if(!confirm(`Kumpulkan jawaban sekarang?${kosong?`\n• ${kosong} soal belum dijawab`:''}${ragu?`\n• ${ragu} soal ditandai ragu-ragu`:''}`))return}
-  clearInterval(exTimer);
+  if(!auto&&!yakin){const kosong=ex.ans.filter(a=>!isAns(a)).length,ragu=ex.flag.filter(Boolean).length;
+    tanya(`Kumpulkan jawaban sekarang?${kosong?`\n• ${kosong} soal belum dijawab`:''}${ragu?`\n• ${ragu} soal ditandai ragu-ragu`:''}`,'Ya, kumpulkan',()=>submitExam(false,true));return}
+  clearInterval(exTimer);tutupTanya();
   ex.res=ex.qs.map((q,i)=>isAns(ex.ans[i])?!!check(q,ex.ans[i]):null);
   ex.correct=ex.res.filter(r=>r===true).length;
   ex.score=Math.round(ex.correct/ex.qs.length*100);
   ex.used=Math.min(ex.menit*60,Math.round((Date.now()-ex.start)/1000));
   ex.auto=auto;ex.done=true;ex.xp=ex.correct*10;
   Object.assign(ex,tryoutStars(ex.correct,ex.qs.length,ex.target));
+  kirimBintang([{kunci:`tryout|${tglWIB()}|${ex.kur}|${ex.mapel}`,bintang:ex.stars}]);
   const before=new Set(S.medals);
   S.xp+=ex.xp;
   S.tryouts=[{d:new Date().toISOString(),kur:ex.kur,mapel:ex.mapel,kelas:ex.kelas,lv:ex.lv,score:ex.score,c:ex.correct,n:ex.qs.length,used:ex.used,menit:ex.menit,stars:ex.stars,max:ex.max}].concat(S.tryouts||[]).slice(0,30);
   MEDALS.forEach(m=>{if(!before.has(m.id)&&m.ok(S))S.medals.push(m.id)});
   ex.newMedals=S.medals.filter(m=>!before.has(m));
   save();exSave();view='tryout';sess=null;render();window.scrollTo(0,0);
-  if(auto)setTimeout(()=>alert('Waktu habis! Jawabanmu sudah dikumpulkan otomatis.'),60);
+  // Bila waktu habis, halaman hasil sudah menulis "Waktu habis, jawaban dikumpulkan otomatis."
 }
 function renderExamResult(app){
   const K=KURS[ex.kur]||KURS.merdeka,N=ex.qs.length,salah=ex.res.filter(r=>r===false).length,kosong=ex.res.filter(r=>r===null).length;
@@ -1180,6 +1206,41 @@ function renderExamResult(app){
   app.querySelectorAll('[data-rf]').forEach(b=>b.onclick=()=>{TO.rf=b.dataset.rf;render()});
   $('#eback').onclick=()=>{ex=null;render();window.scrollTo(0,0)};
 }
+/* ============ Toko aksesori avatar (bintang disimpan di server) ============ */
+let TOKO=null;   // { bintang, punya, pakai, items } dari /api/toko
+const tglWIB=()=>new Date(Date.now()+7*3600e3).toISOString().slice(0,10);   // hari menurut server (WIB)
+async function tokoApi(method,path,body){
+  const r=await fetch('/api/'+path,{method,credentials:'same-origin',headers:{'Content-Type':'application/json','x-bimbel':'1'},body:body?JSON.stringify(body):undefined});
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Gagal menghubungi server.');return j;
+}
+function setToko(j){TOKO=Object.assign(TOKO||{},{bintang:j.bintang,punya:j.punya,pakai:j.pakai},j.items?{items:j.items}:{});header()}
+// Kirim bintang terbaik ke server; saldo hanya bertambah kalau bintang terbaik naik.
+async function kirimBintang(items){
+  items=items.filter(i=>i.bintang>0);if(!items.length||!AKUN)return;
+  try{const j=await tokoApi('POST','bintang',{items});setToko(j);if(j.tambah&&view==='toko'&&!sess)render()}catch(e){}
+}
+function avaSrc(coba){return `/api/avatar.svg?v=${encodeURIComponent(AKUN.avatar+AKUN.color+(TOKO?TOKO.pakai.join(','):''))}${coba?'&coba='+encodeURIComponent(coba):''}`}
+function segarkanAvatar(){$('#ava').innerHTML=`<img src="${avaSrc()}" alt="Avatar ${esc(AKUN.name)}">`}
+function renderToko(app){
+  if(!TOKO||!TOKO.items){app.innerHTML='<h1>Toko</h1><p class="sub">Memuat toko…</p>';
+    tokoApi('GET','toko').then(j=>{setToko(j);if(view==='toko'&&!sess)render()}).catch(e=>{if(view==='toko')app.innerHTML=`<h1>Toko</h1><div class="empty">${esc(e.message)}</div>`});return}
+  const SLOTN={kepala:'Kepala',wajah:'Wajah',leher:'Leher'};
+  const kartu=a=>{const punya=TOKO.punya.includes(a.id),pakai=TOKO.pakai.includes(a.id),cukup=TOKO.bintang>=a.harga;
+    return `<div class="titem ${pakai?'pakai':''}"><img src="${avaSrc(a.id)}" alt="" loading="lazy"><b>${esc(a.name)}</b>
+      <span class="harga">${punya?(pakai?'Sedang dipakai':'Sudah dimiliki'):`★ ${a.harga}`}</span>
+      ${punya?`<button class="btn ${pakai?'ghost':''}" data-pakai="${a.id}" data-on="${pakai?0:1}">${pakai?'Lepas':'Pakai'}</button>`
+        :`<button class="btn" data-beli="${a.id}" ${cukup?'':'disabled'}>${cukup?'Beli':'Bintang kurang'}</button>`}</div>`};
+  app.innerHTML=`<h1>Toko</h1>
+    <p class="sub">Tukar bintang dengan aksesori untuk avatarmu. Aksesori juga terlihat di arena.</p>
+    <div class="tpreview"><img src="${avaSrc()}" alt="Avatarmu"><div><b style="font-size:20px">★ ${TOKO.bintang} bintang</b>
+      <p style="margin:6px 0 0;color:var(--muted)">Dapatkan bintang dari latihan (bintang terbaik tiap topik dan tingkat) dan dari tryout. Mengulang topik yang sama hanya menambah bintang bila bintangmu naik.</p></div></div>
+    ${Object.keys(SLOTN).map(sl=>`<h2>${SLOTN[sl]}</h2><div class="tgrid">${TOKO.items.filter(a=>a.slot===sl).map(kartu).join('')}</div>`).join('')}`;
+  app.querySelectorAll('[data-beli]').forEach(b=>b.onclick=async()=>{const a=TOKO.items.find(x=>x.id===b.dataset.beli);
+    if(!confirm(`Beli ${a.name} seharga ${a.harga} bintang?`))return;b.disabled=true;
+    try{setToko(await tokoApi('POST','toko/beli',{id:a.id}));setToko(await tokoApi('POST','toko/pakai',{id:a.id,pakai:true}));segarkanAvatar()}catch(e){alert(e.message)}render()});
+  app.querySelectorAll('[data-pakai]').forEach(b=>b.onclick=async()=>{b.disabled=true;
+    try{setToko(await tokoApi('POST','toko/pakai',{id:b.dataset.pakai,pakai:b.dataset.on==='1'}));segarkanAvatar()}catch(e){alert(e.message)}render()});
+}
 /* ============ Akun: nama, avatar, kurikulum, dan kelas semuanya dari orang tua ============ */
 function pakaiAkun(){
   S.name=AKUN.name;S.kelas=AKUN.kelas;S.kur=KURS[AKUN.kurikulum]?AKUN.kurikulum:'merdeka';
@@ -1214,7 +1275,9 @@ async function mulai(){
   AKUN=me.anak;SKEY=`ruangpintar_a${AKUN.id}`;EXKEY=`ruangpintar_ujian_a${AKUN.id}`;
   try{S=Object.assign({},DEF,JSON.parse(localStorage.getItem(SKEY)||'{}'))}catch(e){S=Object.assign({},DEF)}
   pakaiAkun();save();
-  $('#ava').innerHTML=`<img src="/api/avatar.svg?v=${encodeURIComponent(AKUN.avatar+AKUN.color)}" alt="Avatar ${esc(AKUN.name)}">`;
+  segarkanAvatar();
+  /* saldo bintang Toko; bintang lama dari latihan ikut dikirim (server hanya menambah yang naik) */
+  tokoApi('GET','toko').then(j=>{setToko(j);segarkanAvatar();kirimBintang(Object.entries(S.topics).map(([k,t])=>({kunci:k,bintang:t.best||0})))}).catch(()=>{});
   /* lanjutkan tryout yang belum selesai (mis. setelah halaman di-refresh) */
   try{const sx=JSON.parse(localStorage.getItem(EXKEY)||'null');if(sx&&!sx.done&&sx.qs&&sx.qs.length){ex=sx;view='tryout'}}catch(e){}
   render();
