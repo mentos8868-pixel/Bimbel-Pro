@@ -801,7 +801,8 @@ function buildSession(t,n){
 }
 
 /* ============ Penyimpanan (di browser) ============ */
-const DEF={name:'',avatar:'🦊',owned:['🦊'],coins:0,xp:0,sessions:0,perfect:0,medals:[],topics:{},history:[],tryouts:[],kelas:4,len:5,lv:2,mapel:'mat',kur:'merdeka'};
+const JUMLAH_SOAL=10;   // jumlah soal tetap untuk setiap sesi latihan
+const DEF={name:'',avatar:'🦊',owned:['🦊'],coins:0,xp:0,sessions:0,perfect:0,medals:[],topics:{},history:[],tryouts:[],kelas:4,lv:2,mapel:'mat',kur:'merdeka'};
 let S=Object.assign({},DEF,JSON.parse(localStorage.getItem('ruangpintar')||'{}'));
 const save=()=>localStorage.setItem('ruangpintar',JSON.stringify(S));
 
@@ -856,20 +857,18 @@ function renderHome(app){
     <div class="kurbar"><b class="glab">Kurikulum</b>${Object.entries(KURS).map(([k,v])=>`<button class="kur ${S.kur===k?'on':''}" data-kur="${k}"><b>${v.short}</b><span>${k==='merdeka'?'Indonesia · 4 pelajaran':'Internasional · Math, Science, English'}</span></button>`).join('')}</div>
     <div class="grades">${Object.entries(K.mapel).map(([m,n])=>`<button class="chip ${S.mapel===m?'on':''}" data-m="${m}">${n}</button>`).join('')}</div>
     <div class="grades kel">${K.groups.map(([g,ks])=>`<span class="glab">${g}</span>${ks.map(kchip).join('')}`).join('')}</div>
-    <div class="grades" style="align-items:center"><b class="glab">Tingkat</b>${[1,2,3].map(l=>`<button class="chip lv${l} ${S.lv===l?'on':''}" data-lv="${l}">${LVNAME[l]}</button>`).join('')}
-      <b class="glab" style="margin-left:10px">Jumlah soal</b>${[5,10,20].map(n=>`<button class="chip ${S.len===n?'on':''}" data-len="${n}">${n}</button>`).join('')}</div>
+    <div class="grades" style="align-items:center"><b class="glab">Tingkat</b>${[1,2,3].map(l=>`<button class="chip lv${l} ${S.lv===l?'on':''}" data-lv="${l}">${LVNAME[l]}</button>`).join('')}</div>
     <h2>${K.mapel[S.mapel]} · ${K.label(S.kelas)}${intl?` <span class="lvtag" style="background:var(--teal-soft);color:var(--teal)">${K.short}</span>`:''} <span style="color:var(--muted);font-weight:700;font-size:15px">· ${topics.filter(t=>!t.mix&&t.g!=='__mix').length} topik · ${LVNAME[S.lv]}</span></h2>
     ${topics.length?`<div class="path">${list}</div>`:`<div class="empty">${empty}</div>`}`;
   app.querySelectorAll('[data-kur]').forEach(b=>b.onclick=()=>{S.kur=b.dataset.kur;S.mapel=Object.keys(KURS[S.kur].mapel)[0];save();render()});
   app.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{S.mapel=b.dataset.m;save();render()});
   app.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{S.kelas=+b.dataset.k;save();render()});
   app.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{S.lv=+b.dataset.lv;save();render()});
-  app.querySelectorAll('[data-len]').forEach(b=>b.onclick=()=>{S.len=+b.dataset.len;save();render()});
   app.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>start(b.dataset.t));
 }
 
 function start(id){const t=topicsFor(S.mapel,S.kelas).find(x=>x.id===id)||topicById(id);LV=S.lv;
-  const qs=buildSession(t,S.len||5);if(!qs.length){alert('Belum ada soal untuk topik ini.');return}
+  const qs=buildSession(t,JUMLAH_SOAL);if(!qs.length){alert('Belum ada soal untuk topik ini.');return}
   sess={t,lv:S.lv,qs,i:0,res:[],coins:0,streak:0,answered:false,done:false};render();
 }
 function ansText(q){if(q.kind==='str')return esc(q.ans);if(q.kind==='frac'){let [n,d]=q.ans;if(d<0){n=-n;d=-d}const g=gcd(n,d);n/=g;d/=g;return d===1?`${n}`:(n<0?'−':'')+F(Math.abs(n),d)}
