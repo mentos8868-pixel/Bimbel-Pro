@@ -289,6 +289,11 @@ async function start(profile, playingAs) {
   }
 
   function useTable(t) {
+    if (t.id === "bimbel") {
+      // Tab baru, supaya sesi arena tetap tersambung.
+      window.open("/bimbel/index.html", "_blank", "noopener");
+      return;
+    }
     if (t.id === "kartu") {
       uiOpen = true;
       keys.clear();
@@ -376,7 +381,7 @@ async function start(profile, playingAs) {
     }
     const btn = $("action-btn");
     if (nearTable && !uiOpen) {
-      const label = nearTable.ready ? `Main ${nearTable.label}` : `${nearTable.label} (segera hadir)`;
+      const label = nearTable.action ? nearTable.action : nearTable.ready ? `Main ${nearTable.label}` : `${nearTable.label} (segera hadir)`;
       btn.textContent = matchMedia("(pointer: coarse)").matches ? label : `${label} [E]`;
       btn.hidden = false;
     } else {
