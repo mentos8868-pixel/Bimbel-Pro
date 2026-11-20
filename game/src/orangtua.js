@@ -2,8 +2,24 @@
 import { api } from "./api.js";
 import { avatarPicker } from "./avatar-picker.js";
 import { avatarSvg } from "./avatar-svg.js";
+import { NEGARA, DEFAULT_NEGARA, negaraName, jenjangDariKelas } from "../../shared/negara.js";
 
 const $ = (id) => document.getElementById(id);
+// Isi pilihan kelas (1–12) dan negara pada sebuah formulir.
+function fillKelasNegara(root, kelas, negara) {
+  root.querySelectorAll(".pilih-kelas").forEach((s) => {
+    if (!s.options.length) {
+      if (!kelas) s.add(new Option("Pilih kelas", "", true, true));
+      for (let k = 1; k <= 12; k++) s.add(new Option(`Kelas ${k} (${jenjangDariKelas(k)})`, String(k)));
+    }
+    s.value = kelas ? String(kelas) : "";
+  });
+  root.querySelectorAll(".pilih-negara").forEach((s) => {
+    if (!s.options.length) for (const n of NEGARA) s.add(new Option(n.name, n.id));
+    s.value = negara || DEFAULT_NEGARA;
+  });
+}
+const kelasText = (c) => (c.kelas ? `Kelas ${c.kelas} (${c.jenjang})` : c.jenjang) + ` · ${negaraName(c.negara)}`;
 const COLORS = ["#4f9cf0", "#ef6f5e", "#f2b134", "#3e9b4f", "#9b7bd8", "#ec7fb5"];
 const GAME_NAME = { catur: "Catur", scramble: "Scramble", kartu: "Kartu Kilat" };
 const OUTCOME = { menang: "menang", kalah: "kalah", seri: "seri" };
@@ -76,15 +92,18 @@ $("btn-keluar").onclick = async () => {
 let newColor = COLORS[0];
 const newAvatar = avatarPicker($("avatar-baru"), { accent: newColor });
 colorPicker($("warna-baru"), newColor, (c) => { newColor = c; newAvatar.setAccent(c); });
+fillKelasNegara($("form-anak"), 0, DEFAULT_NEGARA);
 $("form-anak").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
   setErr(f, "");
+  if (!f.kelas.value) return setErr(f, "Pilih kelas anak.");
   if (!/^\d{4}$/.test(f.pin.value)) return setErr(f, "PIN harus 4 angka.");
   busy(f, true);
   try {
-    await api("POST", "anak", { name: f.name.value, jenjang: f.jenjang.value, pin: f.pin.value, color: newColor, avatar: newAvatar.get() });
+    await api("POST", "anak", { name: f.name.value, kelas: Number(f.kelas.value), negara: f.negara.value, pin: f.pin.value, color: newColor, avatar: newAvatar.get() });
     f.reset();
+    fillKelasNegara(f, 0, DEFAULT_NEGARA);
     await load();
   } catch (x) { setErr(f, x.message); } finally { busy(f, false); }
 });
@@ -167,7 +186,7 @@ function renderKid(c, soc) {
     },
   });
   el.querySelector(".nama").textContent = c.name;
-  el.querySelector(".jenjang").textContent = c.jenjang;
+  el.querySelector(".jenjang").textContent = kelasText(c);
 
   const used = c.week.at(-1)?.minutes ?? c.usedMin;
   const fill = el.querySelector(".bar-fill");
@@ -226,6 +245,7 @@ function renderKid(c, soc) {
 
   // Pengaturan
   const s = el.querySelector(".settings");
+  fillKelasNegara(s, c.kelas, c.negara);
   s.limitMin.value = String(c.limitMin);
   if (![...s.limitMin.options].some((o) => o.value === String(c.limitMin))) {
     s.limitMin.add(new Option(`${c.limitMin} menit`, String(c.limitMin), true, true));
@@ -238,12 +258,16 @@ function renderKid(c, soc) {
   s.addEventListener("submit", async (e) => {
     e.preventDefault();
     setErr(el, "");
+    if (!s.kelas.value) return setErr(el, "Pilih kelas anak.");
     busy(s, true);
     try {
-      await api("PATCH", `anak/${c.id}`, {
+      const r = await api("PATCH", `anak/${c.id}`, {
+        kelas: Number(s.kelas.value), negara: s.negara.value,
         limitMin: Number(s.limitMin.value), allowStrangers: s.allowStrangers.checked, chat: s.chat.value,
         approveFriends: s.approveFriends.checked,
       });
+      Object.assign(c, r.child);
+      el.querySelector(".jenjang").textContent = kelasText(c);
       const ok = s.querySelector(".saved");
       ok.hidden = false;
       setTimeout(() => (ok.hidden = true), 2000);

@@ -4,6 +4,7 @@ import { randomBytes, scryptSync, timingSafeEqual, createHash } from "node:crypt
 import { db, today, lastDays } from "./db.js";
 import { avatarOr, DEFAULT_ORTU_AVATAR } from "../shared/avatars.js";
 import { avatarSvg } from "../shared/avatar-svg.js";
+import { negaraOr, isNegara, jenjangDariKelas } from "../shared/negara.js";
 import { parentView, parentDecide, unblock, purgeUid, notify, kick } from "./social.js";
 
 const DAY = 86400000;
@@ -97,6 +98,7 @@ export function addPlaySeconds(childId, seconds, now = Date.now()) {
 function publicChild(c) {
   return {
     id: c.id, name: c.name, jenjang: c.jenjang, color: c.color, avatar: avatarOr(c.avatar),
+    negara: negaraOr(c.negara), kelas: c.kelas || 0,
     limitMin: c.limit_min, allowStrangers: !!c.allow_strangers, chat: c.chat, approveFriends: !!c.approve_friends,
     usedMin: Math.floor(secondsToday(c.id) / 60),
   };
@@ -110,6 +112,7 @@ export function playerFromSession(s) {
     if (!c) return null;
     return {
       role: "anak", childId: c.id, parentId: c.parent_id, name: c.name, jenjang: c.jenjang, color: c.color, avatar: avatarOr(c.avatar),
+      negara: negaraOr(c.negara), kelas: c.kelas || 0,
       limitMin: c.limit_min, allowStrangers: !!c.allow_strangers,
     };
   }
@@ -151,9 +154,19 @@ function validChildFields(b, partial) {
     out.name = str(b.name, 16);
     if (!out.name) throw new ApiError(400, "Isi nama panggilan anak.");
   }
-  if (!partial || b.jenjang !== undefined) {
-    if (!JENJANG.includes(b.jenjang)) throw new ApiError(400, "Pilih jenjang SD, SMP, atau SMA.");
+  // Kelas 1–12 (jenjang ikut dari kelas). Jenjang saja masih diterima dari tampilan lama.
+  if (b.kelas !== undefined) {
+    const k = Number(b.kelas);
+    if (!Number.isInteger(k) || k < 1 || k > 12) throw new ApiError(400, "Pilih kelas 1 sampai 12.");
+    out.kelas = k;
+    out.jenjang = jenjangDariKelas(k);
+  } else if (!partial || b.jenjang !== undefined) {
+    if (!JENJANG.includes(b.jenjang)) throw new ApiError(400, "Pilih kelas anak.");
     out.jenjang = b.jenjang;
+  }
+  if (!partial || b.negara !== undefined) {
+    if (b.negara !== undefined && !isNegara(b.negara)) throw new ApiError(400, "Negara tidak dikenal.");
+    out.negara = negaraOr(b.negara);
   }
   if (!partial || b.color !== undefined) out.color = WARNA.test(b.color || "") ? b.color : "#4f9cf0";
   if (!partial || b.avatar !== undefined) out.avatar = avatarOr(b.avatar);
@@ -353,9 +366,9 @@ export async function handleApi(req, res) {
       const n = db.prepare("SELECT COUNT(*) AS n FROM children WHERE parent_id = ?").get(pid).n;
       if (n >= 6) throw new ApiError(400, "Maksimal 6 akun anak.");
       const f = validChildFields(body, false);
-      const r = db.prepare(`INSERT INTO children (parent_id, name, jenjang, color, avatar, pin_hash, limit_min, allow_strangers, chat, created_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(pid, f.name, f.jenjang, f.color, f.avatar, f.pin_hash, f.limit_min ?? 60, f.allow_strangers ?? 0, f.chat ?? "mati", Date.now());
+      const r = db.prepare(`INSERT INTO children (parent_id, name, jenjang, kelas, negara, color, avatar, pin_hash, limit_min, allow_strangers, chat, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(pid, f.name, f.jenjang, f.kelas ?? 0, f.negara, f.color, f.avatar, f.pin_hash, f.limit_min ?? 60, f.allow_strangers ?? 0, f.chat ?? "mati", Date.now());
       return send(200, { child: publicChild(childRow(Number(r.lastInsertRowid))) }), true;
     }
     if (path[0] === "anak" && path.length === 2 && path[1] === "keluar" && m === "POST") {

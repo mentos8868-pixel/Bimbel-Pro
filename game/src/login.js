@@ -24,7 +24,7 @@ function busy(el, on) {
   el.querySelectorAll("button").forEach((b) => (b.disabled = on));
 }
 
-const childProfile = (c) => ({ role: "anak", name: c.name, jenjang: c.jenjang, gameJenjang: c.jenjang, color: c.color, avatar: c.avatar, chat: c.chat });
+const childProfile = (c) => ({ role: "anak", name: c.name, jenjang: c.jenjang, gameJenjang: c.jenjang, negara: c.negara, kelas: c.kelas, color: c.color, avatar: c.avatar, chat: c.chat });
 
 // Memanggil onStart(profile, playingAs) saat pemain siap masuk arena.
 export function setupLogin(onStart) {
