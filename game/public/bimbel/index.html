@@ -27,7 +27,6 @@
   .tag{font-size:11px;font-weight:800;background:var(--teal-soft);color:var(--teal);padding:2px 8px;border-radius:99px;margin-left:6px;vertical-align:middle}
   .spacer{flex:1}
   .stat{display:flex;align-items:center;gap:6px;font-weight:800;background:var(--bg);border:2px solid var(--line);padding:4px 12px;border-radius:99px}
-  .coin{width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#FFE27A,var(--gold));border:2px solid #D69A00;display:inline-block}
   .me{display:flex;align-items:center;gap:8px;font-weight:800}
   .ava{width:38px;height:38px;border-radius:50%;background:var(--accent-soft);display:grid;place-items:center;font-size:22px;border:2px solid var(--accent)}
   nav{max-width:1040px;margin:0 auto;padding:0 20px;display:flex;gap:4px;overflow-x:auto}
@@ -199,7 +198,6 @@
   <div class="top-in">
     <div class="brand">Ruang<b>Pintar</b><span class="tag">CONTOH</span></div>
     <div class="spacer"></div>
-    <div class="stat" title="Koin"><span class="coin"></span><span id="coins">0</span></div>
     <div class="me"><div class="ava" id="ava">🦊</div><span id="uname">Murid</span></div>
   </div>
   <nav id="nav">
@@ -802,7 +800,7 @@ function buildSession(t,n){
 
 /* ============ Penyimpanan (di browser) ============ */
 const JUMLAH_SOAL=10;   // jumlah soal tetap untuk setiap sesi latihan
-const DEF={name:'',avatar:'🦊',owned:['🦊'],coins:0,xp:0,sessions:0,perfect:0,medals:[],topics:{},history:[],tryouts:[],kelas:4,lv:2,mapel:'mat',kur:'merdeka'};
+const DEF={name:'',avatar:'🦊',owned:['🦊'],xp:0,sessions:0,perfect:0,medals:[],topics:{},history:[],tryouts:[],kelas:4,lv:2,mapel:'mat',kur:'merdeka'};
 let S=Object.assign({},DEF,JSON.parse(localStorage.getItem('ruangpintar')||'{}'));
 const save=()=>localStorage.setItem('ruangpintar',JSON.stringify(S));
 
@@ -823,7 +821,7 @@ const level=()=>Math.floor(S.xp/100)+1;
 /* ============ Tampilan ============ */
 let view='belajar', sess=null;
 function header(){
-  $('#coins').textContent=S.coins; $('#ava').textContent=S.avatar; $('#uname').textContent=S.name||'Murid';
+  $('#ava').textContent=S.avatar; $('#uname').textContent=S.name||'Murid';
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===view));
 }
 function go(v){
@@ -852,7 +850,7 @@ function renderHome(app){
   const kchip=k=>`<button class="chip ${S.kelas===k?'on':''}" data-k="${k}" title="${K.label(k)}">${K.chip(k)}</button>`;
   app.innerHTML=`
     <h1>Halo, ${esc(S.name||'Murid')}! 👋</h1>
-    <p class="sub">Pilih pelajaran, kelas, dan tingkat kesulitan. Jawaban benar memberi koin.</p>
+    <p class="sub">Pilih pelajaran, kelas, dan tingkat kesulitan.</p>
     <div class="lvl"><span class="lvl-badge">Level ${level()}</span><div class="bar"><i style="width:${xpIn}%"></i></div><span style="font-weight:800;color:var(--muted)">${xpIn}/100 XP</span></div>
     <div class="kurbar"><b class="glab">Kurikulum</b>${Object.entries(KURS).map(([k,v])=>`<button class="kur ${S.kur===k?'on':''}" data-kur="${k}"><b>${v.short}</b><span>${k==='merdeka'?'Indonesia · 4 pelajaran':'Internasional · Math, Science, English'}</span></button>`).join('')}</div>
     <div class="grades">${Object.entries(K.mapel).map(([m,n])=>`<button class="chip ${S.mapel===m?'on':''}" data-m="${m}">${n}</button>`).join('')}</div>
@@ -869,7 +867,7 @@ function renderHome(app){
 
 function start(id){const t=topicsFor(S.mapel,S.kelas).find(x=>x.id===id)||topicById(id);LV=S.lv;
   const qs=buildSession(t,JUMLAH_SOAL);if(!qs.length){alert('Belum ada soal untuk topik ini.');return}
-  sess={t,lv:S.lv,qs,i:0,res:[],coins:0,streak:0,answered:false,done:false};render();
+  sess={t,lv:S.lv,qs,i:0,res:[],streak:0,answered:false,done:false};render();
 }
 function ansText(q){if(q.kind==='str')return esc(q.ans);if(q.kind==='frac'){let [n,d]=q.ans;if(d<0){n=-n;d=-d}const g=gcd(n,d);n/=g;d/=g;return d===1?`${n}`:(n<0?'−':'')+F(Math.abs(n),d)}
   return q.kind==='dec'?fmtD(q.ans,2):(Math.abs(q.ans)>=1000?q.ans.toLocaleString('id-ID'):q.ans)}
@@ -885,7 +883,7 @@ function renderQ(app){const s=sess,q=s.qs[s.i];
   const input=q.choices?`<div class="choices ${q.text?'long':''}">${q.choices.map(c=>`<button class="choice" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>`
     :`<div class="ans"><input id="inp" inputmode="text" autocomplete="off" placeholder="Jawaban"><button class="btn" id="cek">Periksa</button></div>${q.hint?`<div class="hint">${q.hint}</div>`:''}`;
   app.innerHTML=`<div class="practice">
-    <div class="phead"><button class="btn ghost" id="keluar">✕</button><div class="dots">${dots}</div><div class="stat"><span class="coin"></span>+<span id="sc">${s.coins}</span></div></div>
+    <div class="phead"><button class="btn ghost" id="keluar">✕</button><div class="dots">${dots}</div></div>
     <div class="qcard">
       <div class="qlabel">${mapelName(s.t)} · ${esc(s.t.name)}${q.from&&(s.t.mix||s.t.g==='__mix')?' · '+esc(q.from):''} · <span class="lvtag lv${s.lv}">${LVNAME[s.lv]}</span> · Soal ${s.i+1} dari ${s.qs.length}</div>
       <div class="qtext ${q.text?'small':''}">${q.q}</div>
@@ -901,16 +899,15 @@ function renderQ(app){const s=sess,q=s.qs[s.i];
   $('#next').onclick=nextQ;
 }
 function answer(ok,btn){const s=sess,q=s.qs[s.i];s.answered=true;s.res.push(ok);
-  let gain=0;if(ok){s.streak++;gain=(10+(s.lv-1)*5)+(s.streak>=3?5:0);s.coins+=gain}else s.streak=0;
+  if(ok)s.streak++;else s.streak=0;
   if(btn){$('#app').querySelectorAll('.choice').forEach(b=>{if(check(q,b.dataset.c))b.classList.add('right')});if(!ok)btn.classList.add('wrong')}
   const inp=$('#inp');if(inp){inp.disabled=true;inp.style.borderColor=ok?'var(--ok)':'var(--bad)';$('#cek').disabled=true}
   const fb=$('#fb');fb.className='fb show '+(ok?'ok':'bad');
   const steps=`<ol class="steps">${q.steps.map(x=>`<li>${x}</li>`).join('')}</ol>`;
-  fb.innerHTML=ok?`<div class="big">Benar! <span class="pop">+${gain} koin</span>${s.streak>=3?' (bonus beruntun!)':''}</div>
+  fb.innerHTML=ok?`<div class="big">Benar!</div>
       <button class="linkbtn" id="lihat">Lihat pembahasan</button><div id="pb" style="display:none">${steps}</div>`
     :`<div class="big">Belum tepat. Jawaban yang benar: ${ansText(q)}</div><div>Yuk lihat caranya:</div>${steps}`;
   if(ok)$('#lihat').onclick=()=>{$('#pb').style.display='block';$('#lihat').remove()};
-  $('#sc').textContent=s.coins;
   const n=$('#next');n.style.display='inline-block';n.focus();
 }
 function nextQ(){const s=sess;if(!s.answered)return;if(s.i<s.qs.length-1){s.i++;s.answered=false;render()}else finish()}
@@ -918,7 +915,7 @@ function finish(){const s=sess,c=s.res.filter(Boolean).length,N=s.qs.length,pc=c
   const before=new Set(S.medals),key=`${s.t.id}|${s.lv}`;
   const t=S.topics[key]||{best:0,att:0,ok:0,ses:0};
   t.att+=N;t.ok+=c;t.ses++;t.best=Math.max(t.best,stars);S.topics[key]=t;
-  S.coins+=s.coins;S.xp+=c*(10+(s.lv-1)*5);S.sessions++;if(c===N&&N>=5)S.perfect++;
+  S.xp+=c*(10+(s.lv-1)*5);S.sessions++;if(c===N&&N>=5)S.perfect++;
   S.history.unshift({d:new Date().toISOString(),id:key,c,n:N});S.history=S.history.slice(0,50);
   MEDALS.forEach(m=>{if(!before.has(m.id)&&m.ok(S))S.medals.push(m.id)});
   s.newMedals=S.medals.filter(m=>!before.has(m)).map(id=>MEDALS.find(m=>m.id===id));
@@ -932,7 +929,7 @@ function renderResult(app){const s=sess,N=s.qs.length;
     <div class="stars" style="margin-top:10px">${[1,2,3].map(i=>`<span class="${i<=s.stars?'s':''}">★</span>`).join('')}</div>
     <div class="score">${s.correct} / ${N} benar</div>
     <p style="font-weight:700">${msg}</p>${naik}
-    <div class="stat" style="display:inline-flex"><span class="coin"></span>+${s.coins} koin · +${s.correct*(10+(s.lv-1)*5)} XP</div>
+    <div class="stat" style="display:inline-flex">+${s.correct*(10+(s.lv-1)*5)} XP</div>
     ${s.newMedals.map(m=>`<div class="newmedal">Medali baru! ${m.e} <b>${m.n}</b></div>`).join('')}
     <div style="display:flex;gap:12px;justify-content:center;margin-top:24px;flex-wrap:wrap">
       <button class="btn ghost" id="home">Kembali ke topik</button>${naik?`<button class="btn ghost" id="up">Coba ${LVNAME[s.lv+1]}</button>`:''}<button class="btn" id="again">Latihan lagi</button></div>
@@ -970,7 +967,7 @@ function renderReport(app){
     ${strong.length?` Sudah kuat di: ${strong.map(r=>esc(r.t.name)+' ('+LVNAME[r.lv]+')').join(', ')}.`:''}</div>
   ${thBlock}
   <p style="margin-top:18px"><button class="btn ghost" id="reset">Hapus semua data (mulai dari awal)</button></p>`;
-  $('#reset').onclick=()=>{if(confirm('Hapus semua progres, koin, dan medali?')){localStorage.removeItem('ruangpintar');clearInterval(exTimer);ex=null;exSave();S=Object.assign({},DEF,{owned:['🦊'],medals:[],topics:{},history:[],tryouts:[]});go('belajar');onboard()}};
+  $('#reset').onclick=()=>{if(confirm('Hapus semua progres dan medali?')){localStorage.removeItem('ruangpintar');clearInterval(exTimer);ex=null;exSave();S=Object.assign({},DEF,{owned:['🦊'],medals:[],topics:{},history:[],tryouts:[]});go('belajar');onboard()}};
 }
 
 /* ============ Tryout / Mode Ujian ============ */
@@ -1122,9 +1119,9 @@ function submitExam(auto){
   ex.correct=ex.res.filter(r=>r===true).length;
   ex.score=Math.round(ex.correct/ex.qs.length*100);
   ex.used=Math.min(ex.menit*60,Math.round((Date.now()-ex.start)/1000));
-  ex.auto=auto;ex.done=true;ex.coins=ex.correct*5;ex.xp=ex.correct*10;
+  ex.auto=auto;ex.done=true;ex.xp=ex.correct*10;
   const before=new Set(S.medals);
-  S.coins+=ex.coins;S.xp+=ex.xp;
+  S.xp+=ex.xp;
   S.tryouts=[{d:new Date().toISOString(),kur:ex.kur,mapel:ex.mapel,kelas:ex.kelas,lv:ex.lv,score:ex.score,c:ex.correct,n:ex.qs.length,used:ex.used,menit:ex.menit}].concat(S.tryouts||[]).slice(0,30);
   MEDALS.forEach(m=>{if(!before.has(m.id)&&m.ok(S))S.medals.push(m.id)});
   ex.newMedals=S.medals.filter(m=>!before.has(m));
@@ -1150,7 +1147,7 @@ function renderExamResult(app){
         <div class="sbox"><div class="k">Tidak dijawab</div><div class="v">${kosong}</div></div>
         <div class="sbox"><div class="k">Waktu dipakai</div><div class="v">${fmtT(ex.used)}</div></div>
       </div>
-      <div class="stat" style="display:inline-flex"><span class="coin"></span>+${ex.coins} koin · +${ex.xp} XP</div>
+      <div class="stat" style="display:inline-flex">+${ex.xp} XP</div>
       ${medals.map(m=>`<div class="newmedal">Medali baru! ${m.e} <b>${m.n}</b></div>`).join('')}
     </div>
     <h2 style="margin-top:28px">Nilai per topik</h2>
