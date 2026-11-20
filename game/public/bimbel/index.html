@@ -841,6 +841,9 @@ function render(){header();const app=$('#app');
   ({belajar:renderHome,tryout:renderTryout,medali:renderMedals,laporan:renderReport})[view](app);
 }
 function starsHTML(n){return `<span class="stars">${[1,2,3].map(i=>`<span class="${i<=n?'s':''}">★</span>`).join('')}</span>`}
+/* Kurikulum dan kelas diatur orang tua di dashboard; anak hanya melihatnya. */
+const aturOrtu=()=>{const K=KURS[S.kur]||KURS.merdeka;
+  return `<div class="kurbar" style="align-items:center"><b class="glab">Kurikulum</b><span class="lvtag" style="background:var(--teal-soft);color:var(--teal);font-size:14px;padding:6px 12px">${K.name} · ${K.label(S.kelas)}</span><span style="color:var(--muted);font-weight:700;font-size:13px">diatur orang tua</span></div>`};
 function renderHome(app){
   const K=KURS[S.kur]||KURS.merdeka;if(!K.mapel[S.mapel]){S.mapel=Object.keys(K.mapel)[0]}
   const xpIn=S.xp%100,topics=topicsFor(S.mapel,S.kelas),intl=S.kur!=='merdeka';
@@ -850,23 +853,19 @@ function renderHome(app){
       <div><h3>${esc(t.name)}</h3><p>${esc(t.desc)}${t.bank?` · ${nb} soal ${lvName(S.lv,S.kur).toLowerCase()}`:''} · ${starsHTML(st.best)}</p></div>
       <div class="act"><button class="btn" data-t="${t.id}">${st.att?'Latihan lagi':'Mulai'}</button></div>
     </div>`}).join('');
-  const empty=S.kur==='merdeka'&&S.mapel==='ipa'&&S.kelas<=2?`IPA (IPAS) di Kurikulum Merdeka mulai dari kelas 3. Pilih kelas 3 ke atas.`
+  const empty=S.kur==='merdeka'&&S.mapel==='ipa'&&S.kelas<=2?`IPA (IPAS) di Kurikulum Merdeka mulai dari kelas 3. Pilih pelajaran lain.`
     :S.kur==='sgp'&&S.mapel==='sci'&&S.kelas<=2?`Science di kurikulum Singapore MOE mulai dari Primary 3.`
     :`Soal ${K.mapel[S.mapel]} ${K.label(S.kelas)} sedang ditulis oleh tim agency agent. Coba lagi nanti.`;
-  const kchip=k=>`<button class="chip ${S.kelas===k?'on':''}" data-k="${k}" title="${K.label(k)}">${K.chip(k)}</button>`;
   app.innerHTML=`
     <h1>Halo, ${esc(S.name||'Murid')}! 👋</h1>
-    <p class="sub">Pilih pelajaran, kelas, dan tingkat kesulitan.</p>
+    <p class="sub">Pilih pelajaran dan tingkat kesulitan.</p>
     <div class="lvl"><span class="lvl-badge">Level ${level()}</span><div class="bar"><i style="width:${xpIn}%"></i></div><span style="font-weight:800;color:var(--muted)">${xpIn}/100 XP</span></div>
-    <div class="kurbar"><b class="glab">Kurikulum</b>${Object.entries(KURS).map(([k,v])=>`<button class="kur ${S.kur===k?'on':''}" data-kur="${k}"><b>${v.short}</b><span>${k==='merdeka'?'Indonesia · 4 pelajaran':'Internasional · Math, Science, English'}</span></button>`).join('')}</div>
+    ${aturOrtu()}
     <div class="grades">${Object.entries(K.mapel).map(([m,n])=>`<button class="chip ${S.mapel===m?'on':''}" data-m="${m}">${n}</button>`).join('')}</div>
-    <div class="grades kel">${K.groups.map(([g,ks])=>`<span class="glab">${g}</span>${ks.map(kchip).join('')}`).join('')}</div>
     <div class="grades" style="align-items:center"><b class="glab">Tingkat</b>${[1,2,3].map(l=>`<button class="chip lv${l} ${S.lv===l?'on':''}" data-lv="${l}">${lvName(l,S.kur)}</button>`).join('')}</div>
     <h2>${K.mapel[S.mapel]} · ${K.label(S.kelas)}${intl?` <span class="lvtag" style="background:var(--teal-soft);color:var(--teal)">${K.short}</span>`:''} <span style="color:var(--muted);font-weight:700;font-size:15px">· ${topics.filter(t=>!t.mix&&t.g!=='__mix').length} topik · ${lvName(S.lv,S.kur)}</span></h2>
     ${topics.length?`<div class="path">${list}</div>`:`<div class="empty">${empty}</div>`}`;
-  app.querySelectorAll('[data-kur]').forEach(b=>b.onclick=()=>{S.kur=b.dataset.kur;S.mapel=Object.keys(KURS[S.kur].mapel)[0];save();render()});
   app.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{S.mapel=b.dataset.m;save();render()});
-  app.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{S.kelas=+b.dataset.k;save();render()});
   app.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{S.lv=+b.dataset.lv;save();render()});
   app.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>start(b.dataset.t));
 }
@@ -973,7 +972,7 @@ function renderReport(app){
     ${strong.length?` Sudah kuat di: ${strong.map(r=>esc(r.t.name)+' ('+LVNAME[r.lv]+')').join(', ')}.`:''}</div>
   ${thBlock}
   <p style="margin-top:18px"><button class="btn ghost" id="reset">Hapus semua data (mulai dari awal)</button></p>`;
-  $('#reset').onclick=()=>{if(confirm('Hapus semua progres dan medali?')){localStorage.removeItem(SKEY);clearInterval(exTimer);ex=null;exSave();S=Object.assign({},DEF,{medals:[],topics:{},history:[],tryouts:[],name:AKUN.name});go('belajar');onboard()}};
+  $('#reset').onclick=()=>{if(confirm('Hapus semua progres dan medali?')){localStorage.removeItem(SKEY);clearInterval(exTimer);ex=null;exSave();S=Object.assign({},DEF,{medals:[],topics:{},history:[],tryouts:[]});pakaiAkun();save();go('belajar')}};
 }
 
 /* ============ Tryout / Mode Ujian ============ */
@@ -1024,14 +1023,12 @@ function renderTryout(app){
   const chosen=tops.filter(t=>TO.sel.has(t.id));
   const avail=chosen.some(t=>!t.bank)?Infinity:chosen.reduce((a,t)=>a+t.bank.length,0);
   const n=Math.min(TO.n,avail);
-  const kchip=k=>`<button class="chip ${S.kelas===k?'on':''}" data-k="${k}" title="${K.label(k)}">${K.chip(k)}</button>`;
   const empty=`Belum ada soal ${K.mapel[S.mapel]} untuk ${K.label(S.kelas)}. Pilih kelas atau pelajaran lain.`;
   const hist=tryoutHist(5);
   app.innerHTML=`<h1>Tryout</h1>
     <p class="sub">Simulasi ujian: soal campuran dari beberapa topik dengan batas waktu. Jawaban dan pembahasan baru ditampilkan setelah tryout dikumpulkan.</p>
-    <div class="kurbar"><b class="glab">Kurikulum</b>${Object.entries(KURS).map(([k,v])=>`<button class="kur ${S.kur===k?'on':''}" data-kur="${k}"><b>${v.short}</b><span>${k==='merdeka'?'Indonesia · 4 pelajaran':'Internasional · Math, Science, English'}</span></button>`).join('')}</div>
+    ${aturOrtu()}
     <div class="grades">${Object.entries(K.mapel).map(([m,nm])=>`<button class="chip ${S.mapel===m?'on':''}" data-m="${m}">${nm}</button>`).join('')}</div>
-    <div class="grades kel">${K.groups.map(([g,ks])=>`<span class="glab">${g}</span>${ks.map(kchip).join('')}`).join('')}</div>
     ${tops.length?`<div class="tsetup">
       <div class="tbox"><h3>Topik yang diujikan <button class="linkbtn" id="tall">${chosen.length===tops.length?'Kosongkan':'Pilih semua'}</button></h3>
         <div class="tlist">${tops.map(t=>`<label><input type="checkbox" data-sel="${t.id}" ${TO.sel.has(t.id)?'checked':''}><span>${esc(t.name)}<small>${t.bank?t.bank.length+' soal tersedia':'Soal dibuat otomatis'}</small></span></label>`).join('')}</div></div>
@@ -1046,9 +1043,7 @@ function renderTryout(app){
         <button class="btn" id="tmulai" ${!chosen.length||!n?'disabled':''}>Mulai tryout</button></div>
       ${hist?`<div><h2 style="margin-top:8px">Riwayat tryout</h2>${hist}</div>`:''}
     </div>`:`<div class="empty">${empty}</div>`}`;
-  app.querySelectorAll('[data-kur]').forEach(b=>b.onclick=()=>{S.kur=b.dataset.kur;S.mapel=Object.keys(KURS[S.kur].mapel)[0];save();render()});
   app.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{S.mapel=b.dataset.m;save();render()});
-  app.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{S.kelas=+b.dataset.k;save();render()});
   app.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{TO.n=+b.dataset.n;render()});
   app.querySelectorAll('[data-mn]').forEach(b=>b.onclick=()=>{TO.menit=+b.dataset.mn;render()});
   app.querySelectorAll('[data-tl]').forEach(b=>b.onclick=()=>{TO.lv=+b.dataset.tl;render()});
@@ -1176,22 +1171,20 @@ function renderExamResult(app){
   $('#eback').onclick=()=>{ex=null;render();window.scrollTo(0,0)};
   $('#eagain').onclick=()=>{S.kur=ex.kur;S.mapel=ex.mapel;S.kelas=ex.kelas;ex=null;save();startExam()};
 }
-/* ============ Kenalan dulu (nama dan avatar dari akun; anak hanya memilih kurikulum dan kelas) ============ */
-function onboard(){if(S.siap)return;
-  const m=document.createElement('div');m.className='modal';
-  m.innerHTML=`<div class="mbox"><h2>Halo, ${esc(S.name)}! Selamat datang di Ruang Pintar</h2>
-    <p style="margin:0 0 14px;color:var(--muted)">Nama dan avatarmu diatur oleh orang tua.</p>
-    <p style="margin:0 0 8px;font-weight:800">Kurikulum sekolahmu</p><select id="kr" style="font:inherit;font-size:18px;padding:8px;border-radius:10px;border:3px solid var(--line);width:100%;margin-bottom:12px">${Object.entries(KURS).map(([k,v])=>`<option value="${k}">${v.name}</option>`).join('')}</select>
-    <p style="margin:0 0 8px;font-weight:800">Kelas berapa?</p><select id="kl" style="font:inherit;font-size:18px;padding:8px;border-radius:10px;border:3px solid var(--line);width:100%;margin-bottom:16px">${[...Array(12).keys()].map(i=>`<option value="${i+1}" ${i+1===4?'selected':''}>Kelas ${i+1} ${jenjang(i+1)}</option>`).join('')}</select>
-    <button class="btn" id="go" style="width:100%">Mulai belajar</button></div>`;
-  document.body.appendChild(m);
-  $('#go').onclick=()=>{S.siap=true;S.kelas=+$('#kl').value;S.kur=$('#kr').value;S.mapel=Object.keys(KURS[S.kur].mapel)[0];save();m.remove();render()};
+/* ============ Akun: nama, avatar, kurikulum, dan kelas semuanya dari orang tua ============ */
+function pakaiAkun(){
+  S.name=AKUN.name;S.kelas=AKUN.kelas;S.kur=KURS[AKUN.kurikulum]?AKUN.kurikulum:'merdeka';
+  if(!KURS[S.kur].mapel[S.mapel])S.mapel=Object.keys(KURS[S.kur].mapel)[0];
 }
 
 /* ============ Masuk: wajib akun anak dari orang tua ============ */
 function gerbang(me){
   const m=document.createElement('div');m.className='modal';m.id='gerbang';
-  const isi=me===null
+  const isi=me&&me.anak&&!me.anak.kelas
+    ?`<h2>Kelas belum diatur</h2><p>Minta orang tua memilih kelas dan kurikulum sekolahmu di dashboard orang tua (bagian Pengaturan).</p>
+      <a class="btn" href="/orangtua.html" style="display:block;text-align:center;text-decoration:none;margin-bottom:10px">Dashboard orang tua</a>
+      <button class="btn ghost" id="lagi" style="width:100%">Sudah diatur? Muat ulang</button>`
+    :me===null
     ?`<h2>Tidak bisa memeriksa akun</h2><p>Ruang Pintar perlu tersambung ke server Bimbel Pro. Periksa koneksi, lalu coba lagi.</p>
       <button class="btn" id="lagi" style="width:100%">Coba lagi</button>`
     :me.ortu
@@ -1208,14 +1201,14 @@ function gerbang(me){
 async function mulai(){
   let me=null;
   try{const r=await fetch('/api/saya',{credentials:'same-origin'});if(r.ok)me=await r.json()}catch(e){}
-  if(!me||!me.anak){$('#app').innerHTML='';return gerbang(me)}
+  if(!me||!me.anak||!me.anak.kelas){$('#app').innerHTML='';return gerbang(me)}
   AKUN=me.anak;SKEY=`ruangpintar_a${AKUN.id}`;EXKEY=`ruangpintar_ujian_a${AKUN.id}`;
   try{S=Object.assign({},DEF,JSON.parse(localStorage.getItem(SKEY)||'{}'))}catch(e){S=Object.assign({},DEF)}
-  S.name=AKUN.name;
+  pakaiAkun();save();
   $('#ava').innerHTML=`<img src="/api/avatar.svg?v=${encodeURIComponent(AKUN.avatar+AKUN.color)}" alt="Avatar ${esc(AKUN.name)}">`;
   /* lanjutkan tryout yang belum selesai (mis. setelah halaman di-refresh) */
   try{const sx=JSON.parse(localStorage.getItem(EXKEY)||'null');if(sx&&!sx.done&&sx.qs&&sx.qs.length){ex=sx;view='tryout'}}catch(e){}
-  render();onboard();
+  render();
 }
 mulai();
 </script>

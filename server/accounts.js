@@ -12,6 +12,7 @@ const SESSION_MS = 30 * DAY;
 const JENJANG = ["SD", "SMP", "SMA"];
 const WARNA = /^#[0-9a-fA-F]{6}$/;
 const CHAT = ["mati", "siap", "bebas"];
+const KURIKULUM = ["merdeka", "cam", "sgp"];   // Ruang Pintar: Merdeka, Cambridge, Singapore
 const GAMES = ["catur", "scramble", "kartu"];
 
 // ---------- kata sandi dan token ----------
@@ -98,7 +99,7 @@ export function addPlaySeconds(childId, seconds, now = Date.now()) {
 function publicChild(c) {
   return {
     id: c.id, name: c.name, jenjang: c.jenjang, color: c.color, avatar: avatarOr(c.avatar),
-    negara: negaraOr(c.negara), kelas: c.kelas || 0,
+    negara: negaraOr(c.negara), kelas: c.kelas || 0, kurikulum: KURIKULUM.includes(c.kurikulum) ? c.kurikulum : "merdeka",
     limitMin: c.limit_min, allowStrangers: !!c.allow_strangers, chat: c.chat, approveFriends: !!c.approve_friends,
     usedMin: Math.floor(secondsToday(c.id) / 60),
   };
@@ -163,6 +164,10 @@ function validChildFields(b, partial) {
   } else if (!partial || b.jenjang !== undefined) {
     if (!JENJANG.includes(b.jenjang)) throw new ApiError(400, "Pilih kelas anak.");
     out.jenjang = b.jenjang;
+  }
+  if (!partial || b.kurikulum !== undefined) {
+    if (b.kurikulum !== undefined && !KURIKULUM.includes(b.kurikulum)) throw new ApiError(400, "Kurikulum tidak dikenal.");
+    out.kurikulum = b.kurikulum ?? "merdeka";
   }
   if (!partial || b.negara !== undefined) {
     if (b.negara !== undefined && !isNegara(b.negara)) throw new ApiError(400, "Negara tidak dikenal.");
@@ -366,9 +371,9 @@ export async function handleApi(req, res) {
       const n = db.prepare("SELECT COUNT(*) AS n FROM children WHERE parent_id = ?").get(pid).n;
       if (n >= 6) throw new ApiError(400, "Maksimal 6 akun anak.");
       const f = validChildFields(body, false);
-      const r = db.prepare(`INSERT INTO children (parent_id, name, jenjang, kelas, negara, color, avatar, pin_hash, limit_min, allow_strangers, chat, created_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(pid, f.name, f.jenjang, f.kelas ?? 0, f.negara, f.color, f.avatar, f.pin_hash, f.limit_min ?? 60, f.allow_strangers ?? 0, f.chat ?? "mati", Date.now());
+      const r = db.prepare(`INSERT INTO children (parent_id, name, jenjang, kelas, kurikulum, negara, color, avatar, pin_hash, limit_min, allow_strangers, chat, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(pid, f.name, f.jenjang, f.kelas ?? 0, f.kurikulum, f.negara, f.color, f.avatar, f.pin_hash, f.limit_min ?? 60, f.allow_strangers ?? 0, f.chat ?? "mati", Date.now());
       return send(200, { child: publicChild(childRow(Number(r.lastInsertRowid))) }), true;
     }
     if (path[0] === "anak" && path.length === 2 && path[1] === "keluar" && m === "POST") {
