@@ -4,11 +4,18 @@ import { randomBytes, scryptSync, timingSafeEqual, createHash } from "node:crypt
 import { db, today, lastDays } from "./db.js";
 import { avatarOr, DEFAULT_ORTU_AVATAR } from "../shared/avatars.js";
 import { avatarSvg } from "../shared/avatar-svg.js";
+import { rapikanAksesori } from "../shared/aksesori.js";
+import { levelDariXp, auraUntukLevel } from "../shared/aura.js";
+
+const auraAnak = (c) => auraUntukLevel(levelDariXp(c.xp))?.id || "";
+import { handleToko } from "./toko.js";
+import { kamarku } from "./kamarku.js";
+import { handleProgres, ringkasBelajar } from "./progres.js";
 import { negaraOr, isNegara, jenjangDariKelas } from "../shared/negara.js";
 import { parentView, parentDecide, unblock, purgeUid, notify, kick } from "./social.js";
+import { sendMail, APP_URL } from "./mailer.js";
 
 const DAY = 86400000;
-import { sendMail, APP_URL } from "./mailer.js";
 const SESSION_MS = 30 * DAY;
 const JENJANG = ["SD", "SMP", "SMA"];
 const WARNA = /^#[0-9a-fA-F]{6}$/;
@@ -101,6 +108,7 @@ function publicChild(c) {
   return {
     id: c.id, name: c.name, jenjang: c.jenjang, color: c.color, avatar: avatarOr(c.avatar),
     negara: negaraOr(c.negara), kelas: c.kelas || 0, kurikulum: KURIKULUM.includes(c.kurikulum) ? c.kurikulum : "merdeka",
+    aksesori: rapikanAksesori(c.aksesori_pakai).join(","), level: levelDariXp(c.xp), aura: auraAnak(c),
     limitMin: c.limit_min, allowStrangers: !!c.allow_strangers, chat: c.chat, approveFriends: !!c.approve_friends,
     usedMin: Math.floor(secondsToday(c.id) / 60),
   };
@@ -115,6 +123,7 @@ export function playerFromSession(s) {
     return {
       role: "anak", childId: c.id, parentId: c.parent_id, name: c.name, jenjang: c.jenjang, color: c.color, avatar: avatarOr(c.avatar),
       negara: negaraOr(c.negara), kelas: c.kelas || 0, kurikulum: KURIKULUM.includes(c.kurikulum) ? c.kurikulum : "merdeka",
+      aksesori: rapikanAksesori(c.aksesori_pakai).join(","), aura: auraAnak(c),
       limitMin: c.limit_min, allowStrangers: !!c.allow_strangers,
     };
   }
@@ -146,13 +155,9 @@ setInterval(() => {
   for (const [k, v] of attempts) if (v.until < now) attempts.delete(k);
   db.prepare("DELETE FROM sessions WHERE expires_at < ?").run(now);
   db.prepare("DELETE FROM login_codes WHERE expires_at < ?").run(now);
+  db.prepare("DELETE FROM password_resets WHERE expires_at < ?").run(now);
 }, 60000).unref();
 
-// ---------- validasi ----------
-const str = (v, max) => String(v ?? "").trim().slice(0, max);
-  db.prepare("DELETE FROM password_resets WHERE expires_at < ?").run(now);
-function validChildFields(b, partial) {
-  const out = {};
 const RESET_MS = 30 * 60000;
 // Buat token atur ulang kata sandi lalu kirim tautannya ke email orang tua.
 // Token ditaruh di bagian # alamat, sehingga tidak ikut terkirim ke server atau tercatat di log.
@@ -171,6 +176,10 @@ function sendResetLink(p) {
   }).catch((e) => console.error("Lupa kata sandi:", e.message));
 }
 
+// ---------- validasi ----------
+const str = (v, max) => String(v ?? "").trim().slice(0, max);
+function validChildFields(b, partial) {
+  const out = {};
   if (!partial || b.name !== undefined) {
     out.name = str(b.name, 16);
     if (!out.name) throw new ApiError(400, "Isi nama panggilan anak.");
@@ -235,12 +244,12 @@ function cookie(name, value, maxAgeSec) {
   return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSec}`;
 }
 
-async function readJson(req) {
+async function readJson(req, maks = 20000) {
   let size = 0;
   const chunks = [];
   for await (const c of req) {
     size += c.length;
-    if (size > 20000) throw new ApiError(413, "Data terlalu besar.");
+    if (size > maks) throw new ApiError(413, "Data terlalu besar.");
     chunks.push(c);
   }
   if (!chunks.length) return {};
@@ -262,7 +271,7 @@ function report(parentId) {
       stats[g] = s;
     }
     const recent = db.prepare(`SELECT game, mode, outcome, score, created_at AS at FROM results WHERE child_id = ? ORDER BY created_at DESC LIMIT 10`).all(c.id);
-    return { ...publicChild(c), week: days.map((d) => ({ day: d, minutes: Math.floor((byDay[d] || 0) / 60) })), stats, recent };
+    return { ...publicChild(c), week: days.map((d) => ({ day: d, minutes: Math.floor((byDay[d] || 0) / 60) })), stats, recent, belajar: ringkasBelajar(c.id) };
   });
 }
 
@@ -283,7 +292,8 @@ export async function handleApi(req, res) {
     const ip = req.socket.remoteAddress || "?";
     const path = url.pathname.slice(5).split("/").filter(Boolean); // tanpa "/api/"
     const m = req.method;
-    const body = m === "GET" ? {} : await readJson(req);
+    // Kemajuan Ruang Pintar boleh lebih besar (daftar topik dan riwayat).
+    const body = m === "GET" ? {} : await readJson(req, path[0] === "progres" ? 300000 : 20000);
     const needOrtu = () => { if (!ortu) throw new ApiError(401, "Silakan masuk sebagai orang tua."); return ortu.parent_id; };
 
     // --- orang tua ---
@@ -310,10 +320,6 @@ export async function handleApi(req, res) {
       const token = createSession("ortu", p.id);
       return send(200, { ok: true }, { "Set-Cookie": cookie(COOKIE.ortu, token, SESSION_MS / 1000) }), true;
     }
-    if (m === "POST" && path[0] === "keluar") {
-      endSession(cookies[COOKIE.ortu]);
-      endSession(cookies[COOKIE.anak]);
-      return send(200, { ok: true }, { "Set-Cookie": [cookie(COOKIE.ortu, "", 0), cookie(COOKIE.anak, "", 0)] }), true;
     // Lupa kata sandi: jawabannya selalu sama, supaya tidak bisa dipakai untuk menebak email mana yang terdaftar.
     if (m === "POST" && path[0] === "lupa-sandi") {
       const email = str(body.email, 120).toLowerCase();
@@ -343,6 +349,10 @@ export async function handleApi(req, res) {
       const token = createSession("ortu", row.parent_id);
       return send(200, { ok: true }, { "Set-Cookie": cookie(COOKIE.ortu, token, SESSION_MS / 1000) }), true;
     }
+    if (m === "POST" && path[0] === "keluar") {
+      endSession(cookies[COOKIE.ortu]);
+      endSession(cookies[COOKIE.anak]);
+      return send(200, { ok: true }, { "Set-Cookie": [cookie(COOKIE.ortu, "", 0), cookie(COOKIE.anak, "", 0)] }), true;
     }
     if (m === "GET" && path[0] === "saya") {
       const out = { ortu: null, anak: null, children: [] };
@@ -357,11 +367,18 @@ export async function handleApi(req, res) {
       }
       return send(200, out), true;
     }
-    // Ganti avatar orang tua sendiri (sebagai=ortu). Avatar anak hanya diubah orang tua lewat PATCH anak/:id.
+    // Ganti avatar sendiri: orang tua (sebagai=ortu) atau anak yang sedang masuk (sebagai=anak).
+    // Pilihan avatar hanya dari daftar tetap (keluarga hewan/robot), jadi aman dipilih anak sendiri.
+    // Orang tua tetap bisa menggantinya lewat PATCH anak/:id di dashboard.
     if (m === "POST" && path[0] === "avatar") {
       const avatar = avatarOr(body.avatar, "");
       if (!avatar) throw new ApiError(400, "Avatar tidak dikenal.");
-      if (body.sebagai !== "ortu") throw new ApiError(403, "Avatar anak hanya bisa dipilih orang tua.");
+      if (body.sebagai === "anak") {
+        if (!anak || !childRow(anak.child_id)) throw new ApiError(401, "Silakan masuk sebagai anak dulu.");
+        db.prepare("UPDATE children SET avatar = ? WHERE id = ?").run(avatar, anak.child_id);
+        return send(200, { ok: true, avatar }), true;
+      }
+      if (body.sebagai !== "ortu") throw new ApiError(400, "Pilih avatar untuk siapa.");
       db.prepare("UPDATE parents SET avatar = ? WHERE id = ?").run(avatar, needOrtu());
       return send(200, { ok: true, avatar }), true;
     }
@@ -370,7 +387,10 @@ export async function handleApi(req, res) {
       const c = anak && childRow(anak.child_id);
       if (!c) throw new ApiError(401, "Silakan masuk dulu.");
       res.writeHead(200, { "Content-Type": "image/svg+xml; charset=utf-8", "Cache-Control": "no-store" });
-      res.end(avatarSvg(c.avatar, c.color));
+      // ?coba=<id>: pratinjau di Toko, aksesori itu menggantikan yang dipakai di tempat yang sama.
+      const coba = url.searchParams.get("coba");
+      const pakai = coba ? [...rapikanAksesori(c.aksesori_pakai), coba] : c.aksesori_pakai;
+      res.end(avatarSvg(c.avatar, c.color, { aksesori: pakai, aura: auraAnak(c) }));
       return true;
     }
     if (m === "GET" && path[0] === "laporan") {
@@ -513,6 +533,19 @@ export async function handleApi(req, res) {
         .run(anak.child_id, game, mode, outcome, score, Date.now());
       return send(200, { ok: true }), true;
     }
+
+    // --- Kamarku: ringkasan untuk anak yang sedang masuk ---
+    if (m === "GET" && path[0] === "kamarku" && path.length === 1) {
+      const k = anak && kamarku(anak.child_id);
+      if (!k) throw new ApiError(401, "Masuk sebagai anak dulu untuk membuka Kamarku.");
+      return send(200, k), true;
+    }
+
+    // --- kemajuan Ruang Pintar (anak) ---
+    if (handleProgres({ m, path, body, anak, send, ApiError })) return true;
+
+    // --- toko aksesori (anak) ---
+    if (handleToko({ m, path, body, anak, send, ApiError })) return true;
 
     throw new ApiError(404, "Alamat tidak ditemukan.");
   } catch (e) {

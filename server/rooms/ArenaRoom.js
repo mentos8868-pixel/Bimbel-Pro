@@ -4,6 +4,9 @@ import { addPlaySeconds, secondsToday } from "../accounts.js";
 import { setupSocial, socialJoin, socialLeave } from "./arena-social.js";
 import { uidOf } from "../social.js";
 import { avatarOr } from "../../shared/avatars.js";
+import { db } from "../db.js";
+import { rapikanAksesori } from "../../shared/aksesori.js";
+import { levelDariXp, auraUntukLevel } from "../../shared/aura.js";
 
 
 const { Room } = colyseus;
@@ -22,6 +25,8 @@ defineTypes(Player, {
   avatar: "string",
   negara: "string",   // kode negara anak ("" untuk orang tua)
   kelas: "number",    // 1–12, 0 = belum diisi / orang tua
+  aksesori: "string",  // aksesori Toko yang dipakai, dipisah koma
+  aura: "string",      // aura avatar menurut level ("" = belum ada, lihat shared/aura.js)
   kurikulum: "string", // nama kelas di papan nama mengikuti kurikulum (Kelas 4 / P4)
   x: "number",
   z: "number",
@@ -66,6 +71,18 @@ export class ArenaRoom extends Room {
       p.z = z;
       p.ry = num(data.ry, p.ry);
     });
+
+    // Setelah anak membeli/memakai aksesori di Toko (atau naik level): baca ulang dari database,
+    // jadi isi pesan dari browser tidak dipercaya. Pemain lain langsung melihat avatar barunya.
+    this.onMessage("segarkan-avatar", (client) => {
+      const p = this.state.players.get(client.sessionId);
+      const a = client.auth;
+      if (!p || a?.role !== "anak") return;
+      const c = db.prepare("SELECT aksesori_pakai, xp FROM children WHERE id = ?").get(a.childId);
+      if (!c) return;
+      p.aksesori = rapikanAksesori(c.aksesori_pakai).join(",");
+      p.aura = auraUntukLevel(levelDariXp(c.xp))?.id || "";
+    });
   }
 
   onAuth(client, options) {
@@ -83,6 +100,8 @@ export class ArenaRoom extends Room {
     p.negara = a.role === "anak" ? a.negara || "" : "";
     p.kelas = a.role === "anak" ? a.kelas || 0 : 0;
     p.kurikulum = a.role === "anak" ? a.kurikulum || "merdeka" : "";
+    p.aksesori = a.role === "anak" ? a.aksesori || "" : "";
+    p.aura = a.role === "anak" ? a.aura || "" : "";
     // Muncul di sekitar alun-alun.
     const ang = Math.random() * Math.PI * 2;
     p.x = Math.cos(ang) * 3;

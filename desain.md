@@ -99,3 +99,42 @@ Permainan kartu dengan nama, aturan, dan tampilan sendiri, bukan Uno.
 2. Apakah tata letak (bimbel di utara, game di timur) sudah pas?
 3. Apakah "Kartu Kilat" dan aturannya sudah cocok?
 4. Apakah aturan chat dan pertemanan sudah sesuai yang Anda inginkan?
+
+---
+
+## 7. Dashboard anak "Kamarku" (rancangan, belum dibangun)
+
+Dirancang 21 November 2026, **fokus laptop**.
+
+**Status:** Tahap 1 sudah dibangun (21 November 2026): kepala dengan Level/XP, waktu main, bintang dan aksesori, permainan, teman, dan tombol cepat. Kode: `game/src/kamarku-ui.js` dan `server/kamarku.js` (`GET /api/kamarku`, khusus sesi anak). 
+
+**Tahap 2 juga sudah dibangun** (21 November 2026): kemajuan Ruang Pintar sekarang disalin ke server (`server/progres.js`, tabel `child_progres`, `GET/POST/DELETE /api/progres`). Ruang Pintar mengirimnya sekitar 1,5 detik setelah setiap perubahan dan saat dibuka, lalu server menggabungkannya tanpa mengurangi kemajuan: bintang terbaik dan angka diambil yang terbesar, medali digabung, dan riwayat tidak dobel. Ringkasan per pelajaran dihitung di Ruang Pintar karena server tidak punya daftar topik, jadi ringkasan baru diperbarui setelah anak membuka Ruang Pintar lagi (misalnya setelah orang tua mengganti kurikulum). Kamarku sekarang menampilkan medali, misi hari ini, kemajuan belajar, dan saran "coba ulangi". Kotak Aksesori hanya muncul bila anak belum pernah ke Ruang Pintar. Dashboard orang tua mendapat bagian "Ruang Pintar" berisi jumlah sesi, medali, kemajuan per pelajaran, topik yang perlu diulang, dan 5 tryout terakhir.
+
+### Letak dan cara membuka
+- Panel besar di atas arena (sekitar 1000 px lebar), bukan halaman terpisah, supaya anak tidak keluar dari dunia game.
+- Dibuka dengan tombol **"Kamarku"** di pojok kanan atas (sebelah Chat dan Teman) atau tombol **K**. Ditutup dengan Esc, K, atau tombol Tutup.
+- Selama panel terbuka, kontrol berjalan (WASD) dijeda.
+- Muncul otomatis sekali sehari saat anak pertama kali masuk arena (bisa ditutup).
+
+### Isi panel
+| Bagian | Isi | Sumber data sekarang |
+|--------|-----|----------------------|
+| Kepala | Avatar beserta aura, nama, kelas, kurikulum, negara, Level dan batang XP, aura berikutnya | Server: `children` (xp, avatar, aksesori) |
+| Waktu main | "Sisa 21 menit" hari ini dari batas orang tua | Server: `play_time`, `limit_min` |
+| Bintang | Saldo, dan aksesori terdekat yang bisa dibeli | Server: `bintang`, `shared/aksesori.js` |
+| Medali | Jumlah didapat dari total, medali terbaru | Server: `child_progres` |
+| Misi hari ini | Tryout per pelajaran (sudah/belum), latihan 1 topik | Server: `child_progres` (`tryoutHari`, `history`) |
+| Kemajuan belajar | Topik selesai per pelajaran, saran "coba ulangi" untuk topik berbintang rendah | Server: `child_progres` (`ringkasan`) |
+| Permainanku | Main dan menang per game (tanpa menonjolkan kekalahan) | Server: `results` |
+| Teman | Siapa yang sedang di arena, permintaan yang menunggu izin orang tua | Server: `friendships`, status online |
+| Tombol cepat | Ke Ruang Bimbel, Ke Ruang Game, Buka Toko (avatar dipindah ke tempat itu) | — |
+
+### Hal yang harus diputuskan sebelum dibangun
+1. **Kemajuan Ruang Pintar perlu disimpan di server.** Sekarang topik, medali, dan riwayat tryout hanya ada di browser (`localStorage`), jadi akan berbeda di tiap perangkat dan hilang bila data browser dihapus. Usulan: tabel baru untuk ringkasan kemajuan per anak (topik dan bintang terbaik, medali, riwayat tryout 30 terakhir). Manfaat tambahan: dashboard orang tua juga bisa menampilkan kemajuan belajar.
+2. **Tahap 1 tanpa sinkron**: bagian yang datanya sudah di server (kepala, waktu, bintang, permainan, teman) bisa dibangun lebih dulu; bagian belajar menyusul setelah sinkron.
+
+### Aturan keamanan anak
+- Hanya data milik anak sendiri. Tidak ada papan peringkat dengan pemain asing, dan tidak ada perbandingan dengan anak lain.
+- Daftar teman hanya nama panggilan dan status di arena.
+- Pengaturan (batas waktu, chat, pertemanan) tetap hanya bisa diubah orang tua; anak hanya melihat hasilnya.
+- Bahasa positif: "Coba ulangi" bukan "Gagal", jumlah menang ditonjolkan, bukan kalah.

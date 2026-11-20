@@ -139,6 +139,32 @@ function plainTable(scene, x, z, color, walls) {
   walls.push({ minX: x - 0.95, maxX: x + 0.95, minZ: z - 0.95, maxZ: z + 0.95 });
 }
 
+// Kios toko: meja konter menghadap selatan (ke alun-alun), tiang, atap kanopi bergaris, dan pajangan aksesori.
+function kios(scene, walls, x, z) {
+  box(scene, "kiosKonter", { w: 2.8, h: 0.95, d: 0.8, x, z, color: "#f7e1b5", walls });
+  box(scene, "kiosLis", { w: 2.9, h: 0.08, d: 0.9, x, y: 0.99, z, color: "#c98a4b" });
+  for (const sx of [-1.35, 1.35]) box(scene, "kiosTiang", { w: 0.14, h: 2.6, d: 0.14, x: x + sx, y: 1.3, z: z + 0.35, color: "#c98a4b" });
+  // Kanopi bergaris pink-putih, sedikit miring ke depan.
+  for (let i = 0; i < 6; i++) {
+    const s = box(scene, "kiosAtap", { w: 0.52, h: 0.08, d: 1.5, x: x - 1.3 + i * 0.52, y: 2.65, z: z - 0.05, color: i % 2 ? "#ffffff" : "#ff6f9a" });
+    s.rotation.x = -0.25;
+  }
+  // Pajangan: topi pesta, kacamata (dua cincin), dan pita.
+  const topi = MeshBuilder.CreateCylinder("kiosTopi", { height: 0.45, diameterTop: 0, diameterBottom: 0.3, tessellation: 12 }, scene);
+  topi.position.set(x - 0.9, 1.25, z);
+  topi.material = mat(scene, "#9b7bd8");
+  for (const dx of [-0.13, 0.13]) {
+    const r = MeshBuilder.CreateTorus("kiosKaca", { diameter: 0.22, thickness: 0.04, tessellation: 16 }, scene);
+    r.position.set(x + dx, 1.12, z);
+    r.rotation.x = Math.PI / 2;
+    r.material = mat(scene, "#2b2f3a");
+  }
+  const pita = MeshBuilder.CreateSphere("kiosPita", { diameter: 0.28, segments: 8 }, scene);
+  pita.scaling.set(1.4, 0.6, 0.6);
+  pita.position.set(x + 0.9, 1.12, z);
+  pita.material = mat(scene, "#ef6f5e");
+}
+
 export function createArena(canvas) {
   const engine = new Engine(canvas, true, { preserveDrawingBuffer: false, stencil: false }, true);
   const scene = new Scene(engine);
@@ -187,6 +213,11 @@ export function createArena(canvas) {
   plainTable(scene, studyDesk.x, studyDesk.z, "#f2b134", walls);
   makeSign(scene, ["Ruang Pintar"], { width: 2.6, height: 0.7 }).position.set(studyDesk.x, 2.3, studyDesk.z);
 
+  // Toko Aksesori (kios di pinggir alun-alun, barat laut): anak menukar bintang dengan aksesori avatar.
+  const toko = { id: "toko", x: -5.5, z: 5.2, label: "Toko Aksesori", action: "Buka Toko Aksesori", ready: true };
+  kios(scene, walls, toko.x, toko.z + 0.6);
+  makeSign(scene, ["Toko Aksesori", "Tukar bintang ★"], { width: 3.2, height: 1.1, bg: "#ff8fb1", fg: "#4a1024" }).position.set(toko.x, 3.6, toko.z + 0.6);
+
   // Ruang Game (timur)
   room(scene, walls, { cx: 25, cz: 0, w: 14, d: 18, door: "w", floor: "#e3efff", wall: "#4f9cf0" });
   const gameSign = makeSign(scene, ["Ruang Game"], { width: 4.5, height: 1.2, bg: "#4f9cf0", fg: "#ffffff" });
@@ -222,7 +253,7 @@ export function createArena(canvas) {
   for (const [x, z] of [[-9, 9], [9, 9], [-9, -9], [9, -9]]) walls.push({ minX: x - 0.3, maxX: x + 0.3, minZ: z - 0.3, maxZ: z + 0.3 });
 
   window.addEventListener("resize", () => engine.resize());
-  return { engine, scene, camera, walls, tables: [...tables, studyDesk] };
+  return { engine, scene, camera, walls, tables: [...tables, studyDesk, toko] };
 }
 
 // Gelembung chat di atas kepala avatar (hilang setelah 5 detik).
@@ -248,9 +279,9 @@ export function showBubble(scene, avatar, text) {
 // sid (opsional) disimpan di mesh supaya avatar bisa diketuk untuk membuka profil.
 // body = simpul yang dinaikturunkan saat berjalan (posisi dasar y = 0).
 // Baris kedua papan nama: bendera negara + "Kelas N" (anak), atau jenjang bila kelas belum diisi.
-export function createAvatar(scene, { color, avatar, name, jenjang, negara = "", kelas = 0, kurikulum = "merdeka", sid }) {
+export function createAvatar(scene, { color, avatar, aksesori = "", aura = "", name, jenjang, negara = "", kelas = 0, kurikulum = "merdeka", sid }) {
   const root = new TransformNode("avatar", scene);
-  const { bob, meshes, height } = buildAvatar3d(scene, root, avatar, color);
+  const { bob, meshes, height } = buildAvatar3d(scene, root, avatar, color, aksesori, aura);
   const sub = kelas ? namaKelas(kelas, kurikulum, true) : jenjang;
   const tag = makeSign(scene, [name, sub], { width: 1.8, height: 0.6, bg: "rgba(255,255,255,0.9)", flag: negara });
   tag.position.y = height + 0.3;

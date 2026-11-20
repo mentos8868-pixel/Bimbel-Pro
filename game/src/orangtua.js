@@ -238,18 +238,56 @@ function renderSocial(el, c, soc) {
   ])));
 }
 
+// Kemajuan Ruang Pintar (dari /api/laporan → belajar; null bila anak belum pernah membukanya).
+function renderBelajar(box, b) {
+  const q = (sel) => box.querySelector(sel);
+  if (!b) {
+    q(".belajar-ringkas").textContent = "Belum ada kemajuan. Kemajuan muncul setelah anak berlatih di Ruang Pintar (Ruang Bimbel di arena).";
+    q(".belajar-tryout-box").hidden = true;
+    return;
+  }
+  q(".belajar-ringkas").textContent = `${b.sesi} sesi latihan · ${b.latihan7Hari} dalam 7 hari terakhir`
+    + (b.medali.total ? ` · ${b.medali.punya} dari ${b.medali.total} medali` : "");
+  q(".belajar-mapel").replaceChildren(...b.mapel.map((m) => {
+    const row = document.createElement("div");
+    row.className = "belajar-baris";
+    const nama = document.createElement("span");
+    nama.textContent = m.nama;
+    const bar = document.createElement("span");
+    bar.className = "bar";
+    const fill = document.createElement("span");
+    fill.className = "bar-fill";
+    fill.style.width = `${m.total ? Math.round((m.selesai / m.total) * 100) : 0}%`;
+    bar.appendChild(fill);
+    const angka = document.createElement("span");
+    angka.className = "muted";
+    angka.textContent = `${m.selesai}/${m.total} topik`;
+    row.append(nama, bar, angka);
+    return row;
+  }));
+  q(".belajar-ulangi").textContent = b.ulangi ? `Perlu diulang: ${b.ulangi.nama} (${b.ulangi.best} dari 3 bintang)` : "";
+  const list = q(".belajar-tryout");
+  list.replaceChildren(...(b.tryoutTerakhir.length ? b.tryoutTerakhir : [null]).map((t) => {
+    const li = document.createElement("li");
+    li.textContent = t
+      ? `${t.mapel}: nilai ${t.score} (${t.c} dari ${t.n} benar) · ${new Date(t.d).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}`
+      : "Belum ada tryout.";
+    return li;
+  }));
+}
+
 function renderKid(c, soc) {
   const el = $("tpl-anak").content.firstElementChild.cloneNode(true);
   const dot = el.querySelector(".dot");
   dot.classList.add("av-face");
-  dot.innerHTML = avatarSvg(c.avatar, c.color);
+  dot.innerHTML = avatarSvg(c.avatar, c.color, { aksesori: c.aksesori, aura: c.aura });
   avatarPicker(el.querySelector(".av-edit-picker"), {
     value: c.avatar, accent: c.color,
     onPick: async (avatar) => {
       setErr(el, "");
       try {
         await api("PATCH", `anak/${c.id}`, { avatar });
-        dot.innerHTML = avatarSvg(avatar, c.color);
+        dot.innerHTML = avatarSvg(avatar, c.color, { aksesori: c.aksesori, aura: c.aura });
         const ok = el.querySelector(".av-saved");
         ok.hidden = false;
         setTimeout(() => (ok.hidden = true), 2000);
@@ -313,6 +351,8 @@ function renderKid(c, soc) {
       + (r.game === "scramble" ? `, ${r.score} poin` : "") + ` · ${when}`;
     recent.appendChild(li);
   }
+
+  renderBelajar(el.querySelector(".belajar"), c.belajar);
 
   // Pengaturan
   const s = el.querySelector(".settings");

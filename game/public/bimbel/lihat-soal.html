@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bank Soal — Bimbel Pro</title>
+<!-- Halaman penampil seluruh bank soal untuk orang tua / guru / tim.
+     Membaca langsung bank_soal.js (Merdeka) dan bank_intl.js (Cambridge & Singapura). -->
+<style>
+  :root{--bg:#f6f7fb;--card:#fff;--ink:#1f2433;--muted:#6b7285;--line:#e3e6ef;--teal:#0f8a7e;--teal-soft:#e3f5f2;
+        --ok:#1f8a3b;--ok-soft:#e6f6ea;--l1:#2f80ed;--l2:#e08a00;--l3:#c0392b}
+  @media (prefers-color-scheme:dark){:root{--bg:#14161d;--card:#1d2029;--ink:#e8eaf0;--muted:#9aa1b4;--line:#2d3140;
+        --teal:#3cc4b4;--teal-soft:#16332f;--ok:#4cc46a;--ok-soft:#183322}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);padding:12px 16px}
+  h1{margin:0 0 8px;font-size:20px}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  select,input[type=search]{font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+  input[type=search]{flex:1;min-width:180px}
+  label.cb{display:flex;gap:6px;align-items:center;font-size:14px;color:var(--muted)}
+  #info{margin-top:8px;font-size:13px;color:var(--muted)}
+  main{max-width:960px;margin:0 auto;padding:16px}
+  .grp{margin:18px 0 6px;font-size:13px;font-weight:800;color:var(--teal);text-transform:uppercase;letter-spacing:.6px}
+  details.topik{background:var(--card);border:1px solid var(--line);border-radius:12px;margin:8px 0;overflow:hidden}
+  details.topik>summary{cursor:pointer;padding:10px 14px;font-weight:700;list-style:none;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+  details.topik>summary::-webkit-details-marker{display:none}
+  details.topik>summary::before{content:"▸";color:var(--muted)}
+  details.topik[open]>summary::before{content:"▾"}
+  .desc{font-weight:400;color:var(--muted);font-size:13px}
+  .n{margin-left:auto;font-size:12px;color:var(--muted);font-weight:600}
+  ol.soal{margin:0;padding:0 14px 12px 40px}
+  ol.soal>li{padding:10px 0;border-top:1px solid var(--line)}
+  .q{font-weight:600}
+  .lv{display:inline-block;font-size:11px;font-weight:800;padding:1px 7px;border-radius:99px;color:#fff;margin-right:6px;vertical-align:1px}
+  .lv1{background:var(--l1)}.lv2{background:var(--l2)}.lv3{background:var(--l3)}
+  ul.opsi{list-style:none;margin:6px 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:4px 12px}
+  ul.opsi li{padding:3px 8px;border-radius:6px}
+  .kunci ul.opsi li.benar{background:var(--ok-soft);color:var(--ok);font-weight:700}
+  .kunci ul.opsi li.benar::after{content:" ✓"}
+  .p{display:none;font-size:14px;color:var(--muted);background:var(--bg);border-left:3px solid var(--teal);padding:6px 10px;border-radius:0 6px 6px 0}
+  .bahas .p{display:block}
+  mark{background:#ffe58a;color:#000;border-radius:3px}
+  .kosong{text-align:center;color:var(--muted);padding:40px 0}
+  .note{font-size:13px;color:var(--muted);background:var(--teal-soft);border-radius:8px;padding:8px 12px;margin-top:8px}
+  .rv{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}
+  .rv button{font:inherit;font-size:13px;padding:4px 10px;border:1px solid var(--line);border-radius:99px;background:var(--bg);color:var(--ink);cursor:pointer}
+  .rv input{flex:1;min-width:160px;font:inherit;font-size:13px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+  li.st-ok .rv button[data-s=ok]{background:var(--ok);border-color:var(--ok);color:#fff}
+  li.st-fix .rv button[data-s=fix]{background:var(--l3);border-color:var(--l3);color:#fff}
+  li.st-fix{background:color-mix(in srgb,var(--l3) 7%,transparent)}
+  button.utama{font:inherit;font-size:14px;padding:7px 12px;border:0;border-radius:8px;background:var(--teal);color:#fff;cursor:pointer}
+  @media print{header{position:static}details.topik{break-inside:avoid-page}.rv button{display:none}}
+</style>
+</head>
+<body class="kunci bahas">
+<header>
+  <h1>📚 Bank Soal Bimbel Pro</h1>
+  <div class="bar">
+    <select id="kur"></select>
+    <select id="mapel"></select>
+    <select id="kelas"></select>
+    <select id="lv">
+      <option value="">Semua level</option><option value="1">Mudah</option><option value="2">Sedang</option><option value="3">Menantang</option>
+    </select>
+    <input type="search" id="cari" placeholder="Cari kata di soal, pilihan, atau pembahasan…">
+  </div>
+  <div class="bar" style="margin-top:6px">
+    <label class="cb"><input type="checkbox" id="tKunci" checked> Tandai jawaban benar</label>
+    <label class="cb"><input type="checkbox" id="tBahas" checked> Tampilkan pembahasan</label>
+    <label class="cb"><input type="checkbox" id="tBuka"> Buka semua topik</label>
+  </div>
+  <div class="bar" style="margin-top:6px">
+    <b style="font-size:14px">👩‍🏫 Review guru:</b>
+    <input type="text" id="reviewer" placeholder="Nama guru" style="font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);width:160px">
+    <select id="fSt">
+      <option value="">Semua status</option><option value="belum">Belum direview</option>
+      <option value="ok">Sudah benar</option><option value="fix">Perlu diperbaiki</option>
+    </select>
+    <button class="utama" id="unduh">⬇ Unduh hasil review (Excel/CSV)</button>
+    <span id="progres" style="font-size:13px;color:var(--muted)"></span>
+  </div>
+  <div id="info"></div>
+</header>
+<main id="isi"></main>
+
+<script src="bank_soal.js"></script>
+<script src="bank_intl.js"></script>
+<script>
+const KURS={
+  merdeka:{name:'Kurikulum Merdeka',mapel:{big:'Bahasa Inggris',bin:'Bahasa Indonesia',ipa:'IPA'},
+    label:k=>`Kelas ${k} ${k<=6?'SD':k<=9?'SMP':'SMA'}`,data:window.BANK||{}},
+  cam:{name:'Cambridge International',mapel:{math:'Math',sci:'Science',eng:'English'},
+    label:k=>k<=6?`Primary Stage ${k}`:k<=9?`Lower Secondary Stage ${k}`:k<=11?`IGCSE Year ${k-9}`:'AS Level',
+    data:(window.BANK_INTL||{}).cam||{}},
+  sgp:{name:'Singapore MOE',mapel:{math:'Math',sci:'Science',eng:'English'},
+    label:k=>k<=6?`Primary ${k}`:k<=10?`Secondary ${k-6}`:`JC ${k-10}`,
+    data:(window.BANK_INTL||{}).sgp||{}},
+};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const HUR='ABCD';
+
+// Ratakan semua data jadi daftar topik dengan info kurikulum/mapel/kelas.
+const SEMUA=[];
+for(const kur in KURS)for(const m in KURS[kur].data)for(const k in KURS[kur].data[m])
+  for(const t of KURS[kur].data[m][k])SEMUA.push({kur,mapel:m,kelas:+k,t});
+const totalSoal=SEMUA.reduce((s,x)=>s+x.t.soal.length,0);
+
+function isiPilihan(sel,opsi,semua){
+  const v=sel.value;
+  sel.innerHTML=`<option value="">${semua}</option>`+opsi.map(([val,txt])=>`<option value="${val}">${esc(txt)}</option>`).join('');
+  if(opsi.some(([val])=>String(val)===v))sel.value=v;
+}
+function segarkanFilter(){
+  const kur=$('kur').value;
+  const mp=new Map(),kl=new Map();
+  for(const x of SEMUA){
+    if(kur&&x.kur!==kur)continue;
+    mp.set(x.mapel,(kur?KURS[kur].mapel[x.mapel]:Object.values(KURS).map(K=>K.mapel[x.mapel]).find(Boolean))||x.mapel);
+    if(!$('mapel').value||x.mapel===$('mapel').value)kl.set(x.kelas,kur?KURS[kur].label(x.kelas):`Kelas ${x.kelas}`);
+  }
+  isiPilihan($('mapel'),[...mp],'Semua mapel');
+  isiPilihan($('kelas'),[...kl].sort((a,b)=>a[0]-b[0]),'Semua kelas');
+}
+
+function tampil(){
+  const kur=$('kur').value,mapel=$('mapel').value,kelas=$('kelas').value,lv=$('lv').value;
+  const cari=$('cari').value.trim().toLowerCase();
+  const tandai=s=>{let h=esc(s);if(!cari)return h;
+    const re=new RegExp(esc(cari).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');return h.replace(re,m=>`<mark>${m}</mark>`)};
+  const fSt=$('fSt').value;
+  const buka=$('tBuka').checked||!!cari||!!fSt;
+  let html='',grpLama='',nTopik=0,nSoal=0;
+  for(const x of SEMUA){
+    if(kur&&x.kur!==kur||mapel&&x.mapel!==mapel||kelas&&x.kelas!==+kelas)continue;
+    const K=KURS[x.kur];
+    const soal=x.t.soal.map((q,i)=>({q,i})).filter(({q,i})=>(!lv||q.lv===+lv)&&
+      (!fSt||(RV[kunciRv(x.t,i)]?.s||'belum')===fSt)&&
+      (!cari||(q.q+' '+q.o.join(' ')+' '+q.p+' '+x.t.name).toLowerCase().includes(cari)));
+    if(!soal.length)continue;
+    const grp=`${K.name} · ${K.mapel[x.mapel]||x.mapel} · ${K.label(x.kelas)}`;
+    if(grp!==grpLama){html+=`<div class="grp">${esc(grp)}</div>`;grpLama=grp}
+    nTopik++;nSoal+=soal.length;
+    html+=`<details class="topik"${buka?' open':''}><summary>${tandai(x.t.name)} <span class="desc">${esc(x.t.desc||'')}</span>
+      <span class="n">${soal.length} soal · ${esc(x.t.id)}</span></summary><ol class="soal">`+
+      soal.map(({q,i})=>{const k=kunciRv(x.t,i),r=RV[k]||{};return `<li value="${i+1}" class="${r.s?'st-'+r.s:''}"><div class="q"><span class="lv lv${q.lv}">${['','Mudah','Sedang','Menantang'][q.lv]||q.lv}</span>${tandai(q.q)}</div>
+        <ul class="opsi">${q.o.map((o,j)=>`<li class="${j===q.a?'benar':''}">${HUR[j]||j+1}. ${tandai(o)}</li>`).join('')}</ul>
+        <div class="p">💡 ${tandai(q.p)}</div>
+        <div class="rv" data-k="${esc(k)}"><button data-s="ok">✓ Benar</button><button data-s="fix">✗ Perlu diperbaiki</button>
+          <input class="cat" placeholder="Catatan untuk penyusun soal…" value="${esc(r.c||'')}"></div></li>`}).join('')+`</ol></details>`;
+  }
+  $('isi').innerHTML=html||'<div class="kosong">Tidak ada soal yang cocok dengan pilihan ini.</div>';
+  $('info').innerHTML=`Menampilkan <b>${nSoal.toLocaleString('id')}</b> soal dari <b>${nTopik}</b> topik `+
+    `(seluruh bank: ${totalSoal.toLocaleString('id')} soal, ${SEMUA.length} topik).`+
+    (!kur||kur==='merdeka'?` <span class="note" style="display:inline-block;margin:4px 0 0">Matematika Kurikulum Merdeka tidak tampil di sini karena soalnya dibuat acak setiap kali dibuka di Ruang Bimbel.</span>`:'');
+}
+
+// ===== Review guru: status per soal disimpan di browser ini (localStorage) =====
+const kunciRv=(t,i)=>t.id+'#'+(i+1);
+let RV={};
+try{RV=JSON.parse(localStorage.getItem('reviewGuru')||'{}')}catch(e){}
+try{$('reviewer').value=localStorage.getItem('reviewGuruNama')||''}catch(e){}
+const simpanRv=()=>{try{localStorage.setItem('reviewGuru',JSON.stringify(RV))}catch(e){}progres()};
+function progres(){
+  const v=Object.values(RV),ok=v.filter(r=>r.s==='ok').length,fix=v.filter(r=>r.s==='fix').length;
+  $('progres').textContent=`Sudah direview ${(ok+fix).toLocaleString('id')} dari ${totalSoal.toLocaleString('id')} soal · ✓ ${ok} benar · ✗ ${fix} perlu diperbaiki`;
+}
+$('reviewer').oninput=e=>{try{localStorage.setItem('reviewGuruNama',e.target.value)}catch(_){}};
+$('isi').addEventListener('click',e=>{
+  const b=e.target.closest('.rv button');if(!b)return;
+  const k=b.parentNode.dataset.k,li=b.closest('li'),r=RV[k]||(RV[k]={});
+  r.s=r.s===b.dataset.s?'':b.dataset.s;            // klik lagi = batal
+  r.w=new Date().toISOString();r.g=$('reviewer').value.trim();
+  if(!r.s&&!r.c)delete RV[k];
+  li.classList.remove('st-ok','st-fix');if(r.s)li.classList.add('st-'+r.s);
+  simpanRv();
+});
+$('isi').addEventListener('input',e=>{
+  if(!e.target.classList.contains('cat'))return;
+  const k=e.target.parentNode.dataset.k,r=RV[k]||(RV[k]={});
+  r.c=e.target.value;r.g=$('reviewer').value.trim();r.w=new Date().toISOString();
+  if(!r.s&&!r.c)delete RV[k];
+  simpanRv();
+});
+$('unduh').onclick=()=>{
+  const sel=s=>`"${String(s??'').replace(/"/g,'""')}"`;
+  const rows=[['Kurikulum','Mapel','Kelas','ID topik','Topik','No','Level','Soal','A','B','C','D','Kunci','Pembahasan','Status review','Catatan guru','Nama guru','Waktu review']];
+  for(const x of SEMUA){const K=KURS[x.kur];
+    x.t.soal.forEach((q,i)=>{const r=RV[kunciRv(x.t,i)]||{};
+      rows.push([K.name,K.mapel[x.mapel]||x.mapel,K.label(x.kelas),x.t.id,x.t.name,i+1,['','Mudah','Sedang','Menantang'][q.lv],q.q,
+        q.o[0],q.o[1],q.o[2],q.o[3],HUR[q.a],q.p,{ok:'Benar',fix:'Perlu diperbaiki'}[r.s]||'Belum direview',r.c||'',r.g||'',r.w?new Date(r.w).toLocaleString('id'):'']);
+    });}
+  const csv='﻿'+rows.map(r=>r.map(sel).join(';')).join('\r\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`review-bank-soal-${($('reviewer').value.trim()||'guru').replace(/\W+/g,'-')}-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+};
+$('fSt').onchange=()=>tampil();
+progres();
+
+isiPilihan($('kur'),Object.entries(KURS).map(([k,K])=>[k,K.name]),'Semua kurikulum');
+segarkanFilter();
+$('kur').onchange=()=>{$('mapel').value='';segarkanFilter();tampil()};
+$('mapel').onchange=()=>{segarkanFilter();tampil()};
+$('kelas').onchange=$('lv').onchange=$('tBuka').onchange=tampil;
+let tunda;$('cari').oninput=()=>{clearTimeout(tunda);tunda=setTimeout(tampil,250)};
+$('tKunci').onchange=e=>document.body.classList.toggle('kunci',e.target.checked);
+$('tBahas').onchange=e=>document.body.classList.toggle('bahas',e.target.checked);
+tampil();
+</script>
+</body>
+</html>

@@ -24,19 +24,33 @@ function busy(el, on) {
   el.querySelectorAll("button").forEach((b) => (b.disabled = on));
 }
 
-const childProfile = (c) => ({ role: "anak", name: c.name, jenjang: c.jenjang, gameJenjang: c.jenjang, negara: c.negara, kelas: c.kelas, kurikulum: c.kurikulum, color: c.color, avatar: c.avatar, chat: c.chat });
+const childProfile = (c) => ({ role: "anak", childId: c.id, name: c.name, jenjang: c.jenjang, gameJenjang: c.jenjang, negara: c.negara, kelas: c.kelas, kurikulum: c.kurikulum, color: c.color, avatar: c.avatar, aksesori: c.aksesori, aura: c.aura, chat: c.chat });
 
 // Memanggil onStart(profile, playingAs) saat pemain siap masuk arena.
 export function setupLogin(onStart) {
   let me = null;
   let pinChild = null;
   let ortuLevel = "SD";
-  // Avatar anak hanya dipilih orang tua (dashboard); di sini anak hanya melihatnya.
-  // Avatar orang tua disimpan langsung saat dipilih (sebagai=ortu).
+  // Avatar disimpan langsung saat dipilih: orang tua (sebagai=ortu) atau anak sendiri (sebagai=anak).
+  // Orang tua juga tetap bisa mengganti avatar anak di dashboard.
   const save = (body) => api("POST", "avatar", body).catch(() => {});
   const ortuPicker = avatarPicker($("ortu-avatar"), {
     value: DEFAULT_ORTU_AVATAR, accent: "#5b6b7c",
     onPick: (avatar) => { if (me?.ortu) { me.ortu.avatar = avatar; save({ avatar, sebagai: "ortu" }); } },
+  });
+  let okTimer = 0;
+  const anakPicker = avatarPicker($("anak-avatar"), {
+    onPick: async (avatar) => {
+      if (!me?.anak) return;
+      try {
+        await api("POST", "avatar", { avatar, sebagai: "anak" });
+        me.anak.avatar = avatar;
+        $("siap-avatar").innerHTML = avatarSvg(avatar, me.anak.color, { aksesori: me.anak.aksesori, aura: me.anak.aura });
+        $("anak-avatar-ok").hidden = false;
+        clearTimeout(okTimer);
+        okTimer = setTimeout(() => ($("anak-avatar-ok").hidden = true), 2000);
+      } catch (x) { err("siap", x.message); }
+    },
   });
 
   const go = (step) => show(step);
@@ -50,7 +64,10 @@ export function setupLogin(onStart) {
     if (me.anak) {
       $("siap-judul").textContent = `Halo, ${me.anak.name}!`;
       const sisa = me.anak.limitMin ? Math.max(0, me.anak.limitMin - me.anak.usedMin) : null;
-      $("siap-avatar").innerHTML = avatarSvg(me.anak.avatar, me.anak.color);
+      $("siap-avatar").innerHTML = avatarSvg(me.anak.avatar, me.anak.color, { aksesori: me.anak.aksesori, aura: me.anak.aura });
+      anakPicker.setAccent(me.anak.color);
+      anakPicker.set(me.anak.avatar);
+      $("anak-avatar-ok").hidden = true;
       $("siap-info").textContent = `${me.anak.jenjang}` + (sisa !== null ? ` · sisa waktu bermain hari ini ${sisa} menit` : "");
       return go("siap");
     }
@@ -69,7 +86,7 @@ export function setupLogin(onStart) {
       b.className = "kid";
       const dot = document.createElement("span");
       dot.className = "dot av-face";
-      dot.innerHTML = avatarSvg(c.avatar, c.color);
+      dot.innerHTML = avatarSvg(c.avatar, c.color, { aksesori: c.aksesori, aura: c.aura });
       const n = document.createElement("strong");
       n.textContent = c.name;
       const s = document.createElement("small");

@@ -39,7 +39,21 @@ Lalu buka:
 | `server/` | API akun (`/api/...`), database SQLite, dan server multiplayer (Colyseus) |
 | `server/data/` | File database `bimbel.db`. Dibuat otomatis dan tidak dibagikan |
 | `shared/` | Kode yang dipakai bersama game dan server: daftar kata dan aturan Scramble, aturan Kartu Kilat dan bot-nya |
-| `.claude/agents/` | 14 agen dari Claude Code Game Studios (lisensi MIT, lihat file LICENSE di folder itu) |
+| `.claude/agents/` | Tim AI proyek (lihat bagian "Tim AI" di bawah), ditambah 14 agen dari Claude Code Game Studios (lisensi MIT, lihat file LICENSE di folder itu) |
+
+## Tim AI
+
+Tujuh agen khusus Bimbel Pro, berbahasa Indonesia. Panggil dengan menyebut namanya, misalnya *"pakai ketua-tim untuk menambah game baru"*.
+
+| Agen | Tugas |
+|------|-------|
+| `ketua-tim` | Memecah tugas besar, membagi ke anggota tim, lalu memeriksa hasil gabungannya |
+| `pengembang-arena` | Menulis kode arena 3D, game, dashboard orang tua, server, dan database |
+| `penyusun-soal` | Membuat soal dan pembahasan untuk Kurikulum Merdeka, Cambridge, dan Singapura |
+| `pemeriksa-soal` | Mengecek kunci jawaban, soal ambigu, bahasa, dan kecocokan jenjang (tidak mengubah file) |
+| `penjaga-keamanan-anak` | Menjaga privasi dan keamanan anak: akun, chat, pertemanan, batas waktu, UU PDP |
+| `penguji-aplikasi` | Menjalankan aplikasi dan membuktikan fitur bekerja di laptop dan ukuran HP |
+| `penulis-dokumen` | Memperbarui README, rencana kerja, dan catatan dengan bahasa sederhana |
 
 ## Yang sudah bisa
 

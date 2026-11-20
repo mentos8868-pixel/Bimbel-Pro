@@ -11,6 +11,8 @@ import { setupLogin } from "./login.js";
 import { KartuUI } from "./kartu-ui.js";
 import { ChessUI } from "./chess-ui.js";
 import { ScrambleUI } from "./scramble-ui.js";
+import { TokoUI } from "./toko-ui.js";
+import { KamarkuUI } from "./kamarku-ui.js";
 
 const $ = (id) => document.getElementById(id);
 const SPEED = 5.5; // meter per detik
@@ -76,6 +78,14 @@ async function start(profile, playingAs) {
   const { engine, scene, camera, walls, tables } = createArena($("arena"));
   const me = createAvatar(scene, profile);
   me.root.position.set(0, 0, -3);
+  // Membuat ulang figur avatar (mis. setelah membeli aksesori) di posisi dan arah yang sama.
+  function gantiAvatar(lama, opsi) {
+    const baru = createAvatar(scene, opsi);
+    baru.root.position.copyFrom(lama.root.position);
+    baru.root.rotation.copyFrom(lama.root.rotation);
+    lama.root.dispose(false, true);
+    return baru;
+  }
 
   $("hud").hidden = false;
   setupJoystick();
@@ -83,9 +93,14 @@ async function start(profile, playingAs) {
   // Keyboard
   const keys = new Set();
   let uiOpen = false;
+  let kamar = null;   // panel Kamarku (hanya akun anak), dibuat di bawah
   window.addEventListener("keydown", (e) => {
     if (e.target.tagName === "INPUT") return;
-    keys.add(e.key.toLowerCase());
+    const kunci = e.key.toLowerCase();
+    // Kamarku: K membuka/menutup, Esc menutup.
+    if (kamar && kamar.terbuka && (kunci === "k" || kunci === "escape")) return kamar.close();
+    if (kamar && kunci === "k" && !uiOpen) return bukaKamar();
+    keys.add(kunci);
     if (e.key.toLowerCase() === "e" && !uiOpen && nearTable) useTable(nearTable);
   });
   window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
@@ -105,9 +120,14 @@ async function start(profile, playingAs) {
         me.root.position.set(p.x, 0, p.z);
         return;
       }
-      const av = createAvatar(scene, { name: p.name, jenjang: p.jenjang, negara: p.negara, kelas: p.kelas, kurikulum: p.kurikulum, color: p.color, avatar: p.avatar, sid: id });
-      av.root.position.set(p.x, 0, p.z);
-      others.set(id, { av, p });
+      const opsi = () => ({ name: p.name, jenjang: p.jenjang, negara: p.negara, kelas: p.kelas, kurikulum: p.kurikulum, color: p.color, avatar: p.avatar, aksesori: p.aksesori, aura: p.aura, sid: id });
+      const o = { av: createAvatar(scene, opsi()), p };
+      o.av.root.position.set(p.x, 0, p.z);
+      others.set(id, o);
+      // Pemain lain mengganti aksesori di Toko atau naik ke aura baru: buat ulang avatarnya.
+      const ganti = () => { if (others.get(id) === o) o.av = gantiAvatar(o.av, opsi()); };
+      p.listen("aksesori", (v, lama) => { if (lama !== undefined) ganti(); });
+      p.listen("aura", (v, lama) => { if (lama !== undefined) ganti(); });
     });
     room.state.players.onRemove((_, id) => {
       const o = others.get(id);
@@ -254,7 +274,7 @@ async function start(profile, playingAs) {
   // Menerima undangan teman: tutup meja/menu yang terbuka, lalu gabung ke meja dengan kodenya.
   async function joinInvite(game, code) {
     for (const ui of [chessUI, scrambleUI, kartuUI]) if (!ui.el.hidden) ui.close();
-    for (const id of ["chess-menu", "scramble-menu", "kartu-menu", "teman-panel", "profil"]) $(id).hidden = true;
+    for (const id of ["chess-menu", "scramble-menu", "kartu-menu", "toko-panel", "teman-panel", "profil"]) $(id).hidden = true;
     uiOpen = true;
     keys.clear();
     try {
@@ -289,6 +309,13 @@ async function start(profile, playingAs) {
   }
 
   function useTable(t) {
+    if (t.id === "toko") {
+      if (playingAs !== "anak") return toast("Toko Aksesori khusus untuk akun anak.");
+      uiOpen = true;
+      keys.clear();
+      toko.open(profile);
+      return;
+    }
     if (t.id === "bimbel") {
       // Tab baru, supaya sesi arena tetap tersambung.
       window.open("/bimbel/index.html", "_blank", "noopener");
@@ -318,6 +345,52 @@ async function start(profile, playingAs) {
       toast(`${t.label} segera hadir!`);
     }
   }
+  // Toko Aksesori: setelah beli/pakai/lepas, avatar sendiri dibuat ulang dan server diminta
+  // membaca ulang aksesori dari database supaya pemain lain ikut melihat.
+  const toko = new TokoUI({
+    onClose: () => (uiOpen = false),
+    onBerubah: (k) => {
+      profile.aksesori = k.pakai.join(",");
+      if (k.aura !== undefined) profile.aura = k.aura;
+      Object.assign(me, gantiAvatar(me, profile));
+      room?.send("segarkan-avatar");
+    },
+  });
+
+  // ---------- Kamarku (dashboard anak) ----------
+  // Tombol cepat memindahkan avatar ke depan ruangan, atau langsung membuka Toko.
+  const TUJUAN = { bimbel: { x: 0, z: 23, ry: 0 }, game: { x: 21, z: 0, ry: Math.PI / 2 } };
+  kamar = playingAs === "anak" ? new KamarkuUI({
+    onClose: () => (uiOpen = false),
+    onKe: (ke) => {
+      if (ke === "toko") return useTable({ id: "toko" });
+      const t = TUJUAN[ke];
+      me.root.position.set(t.x, 0, t.z);
+      me.root.rotation.y = t.ry;
+    },
+  }) : null;
+  function bukaKamar() {
+    if (!kamar || uiOpen) return;
+    uiOpen = true;
+    keys.clear();
+    kamar.open(profile);
+  }
+  if (kamar) {
+    $("social-btns").hidden = false;
+    $("btn-kamarku").hidden = false;
+    $("btn-kamarku").onclick = () => (kamar.terbuka ? kamar.close() : bukaKamar());
+    if (!social) { $("btn-chat").hidden = true; $("btn-teman").hidden = true; }
+    // Terbuka sendiri sekali sehari saat anak pertama kali masuk arena.
+    const kunciHari = `kamarku_hari_a${profile.childId}`;
+    const hari = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" });
+    let sudah = null;
+    try { sudah = localStorage.getItem(kunciHari); } catch { /* penyimpanan diblokir */ }
+    if (sudah !== hari) {
+      try { localStorage.setItem(kunciHari, hari); } catch { /* abaikan */ }
+      bukaKamar();
+    }
+  }
+
   let nearTable = null;
   $("action-btn").onclick = () => nearTable && !uiOpen && useTable(nearTable);
 

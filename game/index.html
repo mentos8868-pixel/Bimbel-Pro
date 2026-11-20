@@ -76,8 +76,13 @@
         <section data-step="siap" hidden>
           <h1 id="siap-judul">Halo!</h1>
           <p id="siap-info" class="muted"></p>
-          <div class="label">Avatarmu (dipilih orang tua)</div>
+          <div class="label">Avatarmu</div>
           <div id="siap-avatar" class="siap-avatar av-face"></div>
+          <details class="siap-ganti">
+            <summary>Ganti avatar</summary>
+            <div id="anak-avatar"></div>
+            <span id="anak-avatar-ok" class="muted" hidden>Avatar tersimpan ✓</span>
+          </details>
           <span class="error" hidden></span>
           <button class="primary" data-act="main-anak">Masuk ke arena</button>
           <button class="ghost" data-act="ganti">Bukan kamu? Ganti pemain</button>
@@ -101,6 +106,7 @@
       <div id="hud-hint" class="pill muted">WASD / panah untuk berjalan</div>
     </div>
     <div id="social-btns" hidden>
+      <button id="btn-kamarku" hidden>🏠 Kamarku <span class="muted small">[K]</span></button>
       <button id="btn-chat">Chat</button>
       <button id="btn-teman">Teman <span id="teman-badge" class="badge" hidden></span></button>
     </div>
@@ -278,6 +284,45 @@
         </div>
         <span id="ktr-menu-error" class="error" hidden></span>
         <button class="ghost" data-mode="tutup">Tutup</button>
+      </div>
+    </div>
+
+    <!-- Kamarku: dashboard anak (tombol "Kamarku" atau K). Isinya dari /api/kamarku -->
+    <div id="kamarku-panel" class="overlay" hidden>
+      <div class="card kamar-card" role="dialog" aria-labelledby="kamar-judul">
+        <div class="kamar-kepala">
+          <img id="kamar-avatar" alt="Avatarmu" />
+          <div class="kamar-nama">
+            <h2 id="kamar-judul">Kamarku</h2>
+            <div id="kamar-info" class="muted small"></div>
+            <div id="kamar-level" class="kamar-level"></div>
+          </div>
+          <button class="ghost" id="kamar-tutup">Tutup <span class="muted small">[Esc]</span></button>
+        </div>
+        <div id="kamar-isi"><p class="muted">Memuat kamarmu…</p></div>
+        <span id="kamar-error" class="error" hidden></span>
+        <div class="kamar-aksi">
+          <button data-ke="bimbel">📚 Ke Ruang Bimbel</button>
+          <button data-ke="game">🎲 Ke Ruang Game</button>
+          <button data-ke="toko">🛍️ Buka Toko</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toko Aksesori (kios di alun-alun): tukar bintang dari Ruang Pintar dengan aksesori avatar -->
+    <div id="toko-panel" class="overlay" hidden>
+      <div class="card toko-card">
+        <h2>Toko Aksesori</h2>
+        <div class="toko-atas">
+          <img id="toko-preview" alt="Avatarmu" />
+          <div>
+            <b id="toko-saldo" class="toko-saldo">★ 0 bintang</b>
+            <p class="muted small">Dapatkan bintang dari latihan dan tryout di Ruang Pintar. Aksesori yang dipakai langsung terlihat di arena.</p>
+          </div>
+        </div>
+        <div id="toko-isi"></div>
+        <span id="toko-error" class="error" hidden></span>
+        <button class="ghost" id="toko-tutup">Tutup</button>
       </div>
     </div>
 

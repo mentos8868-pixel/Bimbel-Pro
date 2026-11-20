@@ -1,0 +1,154 @@
+// Kemajuan Ruang Pintar per anak: topik dan bintang terbaik, medali, riwayat latihan dan tryout.
+// Dulu hanya di browser (localStorage); sekarang disalin ke server supaya sama di semua perangkat
+// dan bisa dilihat di Kamarku dan dashboard orang tua.
+//
+// Penggabungan tidak pernah mengurangi kemajuan: bintang terbaik dan angka diambil yang terbesar,
+// medali digabung, riwayat digabung tanpa dobel. Datanya dikirim oleh browser anak sendiri, jadi
+// semua isian dirapikan dan dibatasi ukurannya sebelum disimpan.
+// "ringkasan" dihitung di Ruang Pintar (server tidak punya daftar topik), lalu dipakai untuk tampilan.
+import { db, today } from "./db.js";
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS child_progres (
+    child_id INTEGER PRIMARY KEY REFERENCES children(id) ON DELETE CASCADE,
+    data TEXT NOT NULL,
+    ringkasan TEXT NOT NULL DEFAULT '{}',
+    updated_at INTEGER NOT NULL
+  );
+`);
+
+const MAKS_TOPIK = 3000, MAKS_RIWAYAT = 50, MAKS_TRYOUT = 30, MAKS_MEDALI = 50;
+const KUNCI_TOPIK = /^[A-Za-z0-9_.:-]{1,60}\|[123]$/;
+const ID = /^[A-Za-z0-9_.:-]{1,40}$/;
+const TGL = /^\d{4}-\d{2}-\d{2}$/;
+
+const int = (v, max) => Math.max(0, Math.min(max, Math.floor(Number(v) || 0)));
+const teks = (v, max) => String(v ?? "").replace(/[\u0000-\u001f]/g, "").trim().slice(0, max);
+const waktu = (v) => { const t = Date.parse(v); return Number.isFinite(t) ? new Date(t).toISOString() : null; };
+const obj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
+const arr = (v) => (Array.isArray(v) ? v : []);
+
+function rapikanData(d) {
+  d = obj(d);
+  const topics = {};
+  for (const [k, t] of Object.entries(obj(d.topics)).slice(0, MAKS_TOPIK)) {
+    if (!KUNCI_TOPIK.test(k)) continue;
+    const x = obj(t);
+    topics[k] = { best: int(x.best, 3), att: int(x.att, 1e6), ok: int(x.ok, 1e6), ses: int(x.ses, 1e5) };
+  }
+  const history = [];
+  for (const h of arr(d.history).slice(0, MAKS_RIWAYAT * 2)) {
+    const x = obj(h), dt = waktu(x.d);
+    if (dt && KUNCI_TOPIK.test(String(x.id))) history.push({ d: dt, id: String(x.id), c: int(x.c, 100), n: int(x.n, 100) });
+  }
+  const tryouts = [];
+  for (const t of arr(d.tryouts).slice(0, MAKS_TRYOUT * 2)) {
+    const x = obj(t), dt = waktu(x.d);
+    if (!dt || !ID.test(String(x.kur)) || !ID.test(String(x.mapel))) continue;
+    tryouts.push({
+      d: dt, kur: String(x.kur), mapel: String(x.mapel), kelas: int(x.kelas, 12), lv: int(x.lv, 3),
+      score: int(x.score, 100), c: int(x.c, 200), n: int(x.n, 200), used: int(x.used, 1e5), menit: int(x.menit, 600),
+      stars: int(x.stars, 5), max: int(x.max, 5),
+    });
+  }
+  const tryoutHari = {};
+  for (const [k, v] of Object.entries(obj(d.tryoutHari)).slice(0, 50)) {
+    if (/^[A-Za-z0-9_-]{1,20}\|[A-Za-z0-9_-]{1,20}$/.test(k) && TGL.test(String(v))) tryoutHari[k] = String(v);
+  }
+  const medals = [...new Set(arr(d.medals).map(String).filter((m) => /^[a-z0-9]{1,20}$/.test(m)))].slice(0, MAKS_MEDALI);
+  return { sessions: int(d.sessions, 1e6), perfect: int(d.perfect, 1e6), medals, topics, history, tryouts, tryoutHari };
+}
+
+function rapikanRingkasan(r) {
+  r = obj(r);
+  const mapel = arr(r.mapel).slice(0, 8).filter((m) => ID.test(String(obj(m).id))).map((m) => ({
+    id: String(m.id), nama: teks(m.nama, 40), selesai: int(m.selesai, 999), total: int(m.total, 999),
+  }));
+  const u = obj(r.ulangi);
+  return {
+    kur: ID.test(String(r.kur)) ? String(r.kur) : "", kelas: int(r.kelas, 12), mapel,
+    ulangi: u.nama ? { nama: teks(u.nama, 80), best: int(u.best, 3) } : null,
+    totalMedali: int(r.totalMedali, 99), medaliTerbaru: teks(r.medaliTerbaru, 40),
+  };
+}
+
+// Gabungan dua kemajuan (keduanya sudah dirapikan).
+function gabung(a, b) {
+  const topics = { ...a.topics };
+  for (const [k, t] of Object.entries(b.topics)) {
+    const o = topics[k];
+    topics[k] = o ? { best: Math.max(o.best, t.best), att: Math.max(o.att, t.att), ok: Math.max(o.ok, t.ok), ses: Math.max(o.ses, t.ses) } : t;
+  }
+  const unik = (list, kunci, max) => {
+    const m = new Map();
+    for (const x of list) if (!m.has(kunci(x))) m.set(kunci(x), x);
+    return [...m.values()].sort((x, y) => (x.d < y.d ? 1 : -1)).slice(0, max);
+  };
+  const tryoutHari = { ...a.tryoutHari };
+  for (const [k, v] of Object.entries(b.tryoutHari)) if (!tryoutHari[k] || v > tryoutHari[k]) tryoutHari[k] = v;
+  return {
+    sessions: Math.max(a.sessions, b.sessions), perfect: Math.max(a.perfect, b.perfect),
+    medals: [...new Set([...a.medals, ...b.medals])].slice(0, MAKS_MEDALI),
+    topics: Object.fromEntries(Object.entries(topics).slice(0, MAKS_TOPIK)),
+    history: unik([...a.history, ...b.history], (x) => `${x.d}|${x.id}`, MAKS_RIWAYAT),
+    tryouts: unik([...a.tryouts, ...b.tryouts], (x) => x.d, MAKS_TRYOUT),
+    tryoutHari,
+  };
+}
+
+export function bacaProgres(childId) {
+  const r = db.prepare("SELECT data, ringkasan, updated_at FROM child_progres WHERE child_id = ?").get(childId);
+  if (!r) return null;
+  try { return { data: JSON.parse(r.data), ringkasan: JSON.parse(r.ringkasan), updatedAt: r.updated_at }; } catch { return null; }
+}
+
+// Ringkasan kemajuan belajar untuk Kamarku dan dashboard orang tua (null bila belum pernah ke Ruang Pintar).
+export function ringkasBelajar(childId, now = Date.now()) {
+  const p = bacaProgres(childId);
+  if (!p) return null;
+  const { data: d, ringkasan: r } = p;
+  const hariIni = today(now);
+  const nama = Object.fromEntries(r.mapel.map((m) => [m.id, m.nama]));
+  return {
+    medali: { punya: d.medals.length, total: r.totalMedali, terbaru: r.medaliTerbaru },
+    mapel: r.mapel,
+    ulangi: r.ulangi,
+    misi: {
+      tryout: r.mapel.map((m) => {
+        const t = d.tryouts.find((x) => x.kur === r.kur && x.mapel === m.id && today(Date.parse(x.d)) === hariIni);
+        return { id: m.id, nama: m.nama, selesai: d.tryoutHari[`${r.kur}|${m.id}`] === hariIni, bintang: t ? t.stars : null };
+      }),
+      latihanHariIni: d.history.filter((h) => today(Date.parse(h.d)) === hariIni).length,
+    },
+    latihan7Hari: d.history.filter((h) => now - Date.parse(h.d) < 7 * 86400000).length,
+    sesi: d.sessions,
+    tryoutTerakhir: d.tryouts.slice(0, 5).map((t) => ({ d: t.d, mapel: nama[t.mapel] || t.mapel, score: t.score, c: t.c, n: t.n, stars: t.stars })),
+  };
+}
+
+// Mengembalikan true bila permintaan ditangani. anak = sesi anak (atau null).
+export function handleProgres({ m, path, body, anak, send, ApiError }) {
+  if (path[0] !== "progres" || path.length !== 1) return false;
+  if (!anak) throw new ApiError(401, "Masuk sebagai anak dulu.");
+  const id = anak.child_id;
+
+  if (m === "GET") return send(200, { data: bacaProgres(id)?.data || null }), true;
+
+  if (m === "POST") {
+    const lama = bacaProgres(id);
+    const data = lama ? gabung(rapikanData(lama.data), rapikanData(body.data)) : rapikanData(body.data);
+    const ringkasan = body.ringkasan ? rapikanRingkasan(body.ringkasan) : (lama?.ringkasan || rapikanRingkasan({}));
+    db.prepare(`INSERT INTO child_progres (child_id, data, ringkasan, updated_at) VALUES (?, ?, ?, ?)
+                ON CONFLICT(child_id) DO UPDATE SET data = excluded.data, ringkasan = excluded.ringkasan, updated_at = excluded.updated_at`)
+      .run(id, JSON.stringify(data), JSON.stringify(ringkasan), Date.now());
+    return send(200, { data }), true;
+  }
+
+  // "Hapus semua progres" di Ruang Pintar. Bintang dan XP di server tidak ikut terhapus.
+  if (m === "DELETE") {
+    db.prepare("DELETE FROM child_progres WHERE child_id = ?").run(id);
+    return send(200, { ok: true }), true;
+  }
+
+  throw new ApiError(405, "Metode tidak didukung.");
+}
