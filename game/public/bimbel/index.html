@@ -213,6 +213,8 @@
 
 <script src="bank_soal.js"></script>
 <script src="bank_intl.js"></script>
+<script src="topik_tambahan.js"></script>
+<script src="topik_intl.js"></script>
 <script>
 /* ============ Util ============ */
 const R=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
@@ -709,6 +711,7 @@ const G={
     return {q:`Rata-rata nilai ${n1} siswa kelas A adalah ${m1}, dan rata-rata ${n2} siswa kelas B adalah ${m2}. Berapa rata-rata gabungannya?`,ans:g,kind:'int',
       steps:[`Rata-rata gabungan = (n₁·x̄₁ + n₂·x̄₂) : (n₁ + n₂).`,`= (${n1*m1} + ${n2*m2}) : ${n1+n2} = <b>${g}</b>.`]}},
 };
+Object.assign(G,window.G_EXTRA||{},window.G_INTL||{});   // topik tambahan (topik_tambahan.js, topik_intl.js)
 
 const T=(id,name,desc,g,p)=>({id,name,desc,g,p});
 const TOPICS={
@@ -749,6 +752,7 @@ const TOPICS={
      T('k12-pm','Peluang kejadian majemuk','Dua koin, dua dadu, tanpa pengembalian','peluangMajemuk'),T('k12-bunga','Matematika keuangan','Bunga tunggal','bungaTunggal'),
      T('k12-stat','Statistika','Jangkauan, median, rata-rata gabungan','statistik12')],
 };
+for(const k in (window.TOPIK_EXTRA||{}))TOPICS[k]=(TOPICS[k]||[]).concat(window.TOPIK_EXTRA[k].map(a=>T(...a)));
 for(const k in TOPICS)TOPICS[k].push(T(`k${k}-camp`,'Latihan campuran',`Soal acak dari semua topik kelas ${k}`,'__mix'));
 
 /* ============ Kurikulum & mata pelajaran ============ */
@@ -771,9 +775,11 @@ function topicsFor(mapel,k,kur=S.kur){
   if(kur==='merdeka'){
     if(mapel==='mat')return (TOPICS[k]||[]).map(t=>({...t,kelas:+k,mapel,kur}));
     list=((BANKDATA[mapel]||{})[k]||[]).map(t=>({id:t.id,name:t.name,desc:t.desc,bank:t.soal,kelas:+k,mapel,kur}));
-  }else list=(((BANKINTL[kur]||{})[mapel]||{})[k]||[]).map(t=>({id:t.id,name:t.name,desc:t.desc,bank:t.soal,kelas:+k,mapel,kur}));
+  }else{list=(((BANKINTL[kur]||{})[mapel]||{})[k]||[]).map(t=>({id:t.id,name:t.name,desc:t.desc,bank:t.soal,kelas:+k,mapel,kur}));
+    const gx=(((window.INTL_TOPIK||{})[kur]||{})[mapel]||{})[k]||[];   // topik dengan soal otomatis (topik_intl.js)
+    list=list.concat(gx.map(([id,name,desc,g,p])=>({id,name,desc,g,p,kelas:+k,mapel,kur})))}
   if(list.length>1)list.push({id:`${kur==='merdeka'?'':kur+'-'}${mapel}-k${k}-camp`,name:kur==='merdeka'?'Latihan campuran':'Mixed practice',desc:kur==='merdeka'?`Soal acak dari semua topik kelas ${k}`:`Random questions from all topics`,
-    bank:list.flatMap(t=>t.bank.map(s=>({...s,from:t.name}))),kelas:+k,mapel,kur,mix:true});
+    parts:list.slice(),kelas:+k,mapel,kur,mix:true});
   return list;
 }
 const ALLTOPICS=()=>{const out=[];for(const kur in KURS)for(const m in KURS[kur].mapel)for(let k=1;k<=12;k++)out.push(...topicsFor(m,k,kur));return out};
@@ -783,6 +789,11 @@ function makeQ(t){let tt=t;if(t.g==='__mix'){tt=pick(TOPICS[t.kelas].filter(x=>x
   const q=G[tt.g](tt.p);q.from=tt.name;if(t.kelas<=2&&q.kind==='int'&&!q.choices)q.choices=choicesFor(q.ans);return q}
 function bankQ(s){const order=shuffle([0,1,2,3]);return {q:esc(s.q).replace(/\n/g,'<br>'),ans:s.o[s.a],kind:'str',choices:order.map(i=>s.o[i]),steps:[esc(s.p)],from:s.from,text:true}}
 function buildSession(t,n){
+  if(t.parts){   // latihan campuran: gabungan topik bank soal dan topik soal otomatis
+    const gens=t.parts.filter(p=>!p.bank),bank=t.parts.filter(p=>p.bank).flatMap(p=>p.bank.map(s=>({...s,from:p.name})));
+    const pool=shuffle(bank.filter(s=>s.lv===LV)).concat(shuffle(bank.filter(s=>s.lv!==LV))),share=gens.length/t.parts.length,qs=[];
+    for(let i=0;i<n;i++){if(gens.length&&(!pool.length||Math.random()<share))qs.push(makeQ(pick(gens)));else if(pool.length)qs.push(bankQ(pool.shift()))}
+    return qs}
   if(!t.bank){const qs=[];for(let i=0;i<n;i++)qs.push(makeQ(t));return qs}
   let pool=shuffle(t.bank.filter(s=>s.lv===LV));
   if(pool.length<n){const extra=shuffle(t.bank.filter(s=>s.lv!==LV).sort((a,b)=>Math.abs(a.lv-LV)-Math.abs(b.lv-LV)));pool=pool.concat(extra)}
@@ -868,7 +879,7 @@ function check(q,v){v=String(v).trim().toLowerCase().replace(/−/g,'-');if(!v)r
   if(q.kind==='frac'){let n,d;if(v.includes('/')){[n,d]=v.split('/').map(x=>parseInt(x.trim()))}else{n=parseInt(v);d=1}
     if(!isFinite(n)||!isFinite(d)||d===0)return false;return n*q.ans[1]===q.ans[0]*d}
   if(q.kind==='dec'){const x=parseFloat(v.replace(',','.'));return Math.abs(x-q.ans)<1e-9}
-  const x=parseInt(v.replace(/rp|\.|\s/g,''));return x===q.ans;
+  const x=parseInt(v.replace(/rp|\$|\.|,|\s/g,''));return x===q.ans;
 }
 function renderQ(app){const s=sess,q=s.qs[s.i];
   const dots=s.qs.map((_,i)=>`<i class="${i<s.res.length?(s.res[i]?'ok':'bad'):(i===s.i?'cur':'')}"></i>`).join('');
