@@ -103,7 +103,11 @@
       <section id="dash" hidden>
         <header class="dash-heading">
           <div><p class="dash-label">Dashboard orang tua</p><h1 id="halo">Halo!</h1></div>
-          <button class="primary" type="button" id="tambah-anak">Tambah anak</button>
+          <div class="dash-actions">
+            <!-- Orang tua ikut bermain: arena langsung membuka langkah "Main sebagai orang tua". -->
+            <a class="btn" href="/?main=ortu" id="main-arena">Main di arena</a>
+            <button class="primary" type="button" id="tambah-anak">Tambah anak</button>
+          </div>
         </header>
         <div id="pilih-anak" class="child-list" role="group" aria-label="Pilih anak"></div>
         <p class="error" id="laporan-error" role="alert" hidden></p>

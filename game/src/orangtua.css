@@ -132,6 +132,7 @@ main:has(#dash:not([hidden])) { max-width: 1200px; }
   background: #dff2eb; color: #183d36;
 }
 .dash-heading h1 { font-size: clamp(26px, 4vw, 38px); margin: 0; }
+.dash-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .dash-label { margin: 0 0 6px; font-size: 14px; font-weight: 700; }
 #dash button.primary { background: #186553; border-color: #186553; }
 .child-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(235px, 100%), 1fr)); gap: 12px; }

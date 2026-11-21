@@ -31,6 +31,7 @@ export function setupLogin(onStart) {
   let me = null;
   let pinChild = null;
   let ortuLevel = "SD";
+  let mauOrtu = new URLSearchParams(location.search).get("main") === "ortu";
   // Avatar disimpan langsung saat dipilih: orang tua (sebagai=ortu) atau anak sendiri (sebagai=anak).
   // Orang tua juga tetap bisa mengganti avatar anak di dashboard.
   const save = (body) => api("POST", "avatar", body).catch(() => {});
@@ -60,6 +61,14 @@ export function setupLogin(onStart) {
       me = await api("GET", "saya");
     } catch {
       me = { ortu: null, anak: null, children: [], offline: true };
+    }
+    // Dari dashboard orang tua ("Main di arena", /?main=ortu): langsung ke langkah main sebagai orang tua.
+    if (mauOrtu && me.ortu) {
+      mauOrtu = false;
+      history.replaceState(null, "", location.pathname);
+      ortuPicker.set(me.ortu.avatar || DEFAULT_ORTU_AVATAR);
+      renderFamily();   // supaya tombol Kembali menampilkan daftar keluarga
+      return go("ortu");
     }
     if (me.anak) {
       $("siap-judul").textContent = `Halo, ${me.anak.name}!`;
