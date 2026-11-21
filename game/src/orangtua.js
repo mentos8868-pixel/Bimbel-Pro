@@ -2,6 +2,7 @@
 import { api } from "./api.js";
 import { avatarPicker } from "./avatar-picker.js";
 import { avatarSvg } from "./avatar-svg.js";
+import { AKSESORI, SLOT } from "../../shared/aksesori.js";
 import { NEGARA, DEFAULT_NEGARA, negaraName, KURIKULUM, kurikulumName, namaKelas } from "../../shared/negara.js";
 
 const $ = (id) => document.getElementById(id);
@@ -454,6 +455,7 @@ function terapkanHal() {
   $("pilih-anak").querySelectorAll("button").forEach((b) => b.classList.toggle("on", Number(b.dataset.anak) === anakDipilih));
   if (hal === "tugas") gambarTugas();
   if (hal === "keuangan") gambarKeuangan();
+  if (hal === "avatar") gambarAvatarOrtu();
   if (hal === "home") gambarHome();
   if (hal === "chat") gambarChat(); else clearInterval(chatTimer);
   tandaChat();
@@ -546,6 +548,8 @@ function gambarTugas() {
       gambarTugas();
     } catch (x) { setErr(f, x.message); busy(f, false); }
   };
+  // Bintang dari tugas bisa ditukar dengan hadiah dari orang tua.
+  gambarHadiah(box, esc(document.querySelector(`#pilih-anak [data-anak="${anakDipilih}"]`)?.dataset.nama || "anak"));
 }
 // Tombol Setujui / Belum / Hapus di menu Tugas.
 $("tugas-isi").addEventListener("click", async (e) => {
@@ -697,10 +701,9 @@ function gambarKeuangan() {
       gambarKeuangan();
     } catch (x) { setErr(fu, x.message); busy(fu, false); }
   };
-  gambarHadiah(box, nama);
 }
 
-// ---------------- Hadiah tukar bintang (di menu Keuangan) ----------------
+// ---------------- Hadiah tukar bintang (di menu Tugas) ----------------
 // Daftar hadiah berlaku untuk semua anak. Penukaran per anak menunggu persetujuan orang tua;
 // bintang baru berkurang saat disetujui, dan hadiah uang otomatis tercatat sebagai uang saku masuk.
 let dataHadiah = { hadiah: [], anak: {} };
@@ -741,19 +744,23 @@ function gambarHadiah(box, nama) {
     busy(f, true);
     try {
       dataHadiah = await api("POST", "hadiah", { nama: f.nama.value, bintang: f.bintang.value, rupiah: f.rupiah.value });
-      gambarKeuangan();
+      gambarTugas();
     } catch (x) { setErr(sec, x.message); busy(f, false); }
   };
 }
 
 $("keuangan-isi").addEventListener("click", async (e) => {
-  const b = e.target.closest("button[data-hapus-uang], button[data-tukar-setujui], button[data-tukar-tolak], button[data-hapus-hadiah]");
+  const b = e.target.closest("button[data-hapus-uang]");
+  if (!b || !confirm("Hapus catatan pemberian uang ini?")) return;
+  try { dataUang[anakDipilih] = await api("DELETE", `keuangan/${b.dataset.hapusUang}`); gambarKeuangan(); }
+  catch (x) { alert(x.message); }
+});
+// Tombol hadiah di menu Tugas: setujui/tolak penukaran, hapus hadiah.
+$("tugas-isi").addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-tukar-setujui], button[data-tukar-tolak], button[data-hapus-hadiah]");
   if (!b) return;
   try {
-    if (b.dataset.hapusUang) {
-      if (!confirm("Hapus catatan pemberian uang ini?")) return;
-      dataUang[anakDipilih] = await api("DELETE", `keuangan/${b.dataset.hapusUang}`);
-    } else if (b.dataset.hapusHadiah) {
+    if (b.dataset.hapusHadiah) {
       if (!confirm("Hapus hadiah ini? Penukaran yang masih menunggu ikut dibatalkan.")) return;
       dataHadiah = await api("DELETE", `hadiah/${b.dataset.hapusHadiah}`);
     } else {
@@ -763,7 +770,7 @@ $("keuangan-isi").addEventListener("click", async (e) => {
       // Hadiah uang menambah uang saku: muat ulang angka Keuangan anak.
       if (b.dataset.tukarSetujui) dataUang = (await api("GET", "keuangan")).anak;
     }
-    gambarKeuangan();
+    gambarTugas();
   } catch (x) { alert(x.message); b.disabled = false; }
 });
 
@@ -803,20 +810,48 @@ function kartuHome(c, soc) {
 }
 
 // ---------------- menu Avatar: avatar orang tua ----------------
-// Pemilih dibuat sekali; load() bisa dipanggil berkali-kali (mis. setelah menyimpan pengaturan).
+// Dibuat seperti menu Avatar anak: kartu besar di atas, lalu tab Karakter dan Aksesori.
+// Aksesori gratis untuk orang tua (tidak memakai bintang). Aura tetap khusus hadiah belajar anak.
 const WARNA_ORTU = "#5b6b7c";
-let pemilihOrtu = null;
-function pasangAvatarOrtu(avatar) {
-  const dot = $("ortu-dot");
-  dot.innerHTML = avatarSvg(avatar, WARNA_ORTU);
-  if (pemilihOrtu) { pemilihOrtu.set(avatar); return; }
+let dataOrtu = { name: "", email: "", avatar: "beruang-ayah", aksesori: [] };
+let tabAvatarOrtu = "karakter";
+const gambarOrtu = (coba) => avatarSvg(dataOrtu.avatar, WARNA_ORTU, { aksesori: coba ? [...dataOrtu.aksesori, coba] : dataOrtu.aksesori });
+
+function gambarAvatarOrtu() {
+  const box = $("avatar-ortu-isi");
+  const dipakai = dataOrtu.aksesori.map((id) => AKSESORI.find((a) => a.id === id)?.name).filter(Boolean);
+  const isiAksesori = SLOT.map((sl) => {
+    const items = AKSESORI.filter((a) => a.slot === sl.id);
+    if (!items.length) return "";
+    return `<h3>${esc(sl.name)}</h3><div class="toko-grid">${items.map((a) => {
+      const pakai = dataOrtu.aksesori.includes(a.id);
+      return `<div class="toko-item ${pakai ? "pakai" : ""}"><span class="av-face" style="width:80px;height:80px">${gambarOrtu(a.id)}</span><b>${esc(a.name)}</b>
+        <span class="muted kecil">${pakai ? "Sedang dipakai" : "Gratis untuk orang tua"}</span>
+        <button data-aks-ortu="${a.id}" data-on="${pakai ? 0 : 1}" class="${pakai ? "" : "primary"}">${pakai ? "Lepas" : "Pakai"}</button></div>`;
+    }).join("")}</div>`;
+  }).join("");
+  box.innerHTML = `
+    <section class="panel kepala-ortu">
+      <span class="ava-besar av-face" style="width:110px;height:110px">${gambarOrtu()}</span>
+      <div><h2>${esc(dataOrtu.name)}</h2><span class="muted">Orang tua · dipakai saat Anda bermain di arena bersama anak</span>
+        <p class="muted kecil">${dipakai.length ? `Aksesori: ${dipakai.map(esc).join(", ")}` : "Belum memakai aksesori"}</p></div>
+    </section>
+    <div class="tab-avatar" role="tablist">
+      <button role="tab" data-tab-ortu="karakter" class="${tabAvatarOrtu === "karakter" ? "on" : ""}" aria-selected="${tabAvatarOrtu === "karakter"}">🐻 Karakter</button>
+      <button role="tab" data-tab-ortu="aksesori" class="${tabAvatarOrtu === "aksesori" ? "on" : ""}" aria-selected="${tabAvatarOrtu === "aksesori"}">🎀 Aksesori</button>
+    </div>
+    ${tabAvatarOrtu === "aksesori"
+      ? `<section class="panel"><h2>🎀 Aksesori</h2><p class="muted">Semua aksesori gratis untuk orang tua. Satu aksesori untuk setiap tempat (kepala, wajah, leher).</p>${isiAksesori}</section>`
+      : `<section class="panel"><h2>🐻 Pilih karakter</h2><div id="ortu-avatar-picker"></div><span id="ortu-av-ok" class="muted" hidden>Avatar tersimpan ✓</span></section>`}`;
+  if (tabAvatarOrtu !== "karakter") return;
   let okTimer = 0;
-  pemilihOrtu = avatarPicker($("ortu-avatar-picker"), {
-    value: avatar, accent: WARNA_ORTU,
+  avatarPicker($("ortu-avatar-picker"), {
+    value: dataOrtu.avatar, accent: WARNA_ORTU,
     onPick: async (pilih) => {
       try {
         await api("POST", "avatar", { avatar: pilih, sebagai: "ortu" });
-        dot.innerHTML = avatarSvg(pilih, WARNA_ORTU);
+        dataOrtu.avatar = pilih;
+        box.querySelector(".kepala-ortu .ava-besar").innerHTML = gambarOrtu();
         $("ortu-av-ok").hidden = false;
         clearTimeout(okTimer);
         okTimer = setTimeout(() => ($("ortu-av-ok").hidden = true), 2000);
@@ -824,6 +859,17 @@ function pasangAvatarOrtu(avatar) {
     },
   });
 }
+$("avatar-ortu-isi").addEventListener("click", async (e) => {
+  const tab = e.target.closest("[data-tab-ortu]");
+  if (tab) { tabAvatarOrtu = tab.dataset.tabOrtu; gambarAvatarOrtu(); return; }
+  const b = e.target.closest("button[data-aks-ortu]");
+  if (!b) return;
+  b.disabled = true;
+  try {
+    dataOrtu.aksesori = (await api("POST", "avatar/aksesori", { id: b.dataset.aksOrtu, pakai: b.dataset.on === "1" })).aksesori;
+    gambarAvatarOrtu();
+  } catch (x) { alert(x.message); b.disabled = false; }
+});
 
 // ---------------- muat ----------------
 async function load() {
@@ -841,9 +887,9 @@ async function load() {
   $("auth").hidden = masuk;
   $("dash").hidden = !masuk;
   $("top-nav").hidden = !masuk;
-  if (!masuk) return;
+  if (!masuk) { clearInterval(chatTimer); return; }   // berhenti memuat chat bila sudah keluar
   namaOrtu = me.ortu.name;
-  pasangAvatarOrtu(me.ortu.avatar);
+  dataOrtu = { ...me.ortu, aksesori: me.ortu.aksesori || [] };
   const [{ children }, social, tugas, belum, uang, hadiah] = await Promise.all([api("GET", "laporan"), api("GET", "teman"), api("GET", "tugas"), api("GET", "chat/belum?sebagai=ortu"), api("GET", "keuangan"), api("GET", "hadiah")]);
   dataTugas = tugas.anak;
   belumDibaca = belum.anak;

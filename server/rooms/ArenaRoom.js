@@ -103,7 +103,7 @@ export class ArenaRoom extends Room {
     p.negara = a.role === "anak" ? a.negara || "" : "";
     p.kelas = a.role === "anak" ? a.kelas || 0 : 0;
     p.kurikulum = a.role === "anak" ? a.kurikulum || "merdeka" : "";
-    p.aksesori = a.role === "anak" ? a.aksesori || "" : "";
+    p.aksesori = a.aksesori || "";   // anak: dari Toko; orang tua: dipilih di dashboard (gratis)
     p.aura = a.role === "anak" ? a.aura || "" : "";
     // Muncul di sekitar alun-alun.
     const ang = Math.random() * Math.PI * 2;

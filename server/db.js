@@ -85,6 +85,11 @@ for (const [table, def] of [["children", "beruang-putra"], ["parents", "beruang-
   }
 }
 
+// Aksesori yang dipakai orang tua (gratis untuk orang tua; dipilih di menu Avatar dashboard orang tua).
+if (!db.prepare("PRAGMA table_info(parents)").all().some((c) => c.name === "aksesori_pakai")) {
+  db.exec("ALTER TABLE parents ADD COLUMN aksesori_pakai TEXT NOT NULL DEFAULT ''");
+}
+
 // Kolom negara dan kelas anak (diisi orang tua; 0 = kelas belum diisi).
 {
   const cols = db.prepare("PRAGMA table_info(children)").all().map((c) => c.name);

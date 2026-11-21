@@ -210,3 +210,18 @@ main:has(#dash:not([hidden])) { max-width: 1200px; }
 .saldo-ortu { font-size: 15px; font-weight: 700; background: #fff4d6; color: #7a5200; border-radius: 999px; padding: 3px 12px; margin-left: 10px; }
 .hadiah-form { display: grid; grid-template-columns: 2fr 1fr 1.4fr auto; gap: 10px; align-items: end; }
 @media (max-width: 720px) { .hadiah-form { grid-template-columns: 1fr; } }
+
+/* Menu Avatar orang tua (model sama dengan menu Avatar anak) */
+.kepala-ortu { flex-direction: row; align-items: center; gap: 18px; }
+.kepala-ortu .ava-besar { width: 110px; height: 110px; flex: none; display: block; }
+.kepala-ortu .ava-besar svg { width: 100%; height: 100%; }
+.kepala-ortu p { margin: 6px 0 0; }
+.tab-avatar { display: flex; gap: 8px; }
+.tab-avatar button { flex: 1; font-size: 16px; padding: 10px 14px; border-radius: 12px; background: #fff; }
+.tab-avatar button.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.toko-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.toko-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px; border: 2px solid #eee3d0; border-radius: 14px; text-align: center; background: #fff; }
+.toko-item .av-face { width: 80px; height: 80px; display: block; }
+.toko-item .av-face svg { width: 100%; height: 100%; }
+.toko-item.pakai { border-color: var(--primary); background: #eef6ff; }
+.toko-item button { width: 100%; padding: 6px 12px; font-size: 14px; }

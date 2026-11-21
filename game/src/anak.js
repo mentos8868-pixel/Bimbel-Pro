@@ -166,15 +166,15 @@ const ISI = {
         <div class="row"><button class="primary" type="submit">${uang?.target ? "Ubah target" : "Pasang target"}</button>${uang?.target ? `<button type="button" class="ghost" id="hapus-targetku">Hapus target</button>` : ""}</div></form>
     </div>
     ${uangSakuku(true)}
-    ${tukarBintang()}
-    <p class="muted kecil">Ini hanya catatan, bukan uang sungguhan di aplikasi.</p>`;
+    <p class="muted kecil">Ini hanya catatan, bukan uang sungguhan di aplikasi. Bintang bisa ditukar dengan hadiah di menu Tugas.</p>`;
   },
   tugas: () => `<div class="tiga">
       <div class="kotak"><span class="judul">✅ Hari ini</span><span class="besar">${tg ? `${tg.hariIni.disetujui} / ${tg.hariIni.total}` : "–"}</span><span class="kecil">tugas disetujui orang tua</span></div>
       <div class="kotak"><span class="judul">⏳ Menunggu dicek</span><span class="besar">${tg ? tg.hariIni.menunggu : "–"}</span><span class="kecil">orang tua akan mengecek</span></div>
       <div class="kotak"><span class="judul">📅 7 hari terakhir</span><span class="besar">${tg?.minggu.persen ?? "–"}${tg?.minggu.persen != null ? "%" : ""}</span><span class="kecil">tugas selesai</span></div></div>
     <section class="panel"><h3>✅ Tugas dari orang tua</h3><p class="muted kecil">Tekan "Sudah" setelah selesai. Bintang masuk setelah orang tua menyetujui.</p>${daftarTugas(true)}</section>
-    <section class="panel"><h3>🎯 Misi belajar hari ini</h3>${daftarMisi()}</section>`,
+    <section class="panel"><h3>🎯 Misi belajar hari ini</h3>${daftarMisi()}</section>
+    ${tukarBintang()}`,
   arena: () => `<div class="dua">
       <section class="panel"><h3>🌍 Dunia arena</h3><p class="muted">Jalan-jalan, main Catur, Scramble, dan Kartu Kilat, lalu belanja di Toko Avatar.</p>
         ${kotakWaktu()}<div class="aksi-besar">${tombolArena()}</div></section>

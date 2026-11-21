@@ -4,7 +4,7 @@ import { randomBytes, scryptSync, timingSafeEqual, createHash } from "node:crypt
 import { db, today, lastDays } from "./db.js";
 import { avatarOr, DEFAULT_ORTU_AVATAR } from "../shared/avatars.js";
 import { avatarSvg } from "../shared/avatar-svg.js";
-import { rapikanAksesori } from "../shared/aksesori.js";
+import { rapikanAksesori, aksesoriById } from "../shared/aksesori.js";
 import { levelDariXp, auraDipakai } from "../shared/aura.js";
 
 const auraAnak = (c) => auraDipakai(levelDariXp(c.xp), c.aura_pakai);
@@ -133,7 +133,7 @@ export function playerFromSession(s) {
   }
   const p = db.prepare("SELECT * FROM parents WHERE id = ?").get(s.parent_id);
   if (!p) return null;
-  return { role: "ortu", parentId: p.id, name: p.name, jenjang: "Ortu", color: "#5b6b7c", avatar: avatarOr(p.avatar, DEFAULT_ORTU_AVATAR), limitMin: 0, allowStrangers: false };
+  return { role: "ortu", parentId: p.id, name: p.name, jenjang: "Ortu", color: "#5b6b7c", avatar: avatarOr(p.avatar, DEFAULT_ORTU_AVATAR), aksesori: rapikanAksesori(p.aksesori_pakai).join(","), limitMin: 0, allowStrangers: false };
 }
 
 // ---------- tiket untuk masuk ruang game ----------
@@ -361,8 +361,8 @@ export async function handleApi(req, res) {
     if (m === "GET" && path[0] === "saya") {
       const out = { ortu: null, anak: null, children: [] };
       if (ortu) {
-        const p = db.prepare("SELECT id, name, email, avatar FROM parents WHERE id = ?").get(ortu.parent_id);
-        out.ortu = p ? { name: p.name, email: p.email, avatar: avatarOr(p.avatar, DEFAULT_ORTU_AVATAR) } : null;
+        const p = db.prepare("SELECT id, name, email, avatar, aksesori_pakai FROM parents WHERE id = ?").get(ortu.parent_id);
+        out.ortu = p ? { name: p.name, email: p.email, avatar: avatarOr(p.avatar, DEFAULT_ORTU_AVATAR), aksesori: rapikanAksesori(p.aksesori_pakai) } : null;
         out.children = db.prepare("SELECT * FROM children WHERE parent_id = ? ORDER BY id").all(ortu.parent_id).map(publicChild);
       }
       if (anak) {
@@ -374,7 +374,7 @@ export async function handleApi(req, res) {
     // Ganti avatar sendiri: orang tua (sebagai=ortu) atau anak yang sedang masuk (sebagai=anak).
     // Pilihan avatar hanya dari daftar tetap (keluarga hewan/robot), jadi aman dipilih anak sendiri.
     // Orang tua tetap bisa menggantinya lewat PATCH anak/:id di dashboard.
-    if (m === "POST" && path[0] === "avatar") {
+    if (m === "POST" && path[0] === "avatar" && path.length === 1) {
       const avatar = avatarOr(body.avatar, "");
       if (!avatar) throw new ApiError(400, "Avatar tidak dikenal.");
       if (body.sebagai === "anak") {
@@ -385,6 +385,18 @@ export async function handleApi(req, res) {
       if (body.sebagai !== "ortu") throw new ApiError(400, "Pilih avatar untuk siapa.");
       db.prepare("UPDATE parents SET avatar = ? WHERE id = ?").run(avatar, needOrtu());
       return send(200, { ok: true, avatar }), true;
+    }
+    // Aksesori orang tua: semua aksesori gratis (orang tua tidak punya bintang). pakai=true mengganti
+    // aksesori di tempat yang sama, pakai=false melepas.
+    if (m === "POST" && path[0] === "avatar" && path[1] === "aksesori") {
+      const pid = needOrtu();
+      const a = aksesoriById(String(body.id || ""));
+      if (!a) throw new ApiError(400, "Aksesori tidak dikenal.");
+      const lama = rapikanAksesori(db.prepare("SELECT aksesori_pakai FROM parents WHERE id = ?").get(pid)?.aksesori_pakai);
+      const baru = body.pakai === false ? lama.filter((x) => x !== a.id) : [...lama.filter((x) => aksesoriById(x).slot !== a.slot), a.id];
+      const simpan = rapikanAksesori(baru);
+      db.prepare("UPDATE parents SET aksesori_pakai = ? WHERE id = ?").run(simpan.join(","), pid);
+      return send(200, { aksesori: simpan }), true;
     }
     // Gambar avatar anak yang sedang masuk (dipakai Ruang Pintar).
     if (m === "GET" && path[0] === "avatar.svg") {

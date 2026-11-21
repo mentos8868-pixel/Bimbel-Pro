@@ -150,7 +150,7 @@ export function setupLogin(onStart) {
     }
     if (act === "main-ortu") {
       box().hidden = true;
-      onStart({ role: "ortu", name: me.ortu.name, jenjang: "Orang tua", gameJenjang: ortuLevel, color: "#5b6b7c", avatar: ortuPicker.get() }, "ortu");
+      onStart({ role: "ortu", name: me.ortu.name, jenjang: "Orang tua", gameJenjang: ortuLevel, color: "#5b6b7c", avatar: ortuPicker.get(), aksesori: (me.ortu.aksesori || []).join(",") }, "ortu");
     }
   });
 
