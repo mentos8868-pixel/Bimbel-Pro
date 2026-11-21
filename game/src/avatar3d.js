@@ -1,7 +1,8 @@
 // Avatar 3D di arena: hewan/robot lucu dari bentuk sederhana (bola, kotak, tabung).
 // Ukuran mengikuti anggota keluarga (ayah paling besar, anak lebih kecil).
 import { MeshBuilder, StandardMaterial, Color3, TransformNode } from "@babylonjs/core";
-import { parseAvatar, DEFAULT_AVATAR } from "../../shared/avatars.js";
+import { parseAvatar, DEFAULT_AVATAR, DINO_AVATAR } from "../../shared/avatars.js";
+import { attachDinoModel } from "./dino-model.js";
 import { rapikanAksesori, aksesoriById } from "../../shared/aksesori.js";
 
 const INK = "#2b2f3a";
@@ -233,7 +234,7 @@ export function buildManekin(scene, parent, aksesori = []) {
 
 // Membuat figur di bawah induk; mengembalikan { fig, bob, height }.
 // bob = simpul yang dinaikturunkan saat berjalan.
-export function buildAvatar3d(scene, parent, avatarId, accent, aksesori = []) {
+export function buildAvatar3d(scene, parent, avatarId, accent, aksesori = [], sid) {
   const a = parseAvatar(avatarId) || parseAvatar(DEFAULT_AVATAR);
   const fig = new TransformNode("fig", scene);
   fig.parent = parent;
@@ -241,6 +242,25 @@ export function buildAvatar3d(scene, parent, avatarId, accent, aksesori = []) {
   const bob = new TransformNode("bob", scene);
   bob.parent = fig;
   const k = kit(scene, bob);
+  if (avatarId === DINO_AVATAR) {
+    const fallback = buildAvatar3d(scene, bob, DEFAULT_AVATAR, accent);
+    fallback.fig.scaling.setAll(1);
+    const h = { y: 1.62, r: 0.25, z: 0, front: 0.23, neck: 1.32, eye: { y: 1.65, z: 0.23, gap: 0.09 } };
+    const pakai = rapikanAksesori(aksesori);
+    const accessories = new TransformNode("dino-accessories", scene);
+    accessories.parent = bob;
+    accessories.setEnabled(false);
+    const dinoKit = kit(scene, accessories);
+    for (const id of pakai) buildAksesori(dinoKit, id, h);
+    const meshes = fallback.meshes.concat(accessories.getChildMeshes());
+    attachDinoModel(scene, bob, sid ? { sid } : undefined).then((attached) => {
+      if (attached) {
+        fallback.fig.dispose();
+        accessories.setEnabled(true);
+      }
+    }).catch((error) => console.warn("Piyama Dino", error));
+    return { fig, bob, meshes, height: (pakai.length ? 2.5 : 2.05) * a.member.scale };
+  }
   const head = buildFamily(k, a.family);
   const pakai = rapikanAksesori(aksesori);
   buildMember(k, a.member.id, head, accent, new Set(pakai.map((x) => aksesoriById(x).slot)));

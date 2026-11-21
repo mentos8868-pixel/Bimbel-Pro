@@ -1,6 +1,6 @@
 // Gambar avatar 2D (SVG) untuk pemilih avatar dan daftar pemain.
 // accent = warna pilihan pemain, dipakai untuk aksesori (dasi kupu-kupu, bunga, pita, topi).
-import { parseAvatar, DEFAULT_AVATAR } from "./avatars.js";
+import { parseAvatar, DEFAULT_AVATAR, DINO_AVATAR } from "./avatars.js";
 import { rapikanAksesori, aksesoriById, aksesoriSvg } from "./aksesori.js";
 
 const INK = "#2b2f3a";
@@ -111,6 +111,16 @@ function memberParts(m, p, accent) {
 // Mengembalikan string <svg>. sized = true: anak digambar lebih kecil daripada orang tua.
 // aksesori = id aksesori dari Toko (array atau "a,b"); menggantikan hiasan bawaan di tempat yang sama.
 export function avatarSvg(id, accent = "#4f9cf0", { sized = false, aksesori = [] } = {}) {
+  if (id === DINO_AVATAR) {
+    return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect x="25" y="65" width="50" height="31" rx="13" fill="#e6d7bd"/>
+      <path d="M37 82l7 2h8l4-8h5l3 4-5 2-2 7h-3v-3h-7v3h-3v-3z" fill="#527f8e"/>
+      <ellipse cx="50" cy="39" rx="28" ry="32" fill="#33241f"/>
+      <ellipse cx="50" cy="43" rx="23" ry="25" fill="#efae80"/>
+      <path d="M24 42Q22 10 46 8Q70 7 74 35Q62 34 58 20Q44 37 24 42Z" fill="#33241f"/>
+      ${eyes(50, 44, 9, 3.7)}${cheeks(52)}${smile(54)}
+    </svg>`;
+  }
   const a = parseAvatar(id) || parseAvatar(DEFAULT_AVATAR);
   const p = familyParts(a.family);
   const s = sized ? a.member.scale / 1.15 : 1;

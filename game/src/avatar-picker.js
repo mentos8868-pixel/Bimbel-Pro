@@ -1,5 +1,5 @@
 // Pemilih avatar: deretan jenis (Ulat, Robo, ...) lalu satu keluarga berisi 4 anggota.
-import { FAMILIES, MEMBERS, parseAvatar, avatarOr } from "../../shared/avatars.js";
+import { FAMILIES, MEMBERS, DINO_FAMILY, DINO_AVATAR, parseAvatar, avatarOr } from "../../shared/avatars.js";
 import { avatarSvg } from "./avatar-svg.js";
 
 // wrap: elemen kosong. Mengembalikan { get, set, setAccent }.
@@ -16,20 +16,21 @@ export function avatarPicker(wrap, { value, accent = "#4f9cf0", onPick = () => {
   wrap.replaceChildren(tabs, grid);
 
   function render() {
-    tabs.replaceChildren(...FAMILIES.map((f) => {
+    tabs.replaceChildren(...[...FAMILIES, DINO_FAMILY].map((f) => {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "av-tab" + (f.id === family ? " on" : "");
       b.setAttribute("role", "tab");
       b.setAttribute("aria-selected", f.id === family);
-      b.innerHTML = avatarSvg(`${f.id}-putra`, accent);
+      b.innerHTML = avatarSvg(f === DINO_FAMILY ? DINO_AVATAR : `${f.id}-putra`, accent);
       const t = document.createElement("span");
       t.textContent = f.name;
       b.append(t);
       b.onclick = () => { family = f.id; render(); };
       return b;
     }));
-    grid.replaceChildren(...MEMBERS.map((m) => {
+    const members = family === DINO_FAMILY.id ? [parseAvatar(DINO_AVATAR).member] : MEMBERS;
+    grid.replaceChildren(...members.map((m) => {
       const id = `${family}-${m.id}`;
       const b = document.createElement("button");
       b.type = "button";
@@ -37,7 +38,7 @@ export function avatarPicker(wrap, { value, accent = "#4f9cf0", onPick = () => {
       b.setAttribute("aria-pressed", id === current);
       b.innerHTML = avatarSvg(id, accent, { sized: true });
       const t = document.createElement("span");
-      t.textContent = m.name;
+      t.textContent = id === DINO_AVATAR ? DINO_FAMILY.name : m.name;
       b.append(t);
       b.onclick = () => { current = id; render(); onPick(id); };
       return b;

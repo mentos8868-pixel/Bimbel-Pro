@@ -5,6 +5,12 @@ import { avatarSvg } from "./avatar-svg.js";
 import { NEGARA, DEFAULT_NEGARA, negaraName, KURIKULUM, kurikulumName, namaKelas } from "../../shared/negara.js";
 
 const $ = (id) => document.getElementById(id);
+let selectedChildId;
+$("tambah-anak").onclick = () => {
+  const form = $("form-anak");
+  form.scrollIntoView({ block: "start" });
+  form.elements.name.focus({ preventScroll: true });
+};
 // Pilihan kelas mengikuti kurikulum: Merdeka "Kelas 1 SD" … "Kelas 12 SMA", Cambridge/Singapore "Primary 1 (P1)" ….
 function fillKelasOptions(sel, kur, kelas) {
   sel.replaceChildren();
@@ -226,6 +232,9 @@ function renderSocial(el, c, soc) {
     row.className = "approval";
     return row;
   }));
+  if (!approvals.children.length) {
+    approvals.append(Object.assign(document.createElement("li"), { textContent: "Tidak ada permintaan." }));
+  }
   const friends = el.querySelector(".friends");
   const list = soc?.friends || [];
   friends.replaceChildren(...(list.length ? list.map((f) => li(`${f.name} (${f.jenjang})`, [
@@ -249,7 +258,9 @@ function renderKid(c, soc) {
       setErr(el, "");
       try {
         await api("PATCH", `anak/${c.id}`, { avatar });
-        dot.innerHTML = avatarSvg(avatar, c.color);
+        c.avatar = avatar;
+        dot.innerHTML = avatarSvg(avatar, c.color, { aksesori: c.aksesori });
+        $("pilih-anak").querySelector(`[data-child="${c.id}"] .av-face`).innerHTML = dot.innerHTML;
         const ok = el.querySelector(".av-saved");
         ok.hidden = false;
         setTimeout(() => (ok.hidden = true), 2000);
@@ -259,18 +270,23 @@ function renderKid(c, soc) {
   el.querySelector(".nama").textContent = c.name;
   el.querySelector(".jenjang").textContent = kelasText(c);
 
-  const used = c.week.at(-1)?.minutes ?? c.usedMin;
   const fill = el.querySelector(".bar-fill");
-  if (c.limitMin) {
-    el.querySelector(".today-text").textContent = `${used} dari ${c.limitMin} menit`;
-    const pct = Math.min(100, (used / c.limitMin) * 100);
+  function updateTime() {
+    const used = c.usedMin;
+    const pct = c.limitMin ? Math.min(100, (used / c.limitMin) * 100) : 0;
+    el.querySelector(".metric-time").textContent = `${used} menit`;
+    el.querySelector(".today-text").textContent = c.limitMin
+      ? `${used} dari ${c.limitMin} menit`
+      : `${used} menit (tanpa batas)`;
+    fill.parentElement.hidden = !c.limitMin;
     fill.style.width = pct + "%";
     fill.classList.toggle("warn", pct >= 75 && pct < 100);
     fill.classList.toggle("full", pct >= 100);
-  } else {
-    el.querySelector(".today-text").textContent = `${used} menit (tanpa batas)`;
-    fill.style.width = "0%";
   }
+  updateTime();
+  el.querySelector(".metric-stars").textContent = c.stars;
+  el.querySelector(".metric-games").textContent = Object.values(c.stats).reduce((sum, stat) => sum + stat.main, 0);
+  el.querySelector(".metric-learning").textContent = c.starredExercises;
 
   const max = Math.max(30, ...c.week.map((d) => d.minutes));
   el.querySelector(".week").replaceChildren(...c.week.map((d) => {
@@ -339,6 +355,8 @@ function renderKid(c, soc) {
       });
       Object.assign(c, r.child);
       el.querySelector(".jenjang").textContent = kelasText(c);
+      $("pilih-anak").querySelector(`[data-child="${c.id}"] .child-summary`).textContent = childSummary(c, soc);
+      updateTime();
       const ok = s.querySelector(".saved");
       ok.hidden = false;
       setTimeout(() => (ok.hidden = true), 2000);
@@ -380,6 +398,44 @@ function renderKid(c, soc) {
 }
 
 // ---------------- muat ----------------
+function childSummary(child, social) {
+  const approvals = social?.approvals?.length ?? 0;
+  return [kelasText(child), `${child.usedMin} menit hari ini`, approvals ? `${approvals} perlu disetujui` : ""]
+    .filter(Boolean).join(" · ");
+}
+
+function renderChildren(children, byId) {
+  if (!children.some((child) => child.id === selectedChildId)) selectedChildId = children[0]?.id;
+  const cards = children.map((child) => ({
+    child,
+    report: renderKid(child, byId[child.id]),
+    button: document.createElement("button"),
+  }));
+  function select(id) {
+    selectedChildId = id;
+    for (const { child, report, button } of cards) {
+      report.hidden = child.id !== id;
+      button.setAttribute("aria-pressed", String(child.id === id));
+    }
+  }
+  for (const { child, report, button } of cards) {
+    const face = report.querySelector(".av-face").cloneNode(true);
+    const name = Object.assign(document.createElement("strong"), { textContent: child.name });
+    const summary = Object.assign(document.createElement("small"), {
+      className: "child-summary", textContent: childSummary(child, byId[child.id]),
+    });
+    const labels = document.createElement("span");
+    labels.append(name, summary);
+    button.type = "button";
+    button.dataset.child = child.id;
+    button.append(face, labels);
+    button.onclick = () => select(child.id);
+  }
+  $("pilih-anak").replaceChildren(...cards.map(({ button }) => button));
+  $("kids").replaceChildren(...cards.map(({ report }) => report));
+  select(selectedChildId);
+}
+
 async function load() {
   $("memuat").hidden = false;
   let me;
@@ -397,10 +453,17 @@ async function load() {
   $("top-nav").hidden = !masuk;
   if (!masuk) return;
   $("halo").textContent = `Halo, ${me.ortu.name}!`;
-  const [{ children }, social] = await Promise.all([api("GET", "laporan"), api("GET", "teman")]);
-  const byId = Object.fromEntries(social.children.map((s) => [s.childId, s]));
-  $("kids").replaceChildren(...children.map((c) => renderKid(c, byId[c.id])));
-  $("form-anak").querySelector("h2").textContent = children.length ? "Tambah akun anak" : "Mulai dengan menambah akun anak";
+  const error = $("laporan-error");
+  error.hidden = true;
+  try {
+    const [{ children }, social] = await Promise.all([api("GET", "laporan"), api("GET", "teman")]);
+    const byId = Object.fromEntries(social.children.map((s) => [s.childId, s]));
+    renderChildren(children, byId);
+    $("form-anak").querySelector("h2").textContent = children.length ? "Tambah akun anak" : "Mulai dengan menambah akun anak";
+  } catch (x) {
+    error.textContent = x.message;
+    error.hidden = false;
+  }
 }
 
 load();

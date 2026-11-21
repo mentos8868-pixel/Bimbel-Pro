@@ -5,7 +5,7 @@
       "name": "arena",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "cwd": "D:\\Bimbel-Pro",
+      "cwd": ".",
       "port": 5173
     }
   ]

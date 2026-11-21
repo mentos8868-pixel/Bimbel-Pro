@@ -101,8 +101,12 @@
 
       <!-- Sudah masuk -->
       <section id="dash" hidden>
-        <h1 id="halo">Halo!</h1>
-        <p class="muted">Pantau waktu bermain dan hasil permainan anak, lalu atur batas dan izinnya.</p>
+        <header class="dash-heading">
+          <div><p class="dash-label">Dashboard orang tua</p><h1 id="halo">Halo!</h1></div>
+          <button class="primary" type="button" id="tambah-anak">Tambah anak</button>
+        </header>
+        <div id="pilih-anak" class="child-list" role="group" aria-label="Pilih anak"></div>
+        <p class="error" id="laporan-error" role="alert" hidden></p>
         <div id="kids"></div>
 
         <form id="form-anak" class="panel">
@@ -151,6 +155,15 @@
           <div><h2 class="nama"></h2><span class="muted jenjang"></span></div>
         </header>
 
+        <div class="kid-layout">
+        <div class="kid-report">
+        <dl class="kid-metrics">
+          <div><dt>Waktu main hari ini</dt><dd class="metric-time"></dd></div>
+          <div><dt>Saldo bintang</dt><dd class="metric-stars"></dd></div>
+          <div><dt>Total permainan</dt><dd class="metric-games"></dd></div>
+          <div><dt>Latihan berbintang</dt><dd class="metric-learning"></dd></div>
+        </dl>
+
         <details class="av-edit">
           <summary>Ganti avatar</summary>
           <div class="av-edit-picker"></div>
@@ -162,8 +175,10 @@
           <div class="bar"><span class="bar-fill"></span></div>
         </div>
 
-        <div class="week" aria-label="Menit bermain 7 hari terakhir"></div>
+        <h3>Waktu bermain 7 hari terakhir</h3>
+        <div class="week" role="group" aria-label="Menit bermain 7 hari terakhir"></div>
 
+        <h3>Hasil permainan</h3>
         <table class="stats">
           <thead><tr><th>Game</th><th>Main</th><th>Menang</th><th>Kalah</th><th>Seri</th></tr></thead>
           <tbody></tbody>
@@ -173,9 +188,23 @@
           <summary>10 permainan terakhir</summary>
           <ul class="recent"></ul>
         </details>
+        </div>
+
+        <aside class="kid-controls">
+          <div class="social">
+            <h3>Perlu persetujuanmu</h3>
+            <ul class="approvals"></ul>
+            <h3>Teman</h3>
+            <ul class="friends"></ul>
+            <div class="blocks-box" hidden>
+              <h3>Diblokir</h3>
+              <ul class="blocks"></ul>
+            </div>
+          </div>
 
         <form class="settings">
           <h3>Pengaturan</h3>
+          <fieldset><legend>Sekolah</legend>
           <label>Kurikulum sekolah (dipakai di Ruang Pintar)
             <select name="kurikulum" class="pilih-kurikulum"></select>
           </label>
@@ -185,6 +214,8 @@
           <label>Negara (benderanya tampil di papan nama avatar)
             <select name="negara" class="pilih-negara"></select>
           </label>
+          </fieldset>
+          <fieldset><legend>Waktu</legend>
           <label>Batas waktu bermain per hari
             <select name="limitMin">
               <option value="15">15 menit</option>
@@ -196,6 +227,8 @@
               <option value="0">Tanpa batas</option>
             </select>
           </label>
+          </fieldset>
+          <fieldset><legend>Teman dan chat</legend>
           <label class="check">
             <input type="checkbox" name="allowStrangers" />
             <span>Boleh bermain dengan pemain lain lewat "Cari lawan" (hanya yang sejenjang). Bila mati, anak hanya bisa
@@ -212,22 +245,14 @@
             <input type="checkbox" name="approveFriends" />
             <span>Pertemanan baru perlu persetujuan saya</span>
           </label>
+          </fieldset>
           <div class="row">
             <button class="primary" type="submit">Simpan</button>
             <span class="saved muted" hidden>Tersimpan ✓</span>
           </div>
         </form>
 
-        <div class="social">
-          <h3>Teman</h3>
-          <div class="approvals"></div>
-          <ul class="friends"></ul>
-          <div class="blocks-box" hidden>
-            <h3>Diblokir</h3>
-            <ul class="blocks"></ul>
-          </div>
-        </div>
-
+        <h3>Akses masuk</h3>
         <div class="actions">
           <button class="btn-kode">Buat kode masuk</button>
           <button class="btn-pin">Ganti PIN</button>
@@ -235,6 +260,8 @@
         </div>
         <p class="kode-box" hidden></p>
         <p class="error" hidden></p>
+        </aside>
+        </div>
       </article>
     </template>
 

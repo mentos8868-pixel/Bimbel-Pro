@@ -266,7 +266,15 @@ function report(parentId) {
       stats[g] = s;
     }
     const recent = db.prepare(`SELECT game, mode, outcome, score, created_at AS at FROM results WHERE child_id = ? ORDER BY created_at DESC LIMIT 10`).all(c.id);
-    return { ...publicChild(c), week: days.map((d) => ({ day: d, minutes: Math.floor((byDay[d] || 0) / 60) })), stats, recent };
+    const learning = db.prepare("SELECT COUNT(*) AS count FROM child_bintang WHERE child_id = ? AND best > 0 AND kunci NOT LIKE 'tryout|%'").get(c.id);
+    return {
+      ...publicChild(c),
+      stars: c.bintang,
+      starredExercises: learning.count,
+      week: days.map((d) => ({ day: d, minutes: Math.floor((byDay[d] || 0) / 60) })),
+      stats,
+      recent,
+    };
   });
 }
 

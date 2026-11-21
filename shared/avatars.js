@@ -19,8 +19,11 @@ export const MEMBERS = [
 
 export const DEFAULT_AVATAR = "beruang-putra";
 export const DEFAULT_ORTU_AVATAR = "beruang-ayah";
+export const DINO_AVATAR = "dino-putri";
+export const DINO_FAMILY = { id: "dino", name: "Piyama Dino" };
 
 export function parseAvatar(id) {
+  if (id === DINO_AVATAR) return { family: DINO_FAMILY, member: MEMBERS.find((x) => x.id === "putri") };
   const [f, m] = String(id || "").split("-");
   const family = FAMILIES.find((x) => x.id === f);
   const member = MEMBERS.find((x) => x.id === m);
@@ -30,6 +33,7 @@ export function parseAvatar(id) {
 export const isAvatar = (id) => !!parseAvatar(id);
 export const avatarOr = (id, fallback = DEFAULT_AVATAR) => (isAvatar(id) ? id : fallback);
 export const avatarName = (id) => {
+  if (id === DINO_AVATAR) return DINO_FAMILY.name;
   const a = parseAvatar(id);
   return a ? `${a.family.name} ${a.member.name.toLowerCase()}` : "";
 };

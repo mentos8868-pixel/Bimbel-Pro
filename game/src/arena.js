@@ -395,7 +395,7 @@ export function showBubble(scene, avatar, text) {
 // Baris kedua papan nama: bendera negara + "Kelas N" (anak), atau jenjang bila kelas belum diisi.
 export function createAvatar(scene, { color, avatar, aksesori = "", name, jenjang, negara = "", kelas = 0, kurikulum = "merdeka", sid }) {
   const root = new TransformNode("avatar", scene);
-  const { bob, meshes, height } = buildAvatar3d(scene, root, avatar, color, aksesori);
+  const { bob, meshes, height } = buildAvatar3d(scene, root, avatar, color, aksesori, sid);
   const sub = kelas ? namaKelas(kelas, kurikulum, true) : jenjang;
   const tag = makeSign(scene, [name, sub], { width: 1.8, height: 0.6, bg: "rgba(255,255,255,0.9)", flag: negara });
   tag.position.y = height + 0.3;
