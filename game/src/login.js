@@ -2,7 +2,7 @@
 import { api } from "./api.js";
 import { avatarPicker } from "./avatar-picker.js";
 import { avatarSvg } from "./avatar-svg.js";
-import { DEFAULT_ORTU_AVATAR } from "../../shared/avatars.js";
+import { AVATAR_AWAL_ORTU, DEFAULT_ORTU_AVATAR } from "../../shared/avatars.js";
 
 const $ = (id) => document.getElementById(id);
 const box = () => $("login");
@@ -35,7 +35,7 @@ export function setupLogin(onStart) {
   // Orang tua juga tetap bisa mengganti avatar anak di dashboard.
   const save = (body) => api("POST", "avatar", body).catch(() => {});
   const ortuPicker = avatarPicker($("ortu-avatar"), {
-    value: DEFAULT_ORTU_AVATAR, accent: "#5b6b7c",
+    value: DEFAULT_ORTU_AVATAR, accent: "#5b6b7c", dimiliki: AVATAR_AWAL_ORTU,
     onPick: (avatar) => { if (me?.ortu) { me.ortu.avatar = avatar; save({ avatar, sebagai: "ortu" }); } },
   });
   let okTimer = 0;
@@ -70,6 +70,7 @@ export function setupLogin(onStart) {
       const sisa = me.anak.limitMin ? Math.max(0, me.anak.limitMin - me.anak.usedMin) : null;
       $("siap-avatar").innerHTML = avatarSvg(me.anak.avatar, me.anak.color, { aksesori: me.anak.aksesori, aura: me.anak.aura });
       anakPicker.setAccent(me.anak.color);
+      anakPicker.setDimiliki(me.anak.avatarPunya);
       anakPicker.set(me.anak.avatar);
       $("anak-avatar-ok").hidden = true;
       $("siap-info").textContent = `${me.anak.jenjang}` + (sisa !== null ? ` · sisa waktu bermain hari ini ${sisa} menit` : "");
@@ -85,6 +86,7 @@ export function setupLogin(onStart) {
       return;
     }
     if (me.ortu) {
+      ortuPicker.setDimiliki(me.ortu.avatarPunya || AVATAR_AWAL_ORTU);
       ortuPicker.set(me.ortu.avatar || DEFAULT_ORTU_AVATAR);
       return renderFamily();
     }

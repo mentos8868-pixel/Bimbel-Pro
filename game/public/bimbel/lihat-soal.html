@@ -31,7 +31,7 @@
   .n{margin-left:auto;font-size:12px;color:var(--muted);font-weight:600}
   ol.soal{margin:0;padding:0 14px 12px 40px}
   ol.soal>li{padding:10px 0;border-top:1px solid var(--line)}
-  .q{font-weight:600}
+  .q{font-weight:600;white-space:pre-line}
   .lv{display:inline-block;font-size:11px;font-weight:800;padding:1px 7px;border-radius:99px;color:#fff;margin-right:6px;vertical-align:1px}
   .lv1{background:var(--l1)}.lv2{background:var(--l2)}.lv3{background:var(--l3)}
   ul.opsi{list-style:none;margin:6px 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:4px 12px}
@@ -40,6 +40,7 @@
   .kunci ul.opsi li.benar::after{content:" ✓"}
   .p{display:none;font-size:14px;color:var(--muted);background:var(--bg);border-left:3px solid var(--teal);padding:6px 10px;border-radius:0 6px 6px 0}
   .bahas .p{display:block}
+  .p{white-space:pre-line}
   mark{background:#ffe58a;color:#000;border-radius:3px}
   .kosong{text-align:center;color:var(--muted);padding:40px 0}
   .note{font-size:13px;color:var(--muted);background:var(--teal-soft);border-radius:8px;padding:8px 12px;margin-top:8px}
@@ -86,6 +87,7 @@
 
 <script src="bank_soal.js"></script>
 <script src="bank_intl.js"></script>
+<script src="bank_intl_tambahan.js"></script>
 <script>
 const KURS={
   merdeka:{name:'Kurikulum Merdeka',mapel:{big:'Bahasa Inggris',bin:'Bahasa Indonesia',ipa:'IPA'},

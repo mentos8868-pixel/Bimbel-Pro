@@ -1,0 +1,7 @@
+.chat-form { flex-wrap: wrap; }
+.chat-form textarea { min-width: 100px; }
+.chat-rekam { min-width: 44px; }
+.chat-rekaman { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+.chat-audio, .chat-rekaman audio { width: 250px; max-width: 100%; display: block; }
+.gel:has(.chat-audio) { width: min(100%, 290px); }
+.gel.saya:has(.chat-audio) > div { max-width: 100%; }

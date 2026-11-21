@@ -2,17 +2,17 @@
 // batas waktu bermain, hasil permainan, dan laporan untuk orang tua.
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from "node:crypto";
 import { db, today, lastDays } from "./db.js";
-import { avatarOr, DEFAULT_ORTU_AVATAR } from "../shared/avatars.js";
+import { avatarOr, AVATAR_AWAL_ANAK, AVATAR_AWAL_ORTU, DEFAULT_ORTU_AVATAR } from "../shared/avatars.js";
 import { avatarSvg } from "../shared/avatar-svg.js";
 import { rapikanAksesori, aksesoriById } from "../shared/aksesori.js";
 import { levelDariXp, auraDipakai } from "../shared/aura.js";
 
 const auraAnak = (c) => auraDipakai(levelDariXp(c.xp), c.aura_pakai);
-import { handleToko } from "./toko.js";
+import { avatarDimiliki, handleToko, simpanAvatarAwal } from "./toko.js";
 import { kamarku } from "./kamarku.js";
 import { handleProgres, ringkasBelajar } from "./progres.js";
 import { handleTugas } from "./tugas.js";
-import { handleChat } from "./chat.js";
+import { handleChat, MAKS_BODY_SUARA } from "./chat.js";
 import { handleKeuangan } from "./keuangan.js";
 import { handleHadiah } from "./hadiah.js";
 import { negaraOr, isNegara, jenjangDariKelas } from "../shared/negara.js";
@@ -111,6 +111,7 @@ export function addPlaySeconds(childId, seconds, now = Date.now()) {
 function publicChild(c) {
   return {
     id: c.id, name: c.name, jenjang: c.jenjang, color: c.color, avatar: avatarOr(c.avatar),
+    avatarPunya: avatarDimiliki(c),
     negara: negaraOr(c.negara), kelas: c.kelas || 0, kurikulum: KURIKULUM.includes(c.kurikulum) ? c.kurikulum : "merdeka",
     aksesori: rapikanAksesori(c.aksesori_pakai).join(","), level: levelDariXp(c.xp), aura: auraAnak(c),
     limitMin: c.limit_min, allowStrangers: !!c.allow_strangers, chat: c.chat, approveFriends: !!c.approve_friends,
@@ -279,6 +280,8 @@ function report(parentId) {
   });
 }
 
+const avatarOrtuDimiliki = (p) => [...new Set([...AVATAR_AWAL_ORTU, ...[p.avatar, p.avatar_lama].filter((id) => avatarOr(id, ""))])];
+
 // Mengembalikan true bila permintaan ditangani (jalur /api/...).
 export async function handleApi(req, res) {
   const url = new URL(req.url, "http://x");
@@ -297,7 +300,9 @@ export async function handleApi(req, res) {
     const path = url.pathname.slice(5).split("/").filter(Boolean); // tanpa "/api/"
     const m = req.method;
     // Kemajuan Ruang Pintar boleh lebih besar (daftar topik dan riwayat).
-    const body = m === "GET" ? {} : await readJson(req, path[0] === "progres" ? 300000 : 20000);
+    const maksBody = path[0] === "progres" ? 300000
+      : path[0] === "chat" && path[1] === "keluarga" && path.length === 2 ? MAKS_BODY_SUARA : 20000;
+    const body = m === "GET" ? {} : await readJson(req, maksBody);
     const needOrtu = () => { if (!ortu) throw new ApiError(401, "Silakan masuk sebagai orang tua."); return ortu.parent_id; };
 
     // --- orang tua ---
@@ -310,8 +315,8 @@ export async function handleApi(req, res) {
       if (body.consent !== true) throw new ApiError(400, "Persetujuan orang tua diperlukan untuk membuat akun.");
       if (db.prepare("SELECT 1 FROM parents WHERE email = ?").get(email)) throw new ApiError(409, "Email ini sudah terdaftar. Silakan masuk.");
       const now = Date.now();
-      const r = db.prepare("INSERT INTO parents (email, pass_hash, name, consent_at, created_at) VALUES (?, ?, ?, ?, ?)")
-        .run(email, hashSecret(body.password), name, now, now);
+      const r = db.prepare("INSERT INTO parents (email, pass_hash, name, consent_at, created_at, avatar) VALUES (?, ?, ?, ?, ?, ?)")
+        .run(email, hashSecret(body.password), name, now, now, DEFAULT_ORTU_AVATAR);
       const token = createSession("ortu", Number(r.lastInsertRowid));
       return send(200, { ok: true }, { "Set-Cookie": cookie(COOKIE.ortu, token, SESSION_MS / 1000) }), true;
     }
@@ -361,8 +366,8 @@ export async function handleApi(req, res) {
     if (m === "GET" && path[0] === "saya") {
       const out = { ortu: null, anak: null, children: [] };
       if (ortu) {
-        const p = db.prepare("SELECT id, name, email, avatar, aksesori_pakai FROM parents WHERE id = ?").get(ortu.parent_id);
-        out.ortu = p ? { name: p.name, email: p.email, avatar: avatarOr(p.avatar, DEFAULT_ORTU_AVATAR), aksesori: rapikanAksesori(p.aksesori_pakai) } : null;
+        const p = db.prepare("SELECT id, name, email, avatar, avatar_lama, aksesori_pakai FROM parents WHERE id = ?").get(ortu.parent_id);
+        out.ortu = p ? { name: p.name, email: p.email, avatar: avatarOr(p.avatar, DEFAULT_ORTU_AVATAR), avatarPunya: avatarOrtuDimiliki(p), aksesori: rapikanAksesori(p.aksesori_pakai) } : null;
         out.children = db.prepare("SELECT * FROM children WHERE parent_id = ? ORDER BY id").all(ortu.parent_id).map(publicChild);
       }
       if (anak) {
@@ -378,12 +383,18 @@ export async function handleApi(req, res) {
       const avatar = avatarOr(body.avatar, "");
       if (!avatar) throw new ApiError(400, "Avatar tidak dikenal.");
       if (body.sebagai === "anak") {
-        if (!anak || !childRow(anak.child_id)) throw new ApiError(401, "Silakan masuk sebagai anak dulu.");
+        const child = anak && childRow(anak.child_id);
+        if (!child) throw new ApiError(401, "Silakan masuk sebagai anak dulu.");
+        if (!avatarDimiliki(child).includes(avatar)) throw new ApiError(403, "Beli avatar ini dulu di Toko Avatar.");
+        simpanAvatarAwal(child);
         db.prepare("UPDATE children SET avatar = ? WHERE id = ?").run(avatar, anak.child_id);
         return send(200, { ok: true, avatar }), true;
       }
       if (body.sebagai !== "ortu") throw new ApiError(400, "Pilih avatar untuk siapa.");
-      db.prepare("UPDATE parents SET avatar = ? WHERE id = ?").run(avatar, needOrtu());
+      const pid = needOrtu();
+      const p = db.prepare("SELECT avatar, avatar_lama FROM parents WHERE id = ?").get(pid);
+      if (!avatarOrtuDimiliki(p).includes(avatar)) throw new ApiError(403, "Avatar ini belum dimiliki.");
+      db.prepare("UPDATE parents SET avatar = ? WHERE id = ?").run(avatar, pid);
       return send(200, { ok: true, avatar }), true;
     }
     // Aksesori orang tua: semua aksesori gratis (orang tua tidak punya bintang). pakai=true mengganti
@@ -456,6 +467,7 @@ export async function handleApi(req, res) {
       const n = db.prepare("SELECT COUNT(*) AS n FROM children WHERE parent_id = ?").get(pid).n;
       if (n >= 6) throw new ApiError(400, "Maksimal 6 akun anak.");
       const f = validChildFields(body, false);
+      if (!AVATAR_AWAL_ANAK.includes(f.avatar)) throw new ApiError(400, "Pilih avatar manusia untuk akun anak baru.");
       const r = db.prepare(`INSERT INTO children (parent_id, name, jenjang, kelas, kurikulum, negara, color, avatar, pin_hash, limit_min, allow_strangers, chat, created_at)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(pid, f.name, f.jenjang, f.kelas ?? 0, f.kurikulum, f.negara, f.color, f.avatar, f.pin_hash, f.limit_min ?? 60, f.allow_strangers ?? 0, f.chat ?? "mati", Date.now());
@@ -470,6 +482,10 @@ export async function handleApi(req, res) {
       const c = ownChild(pid, path[1]);
       if (path.length === 2 && m === "PATCH") {
         const f = validChildFields(body, true);
+        if (f.avatar) {
+          if (!avatarDimiliki(c).includes(f.avatar)) throw new ApiError(403, "Avatar ini belum dimiliki anak.");
+          simpanAvatarAwal(c);
+        }
         const keys = Object.keys(f);
         if (keys.length) {
           if (f.pin_hash) { f.pin_fail = 0; f.pin_lock_until = 0; keys.push("pin_fail", "pin_lock_until"); }
@@ -561,7 +577,23 @@ export async function handleApi(req, res) {
     if (handleTugas({ m, path, body, url, ortuId: ortu?.parent_id ?? null, anak, ownChild, send, ApiError })) return true;
 
     // --- chat keluarga dan riwayat chat arena ---
-    if (handleChat({ m, path, body, url, ortuId: ortu?.parent_id ?? null, anak, ownChild, send, ApiError })) return true;
+    const sendAudio = (tipe, data) => {
+      const headers = { "Content-Type": tipe, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Accept-Ranges": "bytes" };
+      const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || "");
+      if (range && (range[1] || range[2])) {
+        const start = range[1] ? Number(range[1]) : Math.max(0, data.length - Number(range[2]));
+        const end = range[1] && range[2] ? Math.min(Number(range[2]), data.length - 1) : data.length - 1;
+        if (start > end) {
+          res.writeHead(416, { ...headers, "Content-Range": `bytes */${data.length}` });
+          return res.end();
+        }
+        res.writeHead(206, { ...headers, "Content-Range": `bytes ${start}-${end}/${data.length}`, "Content-Length": end - start + 1 });
+        return res.end(data.subarray(start, end + 1));
+      }
+      res.writeHead(200, { ...headers, "Content-Length": data.length });
+      res.end(data);
+    };
+    if (handleChat({ m, path, body, url, ortuId: ortu?.parent_id ?? null, anak, ownChild, send, sendAudio, ApiError })) return true;
 
     // --- keuangan anak: uang saku dan tabungan (diisi orang tua, anak hanya melihat) ---
     if (handleKeuangan({ m, path, body, ortuId: ortu?.parent_id ?? null, anak, ownChild, send, ApiError })) return true;

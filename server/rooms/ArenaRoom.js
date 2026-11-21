@@ -7,6 +7,7 @@ import { avatarOr } from "../../shared/avatars.js";
 import { db } from "../db.js";
 import { rapikanAksesori } from "../../shared/aksesori.js";
 import { levelDariXp, auraUntukLevel } from "../../shared/aura.js";
+import { JARAK_INTERAKSI_BIMBEL, POSISI_KURSI_BIMBEL, TITIK_BIMBEL } from "../../shared/kursi-bimbel.js";
 
 
 const { Room } = colyseus;
@@ -31,6 +32,7 @@ defineTypes(Player, {
   x: "number",
   z: "number",
   ry: "number",
+  kursiBimbel: "number", // 0 = berdiri, 1 dst. = nomor kursi
 });
 
 export class ArenaState extends Schema {
@@ -55,10 +57,34 @@ export class ArenaRoom extends Room {
     }, 15000);
 
     setupSocial(this);
+    this.posisiSebelumBelajar = new Map();
+
+    this.onMessage("belajar-bimbel", (client, mulai) => {
+      const id = client.sessionId;
+      const p = this.state.players.get(id);
+      if (!p || client.auth?.role !== "anak") return;
+      if (mulai === false && p.kursiBimbel) {
+        Object.assign(p, this.posisiSebelumBelajar.get(id));
+        this.posisiSebelumBelajar.delete(id);
+        p.kursiBimbel = 0;
+      }
+      if (mulai !== true || p.kursiBimbel) return;
+      if (Math.hypot(p.x - TITIK_BIMBEL.x, p.z - TITIK_BIMBEL.z) > JARAK_INTERAKSI_BIMBEL + 0.02) {
+        return client.send("kursi-bimbel-gagal", "Dekati meja guru untuk duduk di kelas.");
+      }
+      const terisi = new Set([...this.state.players.values()].map((pemain) => pemain.kursiBimbel));
+      const indeks = POSISI_KURSI_BIMBEL.findIndex((_, i) => !terisi.has(i + 1));
+      if (indeks === -1) {
+        return client.send("kursi-bimbel-gagal", "Kursi Bimbel penuh. Kamu tetap bisa belajar di Ruang Pintar.");
+      }
+      this.posisiSebelumBelajar.set(id, { x: p.x, z: p.z, ry: p.ry });
+      Object.assign(p, POSISI_KURSI_BIMBEL[indeks]);
+      p.kursiBimbel = indeks + 1;
+    });
 
     this.onMessage("move", (client, data = {}) => {
       const p = this.state.players.get(client.sessionId);
-      if (!p) return;
+      if (!p || p.kursiBimbel) return;
       let x = num(data.x, p.x);
       let z = num(data.z, p.z);
       // Jaga pemain tetap di dalam arena.
@@ -81,8 +107,9 @@ export class ArenaRoom extends Room {
       const now = Date.now();   // paling sering dua kali per detik
       if (now - (client.userData?.avatarAt || 0) < 500) return;
       client.userData = { ...client.userData, avatarAt: now };
-      const c = db.prepare("SELECT aksesori_pakai, xp FROM children WHERE id = ?").get(a.childId);
+      const c = db.prepare("SELECT avatar, aksesori_pakai, xp FROM children WHERE id = ?").get(a.childId);
       if (!c) return;
+      p.avatar = avatarOr(c.avatar);
       p.aksesori = rapikanAksesori(c.aksesori_pakai).join(",");
       p.aura = auraUntukLevel(levelDariXp(c.xp))?.id || "";
     });
@@ -110,6 +137,7 @@ export class ArenaRoom extends Room {
     p.x = Math.cos(ang) * 3;
     p.z = Math.sin(ang) * 3;
     p.ry = 0;
+    p.kursiBimbel = 0;
     this.state.players.set(client.sessionId, p);
     socialJoin(client);
     if (a.role === "anak") {
@@ -121,6 +149,7 @@ export class ArenaRoom extends Room {
   }
 
   onLeave(client) {
+    this.posisiSebelumBelajar.delete(client.sessionId);
     this.state.players.delete(client.sessionId);
     if (client.auth) socialLeave(this, client);
     const a = client.auth;

@@ -44,6 +44,15 @@ const smile = (cy, w = 6) => `<path d="M${50 - w} ${cy} Q50 ${cy + w * 0.9} ${50
 function familyParts(f) {
   const { body: c, belly: b, accent: a } = f;
   switch (f.id) {
+    case "manusia":
+      return {
+        back: "",
+        body: `<rect x="31" y="62" width="38" height="31" rx="14" fill="${b}"/><path d="M42 65 L50 73 L58 65" fill="none" stroke="#edf4ff" stroke-width="3"/>`,
+        head: `<circle cx="28" cy="43" r="5" fill="${c}"/><circle cx="72" cy="43" r="5" fill="${c}"/>
+          <ellipse cx="50" cy="42" rx="22" ry="24" fill="${c}"/><path d="M27 41 Q23 16 49 15 Q75 16 73 38 Q61 35 55 26 Q45 39 27 41Z" fill="${a}"/>`,
+        face: eyes(50, 44, 8, 3.5) + cheeks(52) + smile(53, 5),
+        top: 16, eyeY: 44, gap: 8,
+      };
     case "ulat":
       return {
         back: [28, 72].map((x) => `<circle cx="${x}" cy="80" r="13" fill="${c}"/><circle cx="${x}" cy="80" r="5" fill="${b}"/>`).join(""),

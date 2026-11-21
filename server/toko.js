@@ -2,6 +2,7 @@
 // Bintang dicatat per kunci (topik|tingkat, atau tryout|tanggal|kurikulum|pelajaran) dan saldo hanya
 // bertambah ketika bintang terbaik pada kunci itu naik, jadi mengulang latihan yang sama tidak menambah bintang.
 import { db, today } from "./db.js";
+import { AVATAR_AWAL_ANAK, KATALOG_AVATAR, avatarOr } from "../shared/avatars.js";
 import { AKSESORI, aksesoriById, rapikanAksesori } from "../shared/aksesori.js";
 import { levelDariXp, auraUntukLevel, auraBerikutnya, auraDipakai, auraTerbuka, auraById } from "../shared/aura.js";
 
@@ -14,7 +15,21 @@ db.exec(`
     best INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (child_id, kunci)
   );
+  CREATE TABLE IF NOT EXISTS child_avatar (
+    child_id INTEGER NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+    avatar TEXT NOT NULL,
+    PRIMARY KEY (child_id, avatar)
+  );
 `);
+
+export function avatarDimiliki(child) {
+  const tersimpan = db.prepare("SELECT avatar FROM child_avatar WHERE child_id = ?").all(child.id);
+  return [...new Set([...AVATAR_AWAL_ANAK, avatarOr(child.avatar), ...tersimpan.map((r) => r.avatar)])];
+}
+
+export function simpanAvatarAwal(child) {
+  db.prepare("INSERT OR IGNORE INTO child_avatar (child_id, avatar) VALUES (?, ?)").run(child.id, avatarOr(child.avatar));
+}
 
 // node:sqlite tidak punya db.transaction(), jadi pakai BEGIN/COMMIT sendiri.
 function transaksi(fn) {
@@ -37,9 +52,10 @@ function batasBintang(kunci, now) {
 }
 
 function keadaan(childId) {
-  const c = db.prepare("SELECT bintang, aksesori_punya, aksesori_pakai, xp, aura_pakai FROM children WHERE id = ?").get(childId);
+  const c = db.prepare("SELECT id, avatar, bintang, aksesori_punya, aksesori_pakai, xp, aura_pakai FROM children WHERE id = ?").get(childId);
   const level = levelDariXp(c.xp), aura = auraById(auraDipakai(level, c.aura_pakai)), next = auraBerikutnya(level);
   return {
+    avatar: avatarOr(c.avatar), avatarPunya: avatarDimiliki(c),
     bintang: c.bintang, punya: daftar(c.aksesori_punya).filter(aksesoriById), pakai: rapikanAksesori(c.aksesori_pakai),
     xp: c.xp, level, aura: aura ? aura.id : "", auraNama: aura ? aura.nama : "",
     auraTertinggi: auraUntukLevel(level)?.id || "",
@@ -84,6 +100,21 @@ export function handleToko({ m, path, body, anak, send, ApiError }) {
 
   if (m === "GET" && path[0] === "toko" && path.length === 1) {
     return send(200, { items: AKSESORI, ...keadaan(id) }), true;
+  }
+
+  if (m === "POST" && path[0] === "toko" && path[1] === "beli-avatar" && path.length === 2) {
+    const produk = KATALOG_AVATAR.find((a) => a.id === body.id);
+    if (!produk) throw new ApiError(400, "Avatar ini tidak dijual.");
+    const { id: avatar, harga } = produk;
+    transaksi(() => {
+      const k = keadaan(id);
+      if (k.avatarPunya.includes(avatar)) throw new ApiError(400, "Avatar ini sudah kamu punya.");
+      if (k.bintang < harga) throw new ApiError(400, `Perlu ${harga} bintang untuk membeli avatar ini.`);
+      simpanAvatarAwal({ id, avatar: k.avatar });
+      db.prepare("INSERT INTO child_avatar (child_id, avatar) VALUES (?, ?)").run(id, avatar);
+      db.prepare("UPDATE children SET bintang = bintang - ?, avatar = ? WHERE id = ?").run(harga, avatar, id);
+    });
+    return send(200, keadaan(id)), true;
   }
 
   if (m === "POST" && path[0] === "toko" && path[1] === "beli") {

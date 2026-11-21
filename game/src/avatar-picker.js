@@ -3,7 +3,7 @@ import { FAMILIES, MEMBERS, parseAvatar, avatarOr } from "../../shared/avatars.j
 import { avatarSvg } from "./avatar-svg.js";
 
 // wrap: elemen kosong. Mengembalikan { get, set, setAccent }.
-export function avatarPicker(wrap, { value, accent = "#4f9cf0", onPick = () => {} } = {}) {
+export function avatarPicker(wrap, { value, accent = "#4f9cf0", onPick = () => {}, dimiliki = null } = {}) {
   let current = avatarOr(value);
   let family = parseAvatar(current).family.id;
   wrap.classList.add("avatar-picker");
@@ -16,7 +16,7 @@ export function avatarPicker(wrap, { value, accent = "#4f9cf0", onPick = () => {
   wrap.replaceChildren(tabs, grid);
 
   function render() {
-    tabs.replaceChildren(...FAMILIES.map((f) => {
+    tabs.replaceChildren(...FAMILIES.filter((f) => !dimiliki || dimiliki.some((id) => parseAvatar(id)?.family.id === f.id)).map((f) => {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "av-tab" + (f.id === family ? " on" : "");
@@ -29,7 +29,7 @@ export function avatarPicker(wrap, { value, accent = "#4f9cf0", onPick = () => {
       b.onclick = () => { family = f.id; render(); };
       return b;
     }));
-    grid.replaceChildren(...MEMBERS.map((m) => {
+    grid.replaceChildren(...MEMBERS.filter((m) => !dimiliki || dimiliki.includes(`${family}-${m.id}`)).map((m) => {
       const id = `${family}-${m.id}`;
       const b = document.createElement("button");
       b.type = "button";
@@ -48,5 +48,6 @@ export function avatarPicker(wrap, { value, accent = "#4f9cf0", onPick = () => {
     get: () => current,
     set(v) { current = avatarOr(v); family = parseAvatar(current).family.id; render(); },
     setAccent(c) { accent = c; render(); },
+    setDimiliki(ids) { dimiliki = ids; render(); },
   };
 }

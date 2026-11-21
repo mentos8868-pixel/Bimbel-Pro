@@ -254,6 +254,8 @@ a.btn {
 .toko-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px; border: 2px solid #eee3d0; border-radius: 14px; text-align: center; background: #fff; }
 .toko-item.pakai { border-color: var(--primary); background: #eef6ff; }
 .toko-item img { width: 72px; height: 72px; }
+.toko-item .av-face { display: block; width: 72px; height: 72px; }
+.toko-item .av-face svg { width: 100%; height: 100%; }
 .toko-item b { font-size: 14px; line-height: 1.2; }
 .toko-item .harga { font-size: 13px; color: var(--muted); font-weight: 700; }
 .toko-item button { width: 100%; padding: 6px 8px; font-size: 14px; }

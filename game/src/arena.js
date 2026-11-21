@@ -6,6 +6,7 @@ import {
 } from "@babylonjs/core";
 import { buildAvatar3d, buildManekin } from "./avatar3d.js";
 import { drawFlag, namaKelas } from "../../shared/negara.js";
+import { BARIS_BIMBEL, KOLOM_BIMBEL, TITIK_BIMBEL } from "../../shared/kursi-bimbel.js";
 
 export const ARENA_RADIUS = 38;
 
@@ -220,7 +221,7 @@ function ruangKelas(scene, walls) {
   apel.material = mat(scene, "#e0453a");
   // Meja dan kursi murid: 2 baris x 4 meja, lorong di tengah menuju meja guru.
   const kursi = ["#4f9cf0", "#ef6f5e", "#5fc29a", "#f5a524"];
-  for (const z of [24.8, 22.2]) [-5.4, -2.7, 2.7, 5.4].forEach((x, i) => mejaMurid(scene, x, z, kursi[i], walls));
+  for (const z of BARIS_BIMBEL) KOLOM_BIMBEL.forEach((x, i) => mejaMurid(scene, x, z, kursi[i], walls));
   // Rak buku, tanaman, dan tempat sampah di sudut kelas.
   rakBuku(scene, -7.45, 27.5, walls);
   rakBuku(scene, -7.45, 24.8, walls);
@@ -234,7 +235,7 @@ function ruangKelas(scene, walls) {
   tabung(scene, 0.45, 0.4, "#5d6b7a", -7.2, 0.23, 20);
   // Meja guru adalah tempat membuka Ruang Pintar (tab baru); titik aksi di depan meja.
   makeSign(scene, ["Ruang Pintar"], { width: 2.2, height: 0.6 }).position.set(gx, 1.7, gz - 0.7);
-  return { id: "bimbel", x: gx, z: gz - 1.3, label: "Ruang Pintar", action: "Belajar di Ruang Pintar", ready: true };
+  return { id: "bimbel", ...TITIK_BIMBEL, label: "Ruang Pintar", action: "Belajar di Ruang Pintar", ready: true };
 }
 
 // Kios Toko Avatar: lapak beratap belang dengan manekin berhias aksesori. Bagian depan menghadap selatan.
@@ -395,14 +396,29 @@ export function showBubble(scene, avatar, text) {
 // Baris kedua papan nama: bendera negara + "Kelas N" (anak), atau jenjang bila kelas belum diisi.
 export function createAvatar(scene, { color, avatar, aksesori = "", aura = "", name, jenjang, negara = "", kelas = 0, kurikulum = "merdeka", sid }) {
   const root = new TransformNode("avatar", scene);
-  const { bob, meshes, height } = buildAvatar3d(scene, root, avatar, color, aksesori, aura);
+  const { bob, meshes, height, kaki } = buildAvatar3d(scene, root, avatar, color, aksesori, aura);
   const sub = kelas ? namaKelas(kelas, kurikulum, true) : jenjang;
   const tag = makeSign(scene, [name, sub], { width: 1.8, height: 0.6, bg: "rgba(255,255,255,0.9)", flag: negara });
   tag.position.y = height + 0.3;
   tag.parent = root;
   tag.billboardMode = Mesh.BILLBOARDMODE_ALL;
   if (sid) for (const m of meshes) m.metadata = { sid };
-  return { root, body: bob, height };
+  const statusBelajar = makeSign(scene, ["Sedang belajar"], { width: 1.8, height: 0.34, bg: "#dff6e8", fg: "#205d39" });
+  statusBelajar.parent = tag;
+  statusBelajar.position.y = 0.48;
+  statusBelajar.setEnabled(false);
+  return { root, body: bob, height, kaki, statusBelajar, duduk: false };
+}
+
+export function aturPoseBelajar(av, duduk) {
+  if (av.duduk === duduk) return;
+  av.duduk = duduk;
+  av.body.position.y = duduk ? 0.32 : 0;
+  for (const kaki of av.kaki) {
+    kaki.position.z = duduk ? 0.47 : 0.12;
+    kaki.position.y = duduk ? 0.14 : 0.06;
+  }
+  av.statusBelajar.setEnabled(duduk);
 }
 
 // Buang avatar (figur, papan nama, gelembung chat) tanpa menghapus material warna bersama

@@ -9,15 +9,21 @@ Kamu adalah **Pemeriksa Soal** Bimbel Pro. Anggap setiap soal bisa salah sampai 
 Kamu **tidak mengubah file**; kamu melaporkan temuan agar diperbaiki `penyusun-soal`.
 
 ## Yang diperiksa
-Data ada di `game/public/bimbel/bank_soal.js` (`window.BANK`), `bank_intl.js` (`window.BANK_INTL`),
-dan `topik_tambahan.js` (generator). Gunakan skrip Node untuk memuat data dan mengecek secara otomatis,
-lalu baca soal satu per satu untuk hal yang tidak bisa dicek mesin.
+Mulai dengan `node scripts/audit-soal.mjs` dari akar proyek. Gunakan opsi `--json` untuk daftar
+temuan lengkap. Skrip memeriksa seluruh bank soal dan menjalankan sampel Latihan dan Tryout dari
+kode Ruang Bimbel. Randomisasi audit memakai seed tetap agar temuan bisa diulang.
 
 **Otomatis (wajib untuk semua soal yang diperiksa):**
 - `a` adalah indeks yang valid di `o`; `o` berisi 4 pilihan unik dan tidak kosong.
 - `lv` bernilai 1–3; `id` topik unik; tidak ada pertanyaan kembar dalam satu topik.
 - Sebaran posisi jawaban benar tidak berat sebelah.
-- Untuk generator di `topik_tambahan.js`: jalankan banyak kali (bila bisa) dan cek jawaban yang dihasilkan konsisten.
+- Bedakan pengulangan dalam satu sesi, pengulangan antarsesi, dan kesamaan teks antar topik atau kurikulum.
+- Tinjau kandidat dengan teks sama dan kunci berbeda bersama pilihan dan pembahasannya. Teks yang sama
+  dapat sah bila pilihan atau ilustrasinya berbeda. Pola yang hanya mengganti angka adalah kandidat tinjauan.
+- Prioritaskan generator dengan sedikit variasi atau satu soal yang terlalu sering muncul. Laporkan
+  jumlah variasi, jumlah pengambilan, dan berapa sesi memuat soal berulang.
+- Untuk soal otomatis, uji hasil terhadap perhitungan independen. Kelulusan cek format tidak membuktikan
+  kunci dan pembahasan benar. Nyatakan mana yang diaudit menyeluruh dan mana yang disampel.
 
 **Manual:**
 - Kunci jawaban benar-benar benar (hitung ulang matematika; cek fakta IPA; cek tata bahasa).

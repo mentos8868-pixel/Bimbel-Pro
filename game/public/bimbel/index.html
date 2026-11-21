@@ -218,6 +218,7 @@
 
 <script src="bank_soal.js"></script>
 <script src="bank_intl.js"></script>
+<script src="bank_intl_tambahan.js"></script>
 <script src="topik_tambahan.js"></script>
 <script src="topik_intl.js"></script>
 <script>
@@ -794,14 +795,22 @@ const topicById=id=>ALLTOPICS().find(t=>t.id===id);
 const subjOf=id=>{const t=topicById(id);return t?`${t.kur}:${t.mapel}`:id};
 function makeQ(t){let tt=t;if(t.g==='__mix'){tt=pick(TOPICS[t.kelas].filter(x=>x.g!=='__mix'))}
   const q=G[tt.g](tt.p);q.from=tt.name;if(t.kelas<=2&&q.kind==='int'&&!q.choices)q.choices=choicesFor(q.ans);return q}
-function bankQ(s){const order=shuffle([0,1,2,3]);return {q:esc(s.q).replace(/\n/g,'<br>'),ans:s.o[s.a],kind:'str',choices:order.map(i=>s.o[i]),steps:[esc(s.p)],from:s.from,text:true}}
+function bankQ(s){const order=shuffle([0,1,2,3]);return {q:esc(s.q).replace(/\n/g,'<br>'),ans:s.o[s.a],kind:'str',choices:order.map(i=>s.o[i]),steps:s.p.split('\n').map(line=>esc(line)),from:s.from,text:true}}
+function variedPractice(draw,n){
+  const result=[],seen=new Set(),repeats=[];
+  for(let attempt=0;result.length<n && attempt<16*n;attempt++){
+    const q=draw();if(!q)break;
+    if(seen.has(q.q)){if(repeats.length<n)repeats.push(q);continue}
+    seen.add(q.q);result.push(q);
+  }
+  return shuffle(result.concat(repeats.slice(0,n-result.length)));
+}
 function buildSession(t,n){
   if(t.parts){   // latihan campuran: gabungan topik bank soal dan topik soal otomatis
     const gens=t.parts.filter(p=>!p.bank),bank=t.parts.filter(p=>p.bank).flatMap(p=>p.bank.map(s=>({...s,from:p.name})));
     const pool=shuffle(bank.filter(s=>s.lv===LV)).concat(shuffle(bank.filter(s=>s.lv!==LV))),share=gens.length/t.parts.length,qs=[];
-    for(let i=0;i<n;i++){if(gens.length&&(!pool.length||Math.random()<share))qs.push(makeQ(pick(gens)));else if(pool.length)qs.push(bankQ(pool.shift()))}
-    return qs}
-  if(!t.bank){const qs=[];for(let i=0;i<n;i++)qs.push(makeQ(t));return qs}
+    return variedPractice(()=>gens.length&&(!pool.length||Math.random()<share)?makeQ(pick(gens)):pool.length?bankQ(pool.shift()):null,n)}
+  if(!t.bank)return variedPractice(()=>makeQ(t),n);
   let pool=shuffle(t.bank.filter(s=>s.lv===LV));
   if(pool.length<n){const extra=shuffle(t.bank.filter(s=>s.lv!==LV).sort((a,b)=>Math.abs(a.lv-LV)-Math.abs(b.lv-LV)));pool=pool.concat(extra)}
   return pool.slice(0,n).map(bankQ);
@@ -856,6 +865,8 @@ const MEDALS=[
   {id:'tryout90',e:'🎓',n:'Siap Ujian',d:'Nilai 90 ke atas di tryout minimal 20 soal',ok:s=>(s.tryouts||[]).some(t=>t.score>=90&&t.n>=20)},
 ];
 const level=()=>Math.floor(S.xp/100)+1;
+const XP_PER_JAWABAN_TRYOUT=10;
+const xpPerJawabanLatihan=(tingkat)=>10+(tingkat-1)*5;
 
 /* ============ Tampilan ============ */
 let view='belajar', sess=null;
@@ -896,7 +907,8 @@ function renderHome(app){
   const list=topics.map((t,i)=>{const st=S.topics[`${t.id}|${S.lv}`]||{best:0,att:0};const nb=t.bank?t.bank.filter(s=>s.lv===S.lv).length:0;
     return `<div class="topic ${st.best===3?'done':''}">
       <div class="num">${t.mix?'★':i+1}</div>
-      <div><h3>${esc(t.name)}</h3><p>${esc(t.desc)}${t.bank?` · ${nb} soal ${lvName(S.lv,S.kur).toLowerCase()}`:''} · ${starsHTML(st.best)}</p></div>
+      <div><h3>${esc(t.name)}</h3><p>${esc(t.desc)}${t.bank?` · ${nb} soal ${lvName(S.lv,S.kur).toLowerCase()}`:''} · ${starsHTML(st.best)}</p>
+        <p>${st.best===3?'3 bintang tercapai · 0 XP saat diulang':`Hingga ${3-st.best} bintang tambahan · ${xpPerJawabanLatihan(S.lv)} XP per jawaban benar`}</p></div>
       <div class="act"><button class="btn" data-t="${t.id}">${st.att?'Latihan lagi':'Mulai'}</button></div>
     </div>`}).join('');
   const empty=S.kur==='merdeka'&&S.mapel==='ipa'&&S.kelas<=2?`IPA (IPAS) di Kurikulum Merdeka mulai dari kelas 3. Pilih pelajaran lain.`
@@ -904,8 +916,9 @@ function renderHome(app){
     :`Soal ${K.mapel[S.mapel]} ${K.label(S.kelas)} sedang ditulis oleh tim agency agent. Coba lagi nanti.`;
   app.innerHTML=`
     <h1>Halo, ${esc(S.name||'Murid')}! 👋</h1>
-    <p class="sub">Pilih pelajaran dan tingkat kesulitan.</p>
+    <p class="sub">Dapatkan XP dari latihan topik yang belum mencapai 3 bintang pada tingkat pilihanmu, atau dari tryout. Setiap 100 XP kamu naik satu level.</p>
     <div class="lvl"><span class="lvl-badge">Level ${level()}</span><div class="bar"><i style="width:${xpIn}%"></i></div><span style="font-weight:800;color:var(--muted)">${xpIn}/100 XP</span></div>
+    <p><button type="button" class="btn ghost" id="lihat-xp">Lihat topik dan XP Tryout</button></p>
     ${TOKO&&TOKO.level?`<p style="margin:-6px 0 14px;font-weight:700;color:var(--muted);font-size:14px">${TOKO.auraNama?`✨ Avatarmu memakai <b style="color:var(--ink)">${esc(TOKO.auraNama)}</b>.`:'Avatarmu belum punya aura.'}
       ${TOKO.auraBerikut?` Capai <b style="color:var(--ink)">Level ${TOKO.auraBerikut.level}</b> untuk ${esc(TOKO.auraBerikut.nama)}!`:' Aura tertinggi sudah kamu dapat!'}</p>`:''}
     ${aturOrtu()}
@@ -916,6 +929,7 @@ function renderHome(app){
   app.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{S.mapel=b.dataset.m;save();render()});
   app.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{S.lv=+b.dataset.lv;save();render()});
   app.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>start(b.dataset.t));
+  $('#lihat-xp').onclick=()=>go('tryout');
 }
 
 function start(id){const t=topicsFor(S.mapel,S.kelas).find(x=>x.id===id)||topicById(id);LV=S.lv;
@@ -925,7 +939,7 @@ function start(id){const t=topicsFor(S.mapel,S.kelas).find(x=>x.id===id)||topicB
 function ansText(q){if(q.kind==='str')return esc(q.ans);if(q.kind==='frac'){let [n,d]=q.ans;if(d<0){n=-n;d=-d}const g=gcd(n,d);n/=g;d/=g;return d===1?`${n}`:(n<0?'−':'')+F(Math.abs(n),d)}
   return q.kind==='dec'?fmtD(q.ans,2):(Math.abs(q.ans)>=1000?q.ans.toLocaleString('id-ID'):q.ans)}
 function check(q,v){v=String(v).trim().toLowerCase().replace(/−/g,'-');if(!v)return null;
-  if(q.kind==='str')return v===String(q.ans).toLowerCase();
+  if(q.kind==='str')return v===String(q.ans).trim().toLowerCase().replace(/−/g,'-');
   if(q.kind==='frac'){let n,d;if(v.includes('/')){[n,d]=v.split('/').map(x=>parseInt(x.trim()))}else{n=parseInt(v);d=1}
     if(!isFinite(n)||!isFinite(d)||d===0)return false;return n*q.ans[1]===q.ans[0]*d}
   if(q.kind==='dec'){const x=parseFloat(v.replace(',','.'));return Math.abs(x-q.ans)<1e-9}
@@ -967,13 +981,19 @@ function nextQ(){const s=sess;if(!s.answered)return;if(s.i<s.qs.length-1){s.i++;
 function finish(){const s=sess,c=s.res.filter(Boolean).length,N=s.qs.length,pc=c/N,stars=pc===1?3:pc>=.8?2:pc>=.6?1:0;
   const before=new Set(S.medals),key=`${s.t.id}|${s.lv}`;
   const t=S.topics[key]||{best:0,att:0,ok:0,ses:0};
+  const bestSebelum=t.best;
   t.att+=N;t.ok+=c;t.ses++;t.best=Math.max(t.best,stars);S.topics[key]=t;
-  kirimBintang([{kunci:key,bintang:t.best}]);
-  S.xp+=c*(10+(s.lv-1)*5);S.sessions++;if(c===N&&N>=5)S.perfect++;
+  s.bintangBaru=t.best-bestSebelum;
+  if(s.bintangBaru>0)kirimBintang([{kunci:key,bintang:t.best}]);
+  s.sudahTigaBintang=bestSebelum>=3;
+  s.xp=s.sudahTigaBintang?0:c*xpPerJawabanLatihan(s.lv);
+  S.xp+=s.xp;
+  S.sessions++;if(c===N&&N>=5)S.perfect++;
   S.history.unshift({d:new Date().toISOString(),id:key,c,n:N});S.history=S.history.slice(0,50);
   MEDALS.forEach(m=>{if(!before.has(m.id)&&m.ok(S))S.medals.push(m.id)});
   s.newMedals=S.medals.filter(m=>!before.has(m)).map(id=>MEDALS.find(m=>m.id===id));
-  s.correct=c;s.stars=stars;s.done=true;save();render();kirimXp();
+  s.correct=c;s.stars=stars;s.done=true;save();render();
+  if(s.xp>0)kirimXp();
 }
 function renderResult(app){const s=sess,N=s.qs.length;
   const msg=s.correct===N?'Luar biasa, semua benar!':s.correct/N>=.6?'Bagus! Sedikit lagi sempurna.':'Tidak apa-apa, ayo coba lagi. Lihat pembahasannya ya.';
@@ -983,7 +1003,9 @@ function renderResult(app){const s=sess,N=s.qs.length;
     <div class="stars" style="margin-top:10px">${[1,2,3].map(i=>`<span class="${i<=s.stars?'s':''}">★</span>`).join('')}</div>
     <div class="score">${s.correct} / ${N} benar</div>
     <p style="font-weight:700">${msg}</p>${naik}
-    <div class="stat" style="display:inline-flex">+${s.correct*(10+(s.lv-1)*5)} XP</div>
+    ${s.bintangBaru>0?`<div class="stat" style="display:inline-flex">+${s.bintangBaru} bintang</div>`:''}
+    <div class="stat" style="display:inline-flex">+${s.xp} XP</div>
+    ${s.sudahTigaBintang?'<p class="sub">Kamu sudah meraih 3 bintang pada topik dan tingkat ini.</p>':''}
     ${s.newMedals.map(m=>`<div class="newmedal">Medali baru! ${m.e} <b>${m.n}</b></div>`).join('')}
     <div style="display:flex;gap:12px;justify-content:center;margin-top:24px;flex-wrap:wrap">
       <button class="btn ghost" id="home">Kembali ke topik</button>${naik?`<button class="btn ghost" id="up">Coba ${lvName(s.lv+1,s.t.kur)}</button>`:''}<button class="btn" id="again">Latihan lagi</button></div>
@@ -1106,10 +1128,15 @@ function renderTryout(app){
         <div class="grades"><b class="glab">Waktu</b>${TO_MENIT.map(x=>`<button class="chip ${TO.menit===x?'on':''}" data-mn="${x}">${x} menit</button>`).join('')}</div>
       </div>
       <div class="tbox" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-        <div style="flex:1;min-width:200px"><b style="font-size:18px">${n} soal · ${TO.menit} menit</b><br>
+        <div style="flex:1;min-width:200px"><b style="font-size:18px">${n} soal · ${TO.menit} menit · maks. ${n*XP_PER_JAWABAN_TRYOUT} XP</b><br>
           <span style="color:var(--muted);font-weight:700">${K.mapel[S.mapel]} · ${K.label(S.kelas)} · ${chosen.length} topik · ${mixShort(S.kur)}${n<TO.n&&chosen.length?` · soal yang tersedia hanya ${n}`:''}</span></div>
         ${sudah?`<span style="font-weight:800;color:var(--muted)">Tryout ${K.mapel[S.mapel]} hari ini sudah dikerjakan. Coba lagi besok.</span>`
           :`<button class="btn" id="tmulai" ${!chosen.length||!n?'disabled':''}>Mulai tryout</button>`}</div>
+      <p class="sub" style="margin:0">Setiap jawaban benar memberi ${XP_PER_JAWABAN_TRYOUT} XP. Jawaban salah atau kosong memberi 0 XP. Setiap 100 XP kamu naik satu level.</p>
+      <details class="tbox">
+        <summary>Topik yang dicakup (${chosen.length})</summary>
+        <ul>${chosen.map(t=>`<li>${esc(t.name)}</li>`).join('')}</ul>
+      </details>
       <p style="margin:0;color:var(--muted);font-size:14px">Tryout bisa dikerjakan 1x sehari untuk tiap pelajaran. Bintang: ${TO.n===50?'50 benar = 5★, 47–49 = 4★, 44–46 = 3★, 41–43 = 2★, 35–40 = 1★':'30 benar = 3★, 27–29 = 2★, 21–26 = 1★'}.</p>
       ${hist?`<div><h2 style="margin-top:8px">Riwayat tryout</h2>${hist}</div>`:''}
     </div>`:`<div class="empty">${empty}</div>`}`;
@@ -1190,7 +1217,7 @@ function submitExam(auto,yakin){
   ex.correct=ex.res.filter(r=>r===true).length;
   ex.score=Math.round(ex.correct/ex.qs.length*100);
   ex.used=Math.min(ex.menit*60,Math.round((Date.now()-ex.start)/1000));
-  ex.auto=auto;ex.done=true;ex.xp=ex.correct*10;
+  ex.auto=auto;ex.done=true;ex.xp=ex.correct*XP_PER_JAWABAN_TRYOUT;
   Object.assign(ex,tryoutStars(ex.correct,ex.qs.length,ex.target));
   kirimBintang([{kunci:`tryout|${tglWIB()}|${ex.kur}|${ex.mapel}`,bintang:ex.stars}]);
   const before=new Set(S.medals);

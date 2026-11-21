@@ -3,6 +3,7 @@
 import { api } from "./api.js";
 import { avatarSvg } from "./avatar-svg.js";
 import { SLOT } from "../../shared/aksesori.js";
+import { katalogAvatar } from "./katalog-avatar.js";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -64,7 +65,9 @@ export class TokoUI {
       return `<div class="toko-item ${pakai ? "pakai" : ""}"><img src="${this.gambar(a.id)}" alt="" />
         <b>${esc(a.name)}</b><span class="harga">${punya ? (pakai ? "Sedang dipakai" : "Sudah dimiliki") : `★ ${a.harga}`}</span>${tombol}</div>`;
     };
-    $("toko-isi").innerHTML = SLOT.map((s) => {
+    const isi = $("toko-isi");
+    const katalog = katalogAvatar(k, this.profile.color, this.yakin, isi.querySelector("[data-katalog-avatar]")?.open);
+    isi.innerHTML = katalog + SLOT.map((s) => {
       const items = k.items.filter((a) => a.slot === s.id);
       return items.length ? `<h3 class="toko-slot">${s.name}</h3><div class="toko-grid">${items.map(kartu).join("")}</div>` : "";
     }).join("");
@@ -75,7 +78,19 @@ export class TokoUI {
     if (!b || b.disabled) return;
     this.err("");
     try {
-      if (b.dataset.beli) {
+      if (b.dataset.beliAvatar) {
+        const id = b.dataset.beliAvatar;
+        if (this.yakin !== id) { this.yakin = id; this.render(); return; }
+        this.yakin = null;
+        b.disabled = true;
+        this.k = { ...this.k, ...(await api("POST", "toko/beli-avatar", { id })) };
+        this.onBerubah(this.k);
+      } else if (b.dataset.pakaiAvatar) {
+        b.disabled = true;
+        const { avatar } = await api("POST", "avatar", { avatar: b.dataset.pakaiAvatar, sebagai: "anak" });
+        this.k.avatar = avatar;
+        this.onBerubah(this.k);
+      } else if (b.dataset.beli) {
         const id = b.dataset.beli;
         // Klik pertama minta konfirmasi di tombol itu sendiri (tanpa dialog browser yang bisa diblokir).
         if (this.yakin !== id) { this.yakin = id; this.render(); return; }

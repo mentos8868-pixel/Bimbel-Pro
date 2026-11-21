@@ -1,5 +1,6 @@
 import { Vector3, Scalar, PointerEventTypes } from "@babylonjs/core";
-import { createArena, createAvatar, disposeAvatar, moveWithCollision, showBubble } from "./arena.js";
+import { aturPoseBelajar, createArena, createAvatar, disposeAvatar, moveWithCollision, showBubble } from "./arena.js";
+import { JARAK_INTERAKSI_BIMBEL } from "../../shared/kursi-bimbel.js";
 import { SocialUI } from "./social-ui.js";
 import {
   joinArena, findChessMatch, createChessTable, joinChessTable,
@@ -82,6 +83,7 @@ async function start(profile, playingAs) {
     const baru = createAvatar(scene, opsi);
     baru.root.position.copyFrom(lama.root.position);
     baru.root.rotation.copyFrom(lama.root.rotation);
+    aturPoseBelajar(baru, lama.duduk);
     disposeAvatar(lama);   // material bersama tidak ikut dibuang
     return baru;
   }
@@ -92,35 +94,56 @@ async function start(profile, playingAs) {
   // Keyboard
   const keys = new Set();
   let uiOpen = false;
+  let tabBelajar = null;
+  let pantauTabBelajar;
+  let menungguKursi = false;
   window.addEventListener("keydown", (e) => {
     if (e.target.tagName === "INPUT") return;
     keys.add(e.key.toLowerCase());
-    if (e.key.toLowerCase() === "e" && !uiOpen && nearTable) useTable(nearTable);
+    if (e.key.toLowerCase() === "e" && !uiOpen && !me.duduk && !menungguKursi && nearTable) useTable(nearTable);
   });
   window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
   window.addEventListener("blur", () => keys.clear());
 
   // ---------- Multiplayer arena ----------
   let room = null;
+  const posisiPemain = () => ({
+    x: +me.root.position.x.toFixed(2),
+    z: +me.root.position.z.toFixed(2),
+    ry: +me.root.rotation.y.toFixed(2),
+  });
   const others = new Map();
   try {
     if (!playingAs) throw new Error("tamu");
     room = await joinArena();
     room.onMessage("waktu-hampir", (m) => toast(`Waktu bermain tinggal ${m} menit lagi.`));
     room.onMessage("waktu-habis", (m) => timeUp(m));
+    room.onMessage("kursi-bimbel-gagal", (pesan) => {
+      menungguKursi = false;
+      toast(pesan);
+    });
     $("hud-status").textContent = "Online";
     room.state.players.onAdd((p, id) => {
       if (id === room.sessionId) {
         me.root.position.set(p.x, 0, p.z);
         // Aksesori atau aura sendiri berubah di server (mis. naik level di Ruang Pintar): perbarui figur.
         const cocokkan = () => {
-          if ((p.aksesori || "") === (profile.aksesori || "") && (p.aura || "") === (profile.aura || "")) return;
+          if (p.avatar === profile.avatar && (p.aksesori || "") === (profile.aksesori || "") && (p.aura || "") === (profile.aura || "")) return;
+          profile.avatar = p.avatar;
           profile.aksesori = p.aksesori || "";
           profile.aura = p.aura || "";
           Object.assign(me, gantiAvatar(me, profile));
         };
         p.listen("aksesori", cocokkan);
+        p.listen("avatar", cocokkan);
         p.listen("aura", cocokkan);
+        p.listen("kursiBimbel", (kursi, sebelumnya) => {
+          if (!kursi && !sebelumnya) return;
+          menungguKursi = false;
+          me.root.position.set(p.x, 0, p.z);
+          me.root.rotation.y = p.ry;
+          aturPoseBelajar(me, Boolean(kursi));
+        });
         return;
       }
       const opsi = () => ({ name: p.name, jenjang: p.jenjang, negara: p.negara, kelas: p.kelas, kurikulum: p.kurikulum, color: p.color, avatar: p.avatar, aksesori: p.aksesori, aura: p.aura, sid: id });
@@ -130,6 +153,7 @@ async function start(profile, playingAs) {
       // Pemain lain mengganti aksesori di Toko atau naik ke aura baru: buat ulang avatarnya.
       const ganti = () => { if (others.get(id) === o) o.av = gantiAvatar(o.av, opsi()); };
       p.listen("aksesori", (v, lama) => { if (lama !== undefined) ganti(); });
+      p.listen("avatar", (v, lama) => { if (lama !== undefined) ganti(); });
       p.listen("aura", (v, lama) => { if (lama !== undefined) ganti(); });
     });
     room.state.players.onRemove((_, id) => {
@@ -148,6 +172,8 @@ async function start(profile, playingAs) {
     }
     room.onLeave((code) => {
       room = null;
+      menungguKursi = false;
+      aturPoseBelajar(me, false);
       $("hud-status").textContent = "Offline";
       if (code !== 4000) toast("Koneksi ke server terputus.");
     });
@@ -330,8 +356,26 @@ async function start(profile, playingAs) {
       return;
     }
     if (t.id === "bimbel") {
-      // Tab baru, supaya sesi arena tetap tersambung.
-      window.open("/bimbel/index.html", "_blank", "noopener");
+      if (tabBelajar && !tabBelajar.closed) {
+        tabBelajar.focus();
+        return;
+      }
+      tabBelajar = window.open("/bimbel/index.html", "_blank");
+      if (!tabBelajar) return toast("Izinkan tab baru untuk membuka Ruang Pintar.");
+      tabBelajar.opener = null;
+      if (playingAs !== "anak" || !room) return;
+      keys.clear();
+      menungguKursi = true;
+      room.send("move", posisiPemain());
+      room.send("belajar-bimbel", true);
+      clearInterval(pantauTabBelajar);
+      pantauTabBelajar = setInterval(() => {
+        if (!tabBelajar.closed) return;
+        clearInterval(pantauTabBelajar);
+        tabBelajar = null;
+        menungguKursi = false;
+        room?.send("belajar-bimbel", false);
+      }, 500);
       return;
     }
     if (t.id === "kartu") {
@@ -363,6 +407,7 @@ async function start(profile, playingAs) {
   const toko = new TokoUI({
     onClose: () => (uiOpen = false),
     onBerubah: (k) => {
+      profile.avatar = k.avatar;
       profile.aksesori = k.pakai.join(",");
       if (k.aura !== undefined) profile.aura = k.aura;
       Object.assign(me, gantiAvatar(me, profile));
@@ -390,7 +435,7 @@ async function start(profile, playingAs) {
 
     // Arah gerak relatif terhadap kamera
     let ix = joy.x, iz = joy.y;
-    if (!uiOpen) {
+    if (!uiOpen && !me.duduk && !menungguKursi) {
       if (keys.has("w") || keys.has("arrowup")) iz += 1;
       if (keys.has("s") || keys.has("arrowdown")) iz -= 1;
       if (keys.has("d") || keys.has("arrowright")) ix += 1;
@@ -410,16 +455,16 @@ async function start(profile, playingAs) {
       me.root.rotation.y = Scalar.LerpAngle(me.root.rotation.y, target, 0.25);
       walkT += dt * 10;
       me.body.position.y = Math.abs(Math.sin(walkT)) * 0.08;
-    } else {
+    } else if (!me.duduk) {
       me.body.position.y = 0;
     }
     camera.target.copyFrom(pos.add(new Vector3(0, 1, 0)));
 
     // Kirim posisi ke server 10x per detik bila berubah
     sendTimer += dt;
-    if (room && sendTimer > 0.1) {
+    if (room && !me.duduk && !menungguKursi && sendTimer > 0.1) {
       sendTimer = 0;
-      const msg = { x: +pos.x.toFixed(2), z: +pos.z.toFixed(2), ry: +me.root.rotation.y.toFixed(2) };
+      const msg = posisiPemain();
       const key = `${msg.x},${msg.z},${msg.ry}`;
       if (key !== lastSent) { room.send("move", msg); lastSent = key; }
     }
@@ -427,6 +472,13 @@ async function start(profile, playingAs) {
     // Gerakkan pemain lain dengan halus
     for (const { av, p } of others.values()) {
       const rp = av.root.position;
+      const duduk = Boolean(p.kursiBimbel);
+      if (av.duduk !== duduk || duduk) {
+        rp.set(p.x, 0, p.z);
+        av.root.rotation.y = p.ry;
+        aturPoseBelajar(av, duduk);
+        continue;
+      }
       const moving = Math.hypot(p.x - rp.x, p.z - rp.z) > 0.05;
       rp.x = Scalar.Lerp(rp.x, p.x, 0.2);
       rp.z = Scalar.Lerp(rp.z, p.z, 0.2);
@@ -437,10 +489,11 @@ async function start(profile, playingAs) {
     // Meja terdekat
     nearTable = null;
     for (const t of tables) {
-      if (Math.hypot(pos.x - t.x, pos.z - t.z) < 2.6) { nearTable = t; break; }
+      const jarak = t.id === "bimbel" ? JARAK_INTERAKSI_BIMBEL : 2.6;
+      if (Math.hypot(pos.x - t.x, pos.z - t.z) < jarak) { nearTable = t; break; }
     }
     const btn = $("action-btn");
-    if (nearTable && !uiOpen) {
+    if (nearTable && !uiOpen && !me.duduk && !menungguKursi) {
       const label = nearTable.action ? nearTable.action : nearTable.ready ? `Main ${nearTable.label}` : `${nearTable.label} (segera hadir)`;
       btn.textContent = matchMedia("(pointer: coarse)").matches ? label : `${label} [E]`;
       btn.hidden = false;

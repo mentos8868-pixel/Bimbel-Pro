@@ -146,6 +146,7 @@ main:has(#dash:not([hidden])) { max-width: 1200px; }
 .pilih-anak button.on { background: var(--primary); color: #fff; border-color: var(--primary); }
 .luar { display: none !important; }
 .home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+.home-persetujuan { grid-column: 1 / -1; }
 .home-poin { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 15px; }
 .home-kartu .row button { padding: 6px 12px; font-size: 14px; }
 .segera { border-style: dashed; }
@@ -177,18 +178,43 @@ main:has(#dash:not([hidden])) { max-width: 1200px; }
 @media (max-width: 720px) { .tiga-ortu { grid-template-columns: 1fr; } }
 
 /* Menu Chat */
-.chat-isi { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; }
-.gelembung { height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px; background: #f4f7fb; border-radius: 12px; }
+.chat-jendela { display: grid; grid-template-columns: minmax(150px, 25%) minmax(0, 1fr); background: var(--card); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+.chat-daftar { min-width: 0; padding: 14px 10px; background: #f7f9fc; border-inline-end: 1px solid var(--border); }
+.chat-daftar h2 { font-size: 15px; margin: 0 7px 10px; }
+.chat-prioritas { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.chat-prioritas > li { padding: 6px 8px; display: grid; gap: 2px; }
+.chat-prioritas > li > span { font-weight: 700; }
+.chat-prioritas small { color: var(--muted); font-size: 12px; }
+.chat-prioritas .chat-grup-anak { padding-bottom: 4px; }
+.chat-grup-anak > button { margin-top: 2px; }
+.chat-daftar button, .chat-kontak { display: flex; align-items: center; gap: 8px; width: 100%; text-align: start; background: transparent; border: 1px solid transparent; border-radius: 10px; padding: 8px; overflow-wrap: anywhere; }
+.chat-daftar button:hover { background: #edf2f8; }
+.chat-daftar button[aria-pressed="true"], .chat-kontak { background: #e5efff; border-color: #cbdcfa; font-weight: 700; }
+.chat-inisial { display: grid; place-items: center; flex: 0 0 34px; height: 34px; border-radius: 10px; color: #173e75; background: #d9e8ff; }
+.chat-belum { margin-inline-start: auto; background: var(--error); color: white; border-radius: 999px; padding: 0 6px; font-size: 12px; }
+.chat-kepala { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.chat-kepala button { font-size: 13px; padding: 6px 10px; }
+.chat-arena { padding: 0 16px 10px; border-bottom: 1px solid var(--border); }
+.gelembung { height: clamp(260px, 52dvh, 560px); overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 16px; background: #eef3f8; }
+.chat-kosong { margin: auto; text-align: center; }
 .gel { max-width: 78%; display: flex; flex-direction: column; gap: 2px; }
 .gel > div { padding: 8px 12px; border-radius: 14px; background: #fff; border: 1px solid var(--border); overflow-wrap: anywhere; }
 .gel.saya { align-self: flex-end; align-items: flex-end; }
-.gel.saya > div { background: var(--primary); color: #fff; border-color: var(--primary); }
-.chat-form { display: flex; gap: 8px; align-items: flex-end; }
-.chat-form textarea { flex: 1; font: inherit; font-size: 16px; border-radius: 10px; border: 1px solid var(--border); padding: 9px 12px; resize: vertical; }
-.arena-log { list-style: none; margin: 0; padding: 0; max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; }
+.gel.dia > div { border-bottom-left-radius: 4px; }
+.gel.saya > div { background: #dceaff; color: #173e75; border-color: #cbdcfa; border-bottom-right-radius: 4px; }
+.chat-form { display: flex; gap: 8px; align-items: flex-end; padding: 12px 16px; border-top: 1px solid var(--border); }
+.chat-form textarea { flex: 1; min-width: 0; max-height: 144px; field-sizing: content; font: inherit; font-size: 16px; border-radius: 10px; border: 1px solid var(--border); padding: 9px 12px; resize: vertical; }
+.chat-keluarga > .error { padding: 0 16px 12px; }
+.arena-log { list-style: none; margin: 0; padding: 0; max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; overflow-wrap: anywhere; }
 .arena-log li { display: flex; justify-content: space-between; gap: 10px; padding: 7px 2px; border-bottom: 1px solid var(--border); }
 .side .badge, #chat-badge { background: var(--error); color: #fff; border-radius: 999px; padding: 0 7px; font-size: 13px; margin-left: 4px; }
-@media (max-width: 720px) { .chat-isi { grid-template-columns: 1fr; } }
+@media (max-width: 720px) {
+  .chat-jendela { grid-template-columns: minmax(0, 1fr); }
+  .chat-daftar { border-inline-end: 0; border-bottom: 1px solid var(--border); padding: 8px; }
+  .chat-prioritas { display: flex; overflow-x: auto; align-items: start; }
+  .chat-prioritas > li { flex: 0 0 auto; min-width: 80px; }
+  .chat-daftar button { width: auto; max-width: 160px; }
+}
 
 /* Menu Keuangan */
 .dua-ortu { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }

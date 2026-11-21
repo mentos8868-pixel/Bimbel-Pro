@@ -65,14 +65,7 @@ a.btn-utama, .btn-utama { background: var(--primary); color: #fff; border-color:
 .ulang { color: var(--error); font-size: 13px; }
 .sub-judul { margin-top: 10px; }
 
-/* Chat dengan orang tua */
-.gelembung { height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px; background: #f4f7fb; border-radius: 12px; }
-.gel { max-width: 78%; display: flex; flex-direction: column; gap: 2px; }
-.gel > div { padding: 8px 12px; border-radius: 14px; background: #fff; border: 1px solid var(--border); overflow-wrap: anywhere; font-size: 16px; }
-.gel.saya { align-self: flex-end; align-items: flex-end; }
-.gel.saya > div { background: var(--primary); color: #fff; border-color: var(--primary); }
-.chat-form { display: flex; gap: 8px; align-items: flex-end; }
-.chat-form textarea { flex: 1; font: inherit; font-size: 16px; border-radius: 10px; border: 1px solid var(--border); padding: 9px 12px; resize: vertical; }
+/* Pratinjau pesan di Home */
 .pesan-ortu { margin: 0; background: #fff8e6; border-radius: 10px; padding: 8px 12px; font-style: italic; }
 .badge { background: var(--error); color: #fff; border-radius: 999px; padding: 0 7px; font-size: 13px; margin-left: 4px; }
 button.link { background: none; border: none; padding: 0; color: var(--primary); font-size: inherit; font-weight: 700; }

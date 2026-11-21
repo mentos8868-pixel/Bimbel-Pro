@@ -32,6 +32,20 @@ db.exec(`
 
 export const JENIS = { ibadah: "Ibadah", rumah: "Rumah", belajar: "Belajar", lainnya: "Lainnya" };
 const MAKS_TUGAS_PER_ANAK = 30;
+const MAKS_BINTANG_HARIAN = 10;
+const SATU_HARI_MS = 86_400_000;
+const bintangDiberikan = db.prepare(`
+  SELECT COALESCE(SUM(t.bintang), 0) AS jumlah
+  FROM tugas_catatan c JOIN tugas t ON t.id = c.tugas_id
+  WHERE t.parent_id = ? AND c.status = 'disetujui' AND c.diubah_at >= ? AND c.diubah_at < ?
+`);
+
+function kuotaBintang(ortuId, sekarang = Date.now()) {
+  const awal = Date.parse(today(sekarang) + "T00:00:00+07:00");
+  const jumlah = bintangDiberikan.get(ortuId, awal, awal + SATU_HARI_MS).jumlah;
+  return { batas: MAKS_BINTANG_HARIAN, sisa: Math.max(0, MAKS_BINTANG_HARIAN - jumlah) };
+}
+
 const TGL = /^\d{4}-\d{2}-\d{2}$/;
 const hariKe = (tgl) => new Date(tgl + "T05:00:00Z").getUTCDay();   // 05:00 UTC = 12:00 WIB, hari yang sama
 
@@ -98,7 +112,8 @@ function validTugas(b) {
   const jadwal = ["harian", "hari", "sekali"].includes(b.jadwal) ? b.jadwal : "harian";
   const hari = jadwal === "hari" ? [...new Set((Array.isArray(b.hari) ? b.hari : []).map(Number).filter((n) => n >= 0 && n <= 6))].sort() : [];
   if (jadwal === "hari" && !hari.length) throw new Error("Pilih minimal satu hari.");
-  const bintang = Math.max(0, Math.min(5, Math.floor(Number(b.bintang) || 0)));
+  const bintang = Number(b.bintang);
+  if (!Number.isInteger(bintang) || bintang < 1 || bintang > 3) throw new Error("Pilih 1, 2, atau 3 bintang.");
   return { judul, jenis, jadwal, hari: hari.join(","), bintang };
 }
 
@@ -132,7 +147,7 @@ export function handleTugas({ m, path, body, url, ortuId, anak, ownChild, send, 
   if (!ortuId) throw new ApiError(401, "Silakan masuk sebagai orang tua.");
   if (path.length === 1 && m === "GET") {
     const kids = db.prepare("SELECT id FROM children WHERE parent_id = ? ORDER BY id").all(ortuId);
-    return send(200, { anak: Object.fromEntries(kids.map((k) => [k.id, tugasAnak(k.id)])) }), true;
+    return send(200, { anak: Object.fromEntries(kids.map((k) => [k.id, tugasAnak(k.id)])), kuotaBintang: kuotaBintang(ortuId) }), true;
   }
   if (path.length === 1 && m === "POST") {
     const c = ownChild(ortuId, body.childId);
@@ -153,19 +168,24 @@ export function handleTugas({ m, path, body, url, ortuId, anak, ownChild, send, 
   if ((path[2] === "setujui" || path[2] === "belum") && m === "POST") {
     const tgl = String(body.tanggal || "");
     if (!TGL.test(tgl)) throw new ApiError(400, "Tanggal tidak valid.");
-    const row = db.prepare("SELECT * FROM tugas_catatan WHERE tugas_id = ? AND tanggal = ?").get(t.id, tgl);
-    if (!row || row.status !== "menunggu") throw new ApiError(400, "Tugas ini tidak sedang menunggu dicek.");
     const setuju = path[2] === "setujui";
     db.exec("BEGIN IMMEDIATE");
     try {
-      db.prepare("UPDATE tugas_catatan SET status = ?, diubah_at = ? WHERE tugas_id = ? AND tanggal = ?").run(setuju ? "disetujui" : "belum", Date.now(), t.id, tgl);
+      const row = db.prepare("SELECT status FROM tugas_catatan WHERE tugas_id = ? AND tanggal = ?").get(t.id, tgl);
+      if (row?.status !== "menunggu") throw new ApiError(400, "Tugas ini tidak sedang menunggu dicek.");
+      const sekarang = Date.now();
+      const { sisa, batas } = kuotaBintang(ortuId, sekarang);
+      if (setuju && t.bintang > sisa) {
+        throw new ApiError(400, `Batas pemberian ${batas} bintang per hari. Sisa hari ini ${sisa} bintang. Tugas ini masih bisa disetujui besok.`);
+      }
+      db.prepare("UPDATE tugas_catatan SET status = ?, diubah_at = ? WHERE tugas_id = ? AND tanggal = ?").run(setuju ? "disetujui" : "belum", sekarang, t.id, tgl);
       if (setuju && t.bintang) db.prepare("UPDATE children SET bintang = bintang + ? WHERE id = ?").run(t.bintang, t.child_id);
       db.exec("COMMIT");
     } catch (e) { db.exec("ROLLBACK"); throw e; }
     notify(`a${t.child_id}`, "info", setuju
       ? `Tugas "${t.judul}" disetujui orang tua!${t.bintang ? ` +${t.bintang} bintang` : ""}`
       : `Tugas "${t.judul}" belum diterima orang tua. Coba lagi, ya.`);
-    return send(200, tugasAnak(t.child_id)), true;
+    return send(200, { ...tugasAnak(t.child_id), kuotaBintang: kuotaBintang(ortuId) }), true;
   }
   throw new ApiError(404, "Alamat tidak ditemukan.");
 }

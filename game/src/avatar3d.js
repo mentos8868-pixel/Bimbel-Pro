@@ -117,10 +117,26 @@ function eyesAndCheeks(k, { y, z, gap = 0.14, cheekY = y - 0.12 }) {
 }
 
 // Bentuk badan per jenis. Mengembalikan info kepala untuk aksesori anggota keluarga.
-function buildFamily(k, f) {
+function buildFamily(k, f, kaki) {
   const { body: c, belly: b, accent: a } = f;
-  const feet = (col = a) => { for (const sx of [-1, 1]) k.ball(0.22, col, [sx * 0.18, 0.06, 0.12], [1, 0.5, 1.3]); };
+  const feet = (col = a) => {
+    for (const sx of [-1, 1]) kaki.push(k.ball(0.22, col, [sx * 0.18, 0.06, 0.12], [1, 0.5, 1.3]));
+  };
   switch (f.id) {
+    case "manusia": {
+      for (const sx of [-1, 1]) {
+        kaki.push(k.box(0.17, 0.39, 0.21, "#35465e", [sx * 0.13, 0.24, 0.04]));
+        k.rod(0.32, 0.14, c, [sx * 0.36, 0.65, 0.04], [0, 0, sx * 0.22]);
+        k.ball(0.15, c, [sx * 0.34, 1.18, 0.04]);
+      }
+      k.box(0.56, 0.49, 0.36, b, [0, 0.67, 0.02]);
+      const head = { y: 1.21, r: 0.34 };
+      k.ball(0.68, c, [0, head.y, 0.04], [1, 1.08, 0.94]);
+      k.dome(0.7, a, [0, 1.31, 0.025], [1, 0.81, 1]);
+      eyesAndCheeks(k, { y: 1.19, z: 0.34, gap: 0.12 });
+      k.ball(0.07, "#843f37", [0, 1.07, 0.34], [1.3, 0.35, 0.4]);
+      return head;
+    }
     case "ulat": {
       k.ball(0.62, c, [0, 0.3, -0.45]); k.ball(0.25, b, [0.25, 0.32, -0.45]); k.ball(0.25, b, [-0.25, 0.32, -0.45]);
       k.ball(0.5, c, [0, 0.25, -0.88]);
@@ -313,12 +329,13 @@ export function buildAvatar3d(scene, parent, avatarId, accent, aksesori = [], au
   const bob = new TransformNode("bob", scene);
   bob.parent = fig;
   const k = kit(scene, bob);
-  const head = buildFamily(k, a.family);
+  const kaki = [];
+  const head = buildFamily(k, a.family, kaki);
   const pakai = rapikanAksesori(aksesori);
   buildMember(k, a.member.id, head, accent, new Set(pakai.map((x) => aksesoriById(x).slot)));
   for (const id of pakai) buildAksesori(k, id, head);
   const meshes = bob.getChildMeshes();
   const tinggi = pakai.some((x) => x === "topi-penyihir" || x === "topi-pesta") ? 0.55 : 0;   // papan nama di atas topi
   const height = (head.y + head.r + 0.35 + tinggi) * a.member.scale;
-  return { fig, bob, meshes, height };
+  return { fig, bob, meshes, height, kaki };
 }

@@ -30,6 +30,16 @@ db.exec(`
 
 const SIMPAN_ARENA_MS = 7 * 86400000;
 const MAKS_PESAN = 500;
+const MAKS_AUDIO = 512 * 1024;
+export const MAKS_BODY_SUARA = Math.ceil(MAKS_AUDIO / 3) * 4 + 1024;
+const audioTypes = {
+  "audio/webm": (data) => data.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3])),
+  "audio/ogg": (data) => data.toString("ascii", 0, 4) === "OggS",
+  "audio/mp4": (data) => data.toString("ascii", 4, 8) === "ftyp",
+};
+const kolomPesan = db.prepare("PRAGMA table_info(pesan_keluarga)").all().map((c) => c.name);
+if (!kolomPesan.includes("suara")) db.exec("ALTER TABLE pesan_keluarga ADD COLUMN suara BLOB");
+if (!kolomPesan.includes("tipe_suara")) db.exec("ALTER TABLE pesan_keluarga ADD COLUMN tipe_suara TEXT");
 
 // Dipanggil ruang arena setiap kali anak berhasil mengirim chat.
 export function catatChatArena(childId, isi, preset) {
@@ -51,8 +61,8 @@ function batas(kunci) {
 }
 
 const daftarPesan = (childId) => db.prepare(
-  "SELECT id, dari, isi, dibaca, created_at AS at FROM (SELECT * FROM pesan_keluarga WHERE child_id = ? ORDER BY id DESC LIMIT 100) ORDER BY id",
-).all(childId).map((p) => ({ ...p, dibaca: !!p.dibaca }));
+  "SELECT id, dari, isi, dibaca, created_at AS at, tipe_suara IS NOT NULL AS suara FROM pesan_keluarga WHERE child_id = ? ORDER BY id DESC LIMIT 100",
+).all(childId).reverse().map((p) => ({ ...p, dibaca: !!p.dibaca, suara: !!p.suara }));
 
 // Jumlah pesan yang belum dibaca oleh "untuk" (ortu: pesan dari anak; anak: pesan dari orang tua).
 const belumDibaca = (childId, untuk) => db.prepare(
@@ -61,7 +71,7 @@ const belumDibaca = (childId, untuk) => db.prepare(
 
 // Mengembalikan true bila permintaan ditangani.
 // sebagai=ortu|anak menentukan peran (di perangkat keluarga, orang tua dan anak bisa sama-sama masuk).
-export function handleChat({ m, path, body, url, ortuId, anak, ownChild, send, ApiError }) {
+export function handleChat({ m, path, body, url, ortuId, anak, ownChild, send, sendAudio, ApiError }) {
   if (path[0] !== "chat") return false;
   const sebagai = (m === "GET" ? url.searchParams.get("sebagai") : body.sebagai) === "anak" ? "anak" : "ortu";
   let childId, parentId;
@@ -97,6 +107,12 @@ export function handleChat({ m, path, body, url, ortuId, anak, ownChild, send, A
 
   if (path[1] === "keluarga") {
     if (sebagai === "ortu") childId = ownChild(parentId, m === "GET" ? url.searchParams.get("anak") : body.anak).id;
+    if (path[2] === "suara" && path.length === 4 && m === "GET") {
+      const p = db.prepare("SELECT suara, tipe_suara FROM pesan_keluarga WHERE id = ? AND child_id = ?").get(Number(path[3]), childId);
+      if (!p?.suara) throw new ApiError(404, "Pesan suara tidak ditemukan.");
+      return sendAudio(p.tipe_suara, Buffer.from(p.suara)), true;
+    }
+    if (path.length !== 2) throw new ApiError(404, "Alamat tidak ditemukan.");
     if (m === "GET") {
       // Membuka percakapan berarti pesan dari pihak lain sudah dibaca.
       db.prepare("UPDATE pesan_keluarga SET dibaca = 1 WHERE child_id = ? AND dari = ? AND dibaca = 0").run(childId, sebagai === "ortu" ? "anak" : "ortu");
@@ -104,14 +120,28 @@ export function handleChat({ m, path, body, url, ortuId, anak, ownChild, send, A
     }
     if (m === "POST") {
       if (!batas(`${sebagai}:${childId}`)) throw new ApiError(429, "Pelan-pelan ya, tunggu sebentar sebelum mengirim lagi.");
-      const r = cekPesanKeluarga(body.isi);
-      if (!r.ok) throw new ApiError(400, r.reason);
-      db.prepare("INSERT INTO pesan_keluarga (child_id, dari, isi, created_at) VALUES (?, ?, ?, ?)").run(childId, sebagai, r.text, Date.now());
+      let isi, suara = null, tipe = null;
+      if (body.suara !== undefined) {
+        tipe = body.tipe;
+        if (typeof tipe !== "string" || !Object.hasOwn(audioTypes, tipe) || typeof body.suara !== "string" || !/^[A-Za-z0-9+/]+={0,2}$/.test(body.suara)) {
+          throw new ApiError(400, "Format pesan suara tidak didukung.");
+        }
+        suara = Buffer.from(body.suara, "base64");
+        if (suara.length > MAKS_AUDIO) throw new ApiError(413, "Rekaman terlalu besar.");
+        if (!audioTypes[tipe](suara)) throw new ApiError(400, "Rekaman tidak valid.");
+        isi = "🎙 Pesan suara";
+      } else {
+        const r = cekPesanKeluarga(body.isi);
+        if (!r.ok) throw new ApiError(400, r.reason);
+        isi = r.text;
+      }
+      db.prepare("INSERT INTO pesan_keluarga (child_id, dari, isi, created_at, suara, tipe_suara) VALUES (?, ?, ?, ?, ?, ?)")
+        .run(childId, sebagai, isi, Date.now(), suara, tipe);
       db.prepare(`DELETE FROM pesan_keluarga WHERE child_id = ? AND id NOT IN
                   (SELECT id FROM pesan_keluarga WHERE child_id = ? ORDER BY id DESC LIMIT ${MAKS_PESAN})`).run(childId, childId);
       if (sebagai === "ortu") {
         const nama = db.prepare("SELECT name FROM parents WHERE id = ?").get(parentId)?.name || "orang tua";
-        notify(`a${childId}`, "info", `💬 Pesan dari ${nama}: ${r.text.length > 60 ? r.text.slice(0, 60) + "…" : r.text}`);
+        notify(`a${childId}`, "info", `💬 Pesan dari ${nama}: ${isi.length > 60 ? isi.slice(0, 60) + "…" : isi}`);
       }
       return send(200, { pesan: daftarPesan(childId) }), true;
     }

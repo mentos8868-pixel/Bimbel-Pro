@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { DEFAULT_AVATAR, DEFAULT_ORTU_AVATAR } from "../shared/avatars.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const file = process.env.BIMBEL_DB || join(here, "data", "bimbel.db");
@@ -79,10 +80,14 @@ db.exec(`
 `);
 
 // Kolom avatar (database lama ditingkatkan otomatis).
-for (const [table, def] of [["children", "beruang-putra"], ["parents", "beruang-ayah"]]) {
+for (const [table, def] of [["children", DEFAULT_AVATAR], ["parents", DEFAULT_ORTU_AVATAR]]) {
   if (!db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === "avatar")) {
     db.exec(`ALTER TABLE ${table} ADD COLUMN avatar TEXT NOT NULL DEFAULT '${def}'`);
   }
+}
+
+if (!db.prepare("PRAGMA table_info(parents)").all().some((c) => c.name === "avatar_lama")) {
+  db.exec("BEGIN IMMEDIATE; ALTER TABLE parents ADD COLUMN avatar_lama TEXT; UPDATE parents SET avatar_lama = avatar; COMMIT;");
 }
 
 // Aksesori yang dipakai orang tua (gratis untuk orang tua; dipilih di menu Avatar dashboard orang tua).
