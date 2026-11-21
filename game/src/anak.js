@@ -5,6 +5,7 @@ import { avatarPicker } from "./avatar-picker.js";
 import { avatarSvg } from "./avatar-svg.js";
 import { namaKelas, kurikulumName, negaraName } from "../../shared/negara.js";
 import { SLOT } from "../../shared/aksesori.js";
+import { AURA } from "../../shared/aura.js";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -33,6 +34,9 @@ let ch = { n: 0, terakhir: null, namaOrtu: "Orang tua" };   // ringkasan chat ke
 let chatTimer = 0;
 let uang = null;   // uang saku (diberi orang tua) dan belanja/tabungan (dicatat anak): /api/keuangan/saya
 let yakinBeli = null;
+// Menu Avatar dibagi tiga tab: Karakter, Aksesori (yang sudah dimiliki), Aura (terbuka sesuai level).
+const TAB_AVATAR = [["karakter", "🐻 Karakter"], ["aksesori", "🎀 Aksesori"], ["aura", "✨ Aura"]];
+let tabAvatar = "karakter";
 
 const galat = (t) => { $("galat").textContent = t || ""; $("galat").hidden = !t; };
 const gambarAvatar = (coba) => avatarSvg(anak.avatar, anak.color, {
@@ -41,13 +45,13 @@ const gambarAvatar = (coba) => avatarSvg(anak.avatar, anak.color, {
 });
 
 // ---------- potongan tampilan ----------
-function kepala() {
+function kepala(saldo = false) {
   const persen = Math.round((k.xpLevel / k.xpPerLevel) * 100);
   const aura = k.auraBerikut ? `${esc(k.auraBerikut.nama)} di Level ${k.auraBerikut.level}` : `${esc(k.aura)} (tertinggi)`;
   const info = [anak.kelas ? namaKelas(anak.kelas, anak.kurikulum) : anak.jenjang, kurikulumName(anak.kurikulum), negaraName(anak.negara)].join(" · ");
   return `<section class="panel kepala-anak">
     <span class="ava-besar av-face">${gambarAvatar()}</span>
-    <div class="kepala-isi"><h2>${esc(anak.name)}</h2><span class="muted">${esc(info)}</span>
+    <div class="kepala-isi"><h2 class="nama-baris">${esc(anak.name)}${saldo ? ` <span class="saldo">★ ${toko ? toko.bintang : k.bintang} bintang</span>` : ""}</h2><span class="muted">${esc(info)}</span>
       <div class="level-baris"><span class="lv">Level ${k.level}</span>${bar(persen)}<span class="muted">${k.xpLevel}/${k.xpPerLevel} XP · ${aura}</span></div></div>
   </section>`;
 }
@@ -196,9 +200,17 @@ const ISI = {
       <div class="gelembung" id="gelembung"><p class="muted">Memuat…</p></div>
       <form id="form-chat" class="chat-form"><textarea name="isi" rows="2" maxlength="300" placeholder="Tulis pesan untuk ${esc(ch.namaOrtu)}…"></textarea><button class="primary" type="submit">Kirim</button></form>
       <p class="muted kecil">Chat dengan pemain lain tetap ada di dalam arena.</p></section>`,
-  avatar: () => `${kepala()}
-    <section class="panel"><h3>🐻 Pilih avatar</h3><div id="pilih-avatar"></div><span id="avatar-ok" class="muted" hidden>Avatar tersimpan ✓</span>
-      <p class="muted kecil">Mau hiasan baru? <button class="link" data-ke-hal="toko">Buka Toko Avatar</button></p></section>`,
+  avatar: () => {
+    const memuat = `<p class="muted">Memuat…</p>`;
+    const isi = tabAvatar === "aksesori"
+      ? `<section class="panel"><h3>🎀 Aksesoriku</h3><p class="muted kecil">Pakai atau lepas aksesori yang sudah kamu punya. Aksesori baru bisa dibeli di <button class="link" data-ke-hal="toko">Toko Avatar</button>.</p>${toko ? isiAksesoriku() : memuat}</section>`
+      : tabAvatar === "aura"
+      ? `<section class="panel"><h3>✨ Aura</h3><p class="muted kecil">Aura terbuka saat levelmu naik. Kumpulkan XP di Ruang Pintar untuk membuka aura baru.</p>${toko ? isiAura() : memuat}</section>`
+      : `<section class="panel"><h3>🐻 Pilih karakter</h3><div id="pilih-avatar"></div><span id="avatar-ok" class="muted" hidden>Avatar tersimpan ✓</span></section>`;
+    return `${kepala(true)}
+      <div class="tab-avatar" role="tablist">${TAB_AVATAR.map(([id, t]) => `<button role="tab" aria-selected="${tabAvatar === id}" class="${tabAvatar === id ? "on" : ""}" data-tab-avatar="${id}">${t}</button>`).join("")}</div>
+      ${isi}`;
+  },
   toko: () => `${kepala()}
     <section class="panel"><h3>🛍️ Toko Avatar <span class="saldo">★ ${toko ? toko.bintang : k.bintang} bintang</span></h3>
       <p class="muted">Tukar bintang dari Ruang Pintar dengan aksesori. Aksesori yang dipakai juga terlihat di arena.</p><div id="toko-isi">${toko ? isiToko() : "<p class=\"muted\">Memuat toko…</p>"}</div></section>`,
@@ -219,6 +231,37 @@ function isiToko() {
   }).join("");
 }
 
+// Tab Aksesori: hanya yang sudah dimiliki, dikelompokkan per tempat.
+function isiAksesoriku() {
+  const milik = toko.items.filter((a) => toko.punya.includes(a.id));
+  if (!milik.length) return `<p class="muted">Kamu belum punya aksesori. <button class="link" data-ke-hal="toko">Beli di Toko Avatar</button></p>`;
+  return SLOT.map((sl) => {
+    const items = milik.filter((a) => a.slot === sl.id);
+    if (!items.length) return "";
+    return `<h4>${esc(sl.name)}</h4><div class="toko-grid">${items.map((a) => {
+      const pakai = toko.pakai.includes(a.id);
+      return `<div class="toko-item ${pakai ? "pakai" : ""}"><span class="av-face">${gambarAvatar(a.id)}</span><b>${esc(a.name)}</b>
+        <span class="muted">${pakai ? "Sedang dipakai" : "Disimpan"}</span>
+        <button data-pakai="${a.id}" data-on="${pakai ? 0 : 1}" class="${pakai ? "" : "primary"}">${pakai ? "Lepas" : "Pakai"}</button></div>`;
+    }).join("")}</div>`;
+  }).join("");
+}
+// Tab Aura: semua aura; yang terkunci menunjukkan level yang dibutuhkan.
+function isiAura() {
+  const lv = toko.level;
+  const kartu = (id, nama, terbuka, syarat) => {
+    const pakai = toko.aura === id;
+    const tombol = pakai ? `<button disabled>Dipakai</button>`
+      : terbuka ? `<button class="primary" data-aura="${id}">Pakai</button>`
+      : `<button disabled>🔒 ${syarat}</button>`;
+    const gbr = avatarSvg(anak.avatar, anak.color, { aksesori: toko.pakai, aura: id });
+    return `<div class="toko-item ${pakai ? "pakai" : ""} ${terbuka ? "" : "terkunci"}"><span class="av-face">${gbr}</span><b>${esc(nama)}</b>
+      <span class="muted">${pakai ? "Sedang dipakai" : terbuka ? "Sudah terbuka" : `Terbuka di Level ${syarat.replace("Level ", "")}`}</span>${tombol}</div>`;
+  };
+  return `<p class="muted">Levelmu sekarang: <b>Level ${lv}</b>.</p>
+    <div class="toko-grid">${kartu("", "Tanpa aura", true, "")}${AURA.map((a) => kartu(a.id, a.nama, lv >= a.dari, `Level ${a.dari}`)).join("")}</div>`;
+}
+
 // ---------- menggambar menu ----------
 function gambar() {
   const [judul, sub] = HAL[hal];
@@ -227,9 +270,9 @@ function gambar() {
   $("menu").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.ke === hal));
   clearInterval(chatTimer);
   $("halaman").innerHTML = ISI[hal]();
-  if (hal === "avatar") pasangAvatar();
-  if (hal === "toko" && !toko) {
-    api("GET", "toko").then((j) => { toko = j; if (hal === "toko") gambar(); }).catch((x) => galat(x.message));
+  if (hal === "avatar" && $("pilih-avatar")) pasangAvatar();
+  if ((hal === "toko" || hal === "avatar") && !toko) {
+    api("GET", "toko").then((j) => { toko = j; if (hal === "toko" || hal === "avatar") gambar(); }).catch((x) => galat(x.message));
   }
   if (hal === "chat") pasangChat();
   if (hal === "keuangan") pasangKeuangan();
@@ -329,7 +372,21 @@ $("halaman").addEventListener("click", async (e) => {
   try { tg = await api("POST", `tugas/${b.dataset.sudah}/sudah`); gambar(); }
   catch (x) { galat(x.message); b.disabled = false; }
 });
-// Beli (klik kedua untuk yakin) dan pakai/lepas aksesori di menu Toko Avatar.
+// Tab di menu Avatar, dan memilih aura.
+$("halaman").addEventListener("click", async (e) => {
+  const t = e.target.closest("button[data-tab-avatar]");
+  if (t) { tabAvatar = t.dataset.tabAvatar; galat(""); gambar(); return; }
+  const b = e.target.closest("button[data-aura]");
+  if (!b || b.disabled || !toko) return;
+  galat("");
+  b.disabled = true;
+  try {
+    toko = { ...toko, ...(await api("POST", "toko/aura", { id: b.dataset.aura })) };
+    anak.aura = toko.aura;
+  } catch (x) { galat(x.message); }
+  gambar();
+});
+// Beli (klik kedua untuk yakin) dan pakai/lepas aksesori di menu Toko Avatar dan tab Aksesori.
 $("halaman").addEventListener("click", async (e) => {
   const b = e.target.closest("button[data-beli], button[data-pakai]");
   if (!b || b.disabled || !toko) return;

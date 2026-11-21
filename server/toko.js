@@ -3,7 +3,7 @@
 // bertambah ketika bintang terbaik pada kunci itu naik, jadi mengulang latihan yang sama tidak menambah bintang.
 import { db, today } from "./db.js";
 import { AKSESORI, aksesoriById, rapikanAksesori } from "../shared/aksesori.js";
-import { levelDariXp, auraUntukLevel, auraBerikutnya } from "../shared/aura.js";
+import { levelDariXp, auraUntukLevel, auraBerikutnya, auraDipakai, auraTerbuka, auraById } from "../shared/aura.js";
 
 const XP_MAKS = 1_000_000;   // batas wajar total XP (Level 10.001)
 
@@ -37,11 +37,12 @@ function batasBintang(kunci, now) {
 }
 
 function keadaan(childId) {
-  const c = db.prepare("SELECT bintang, aksesori_punya, aksesori_pakai, xp FROM children WHERE id = ?").get(childId);
-  const level = levelDariXp(c.xp), aura = auraUntukLevel(level), next = auraBerikutnya(level);
+  const c = db.prepare("SELECT bintang, aksesori_punya, aksesori_pakai, xp, aura_pakai FROM children WHERE id = ?").get(childId);
+  const level = levelDariXp(c.xp), aura = auraById(auraDipakai(level, c.aura_pakai)), next = auraBerikutnya(level);
   return {
     bintang: c.bintang, punya: daftar(c.aksesori_punya).filter(aksesoriById), pakai: rapikanAksesori(c.aksesori_pakai),
     xp: c.xp, level, aura: aura ? aura.id : "", auraNama: aura ? aura.nama : "",
+    auraTertinggi: auraUntukLevel(level)?.id || "",
     auraBerikut: next ? { nama: next.nama, level: next.dari } : null,
   };
 }
@@ -107,6 +108,16 @@ export function handleToko({ m, path, body, anak, send, ApiError }) {
     const lain = k.pakai.filter((x) => aksesoriById(x).slot !== a.slot);
     const baru = body.pakai === false ? k.pakai.filter((x) => x !== a.id) : [...lain, a.id];
     db.prepare("UPDATE children SET aksesori_pakai = ? WHERE id = ?").run(rapikanAksesori(baru).join(","), id);
+    return send(200, keadaan(id)), true;
+  }
+
+  // Memilih aura yang dipakai: id aura yang sudah terbuka di levelnya, atau "" untuk tanpa aura.
+  if (m === "POST" && path[0] === "toko" && path[1] === "aura") {
+    const pilih = String(body.id ?? "");
+    const level = levelDariXp(db.prepare("SELECT xp FROM children WHERE id = ?").get(id).xp);
+    if (pilih && !auraTerbuka(level, pilih)) throw new ApiError(403, "Aura ini belum terbuka. Naikkan levelmu dulu.");
+    // Belum ada aura terbuka: simpan "belum memilih" supaya aura pertama nanti langsung terpakai otomatis.
+    db.prepare("UPDATE children SET aura_pakai = ? WHERE id = ?").run(!pilih && !auraUntukLevel(level) ? null : pilih, id);
     return send(200, keadaan(id)), true;
   }
 

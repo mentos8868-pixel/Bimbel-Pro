@@ -98,6 +98,8 @@ for (const [table, def] of [["children", "beruang-putra"], ["parents", "beruang-
   if (!cols.includes("aksesori_pakai")) db.exec("ALTER TABLE children ADD COLUMN aksesori_pakai TEXT NOT NULL DEFAULT ''");
   // XP dari Ruang Pintar; menentukan level dan aura avatar (lihat shared/aura.js).
   if (!cols.includes("xp")) db.exec("ALTER TABLE children ADD COLUMN xp INTEGER NOT NULL DEFAULT 0");
+  // Aura pilihan anak: NULL = otomatis (aura tertinggi yang sudah terbuka), '' = tanpa aura, atau id aura.
+  if (!cols.includes("aura_pakai")) db.exec("ALTER TABLE children ADD COLUMN aura_pakai TEXT");
 }
 
 // Hari dihitung menurut waktu Indonesia Barat (UTC+7).

@@ -5,9 +5,9 @@ import { db, today, lastDays } from "./db.js";
 import { avatarOr, DEFAULT_ORTU_AVATAR } from "../shared/avatars.js";
 import { avatarSvg } from "../shared/avatar-svg.js";
 import { rapikanAksesori } from "../shared/aksesori.js";
-import { levelDariXp, auraUntukLevel } from "../shared/aura.js";
+import { levelDariXp, auraDipakai } from "../shared/aura.js";
 
-const auraAnak = (c) => auraUntukLevel(levelDariXp(c.xp))?.id || "";
+const auraAnak = (c) => auraDipakai(levelDariXp(c.xp), c.aura_pakai);
 import { handleToko } from "./toko.js";
 import { kamarku } from "./kamarku.js";
 import { handleProgres, ringkasBelajar } from "./progres.js";

@@ -37,6 +37,8 @@ a.btn-utama, .btn-utama { background: var(--primary); color: #fff; border-color:
 .mapel-baris .bar { margin-top: 0; }
 .mapel-baris .muted { text-align: right; }
 
+.nama-baris { display: flex; align-items: center; gap: 10px; }
+.nama-baris .saldo { margin-left: 0; font-weight: 600; }
 .saldo { margin-left: auto; background: #fff4d6; color: #7a5200; border-radius: 999px; padding: 3px 12px; font-size: 15px; }
 .toko-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
 .toko-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px; border: 2px solid #eee3d0; border-radius: 14px; text-align: center; background: #fff; }
@@ -44,6 +46,10 @@ a.btn-utama, .btn-utama { background: var(--primary); color: #fff; border-color:
 .toko-item .av-face svg { width: 100%; height: 100%; }
 .toko-item.pakai { border-color: var(--primary); background: #eef6ff; }
 .toko-item button { padding: 6px 12px; font-size: 14px; width: 100%; }
+.toko-item.terkunci .av-face { filter: grayscale(1); opacity: 0.55; }
+.tab-avatar { display: flex; gap: 8px; }
+.tab-avatar button { flex: 1; font-size: 16px; font-weight: 700; padding: 10px 14px; border-radius: 12px; background: #fff; }
+.tab-avatar button.on { background: var(--primary); border-color: var(--primary); color: #fff; }
 .toko-item button.yakin { background: #f2b134; border-color: #f2b134; }
 
 /* Layar sempit (HP) belum jadi fokus: cukup ditumpuk satu kolom. */

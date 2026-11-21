@@ -25,5 +25,16 @@ export const auraById = (id) => AURA.find((x) => x.id === id) || null;
 // Urutan 0 (perunggu) … 4 (pelangi): makin tinggi makin besar dan ramai.
 export const auraUrutan = (id) => AURA.findIndex((x) => x.id === id);
 
+// Aura yang sudah terbuka di level ini (boleh dipilih anak).
+export const auraTerbuka = (level, id) => AURA.some((x) => x.id === id && level >= x.dari);
+
+// Aura yang dipakai: pilihan anak bila masih terbuka, "" bila anak memilih tanpa aura,
+// selain itu (belum memilih) aura tertinggi untuk levelnya.
+export function auraDipakai(level, pilihan) {
+  if (pilihan === "") return "";
+  if (pilihan && auraTerbuka(level, pilihan)) return pilihan;
+  return auraUntukLevel(level)?.id || "";
+}
+
 // Aura berikutnya yang belum didapat (untuk motivasi), atau null bila sudah tertinggi.
 export const auraBerikutnya = (level) => AURA.find((x) => x.dari > level) || null;

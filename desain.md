@@ -185,7 +185,7 @@ Setelah anak masuk (PIN atau kode), ia melihat dashboard ini dulu, bukan langsun
 | **Keuangan** | Uang saku dari orang tua, dompet dan tabungan, ringkasan bulan ini, dan riwayat. Anak mencatat sendiri pemasukan dari luar (mis. hadiah), belanja, menabung, dan ambil tabungan, serta memasang target tabungannya |
 | **Report** | Waktu main 7 hari, medali, riwayat tryout, dan hasil permainan |
 | **Chat** | Chat dengan orang tua. Chat dengan pemain lain tetap di dalam arena |
-| **Avatar** | Pilih avatar dan kemajuan aura |
+| **Avatar** | Saldo bintang di samping nama, lalu tiga tab: **Karakter** (pilih avatar), **Aksesori** (pakai/lepas aksesori yang sudah dimiliki), dan **Aura** (semua aura; yang belum terbuka menunjukkan level yang dibutuhkan, yang sudah terbuka bisa dipilih, atau "Tanpa aura"). Pilihan aura disimpan di server (`children.aura_pakai`, `POST /api/toko/aura`) sehingga juga terlihat di arena; bila anak belum memilih, aura tertinggi untuk levelnya dipakai otomatis |
 | **Toko Avatar** | Menu sendiri (dipisah dari Avatar): tukar bintang dengan aksesori, lalu pakai atau lepas |
 
 ### Data baru di server
