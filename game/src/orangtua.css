@@ -197,3 +197,11 @@ main:has(#dash:not([hidden])) { max-width: 1200px; }
 .uang.keluar { color: var(--error); }
 .uang.tabung, .uang.ambil { color: #b07800; }
 @media (max-width: 720px) { .dua-ortu { grid-template-columns: 1fr; } }
+
+/* Menu Avatar */
+.av-ortu { display: flex; gap: 18px; align-items: center; }
+.av-ortu > .dot { width: 96px; height: 96px; flex: none; display: block; }
+.av-ortu > .dot svg { width: 100%; height: 100%; }
+.av-ortu > div { flex: 1; min-width: 0; }
+.dash .av-edit summary { font-weight: 700; font-size: 18px; cursor: pointer; margin-bottom: 8px; }
+@media (max-width: 720px) { .av-ortu { flex-direction: column; } }

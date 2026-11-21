@@ -111,6 +111,7 @@
           <button data-ke="keuangan">💰 Keuangan</button>
           <button data-ke="chat">💬 Chat <span id="chat-badge" class="badge" hidden></span></button>
           <button data-ke="report">📊 Report</button>
+          <button data-ke="avatar">🐻 Avatar</button>
           <button data-ke="setting">⚙️ Setting</button>
         </nav>
 
@@ -124,6 +125,17 @@
           </div>
 
           <div id="home" class="home-grid" data-hal="home"></div>
+
+          <!-- Avatar orang tua sendiri (dipakai saat bermain di arena). Avatar anak ada di kartu anak di bawah. -->
+          <section class="panel" data-hal="avatar">
+            <h2>Avatar Anda</h2>
+            <p class="muted">Dipakai saat Anda masuk arena dan bermain bersama anak.</p>
+            <div class="av-ortu">
+              <span class="dot av-face" id="ortu-dot"></span>
+              <div id="ortu-avatar-picker"></div>
+            </div>
+            <span id="ortu-av-ok" class="muted" hidden>Avatar tersimpan ✓</span>
+          </section>
 
           <div id="kids"></div>
 
@@ -178,8 +190,8 @@
           <div><h2 class="nama"></h2><span class="muted jenjang"></span></div>
         </header>
 
-        <details class="av-edit" data-hal="setting">
-          <summary>Ganti avatar</summary>
+        <details class="av-edit" data-hal="avatar" open>
+          <summary>Avatar anak</summary>
           <div class="av-edit-picker"></div>
           <span class="av-saved muted" hidden>Avatar tersimpan ✓</span>
         </details>

@@ -171,7 +171,8 @@ Di bagian atas ada pilihan anak (Budi / Liliya), kecuali di menu Home yang menam
 | **Keuangan** | Orang tua **hanya memberi uang saku** (keputusan pengguna 22 November 2026). Anak sendiri mencatat pemasukan dari luar, belanja, menabung, dan mengambil tabungan, serta memasang target tabungan. Orang tua melihat semuanya. Terpisah dari bintang |
 | **Chat** | (1) Chat keluarga: pesan antara orang tua dan anaknya. (2) Riwayat chat arena anak, hanya bisa dibaca |
 | **Report** | Waktu main 7 hari, kemajuan Ruang Pintar per pelajaran, riwayat tryout, medali, dan tugas yang selesai minggu ini |
-| **Setting** | Per anak: kurikulum, kelas, negara, batas waktu, ganti PIN, buat kode masuk, avatar, dan hapus akun anak. Untuk orang tua: nama, avatar, ganti kata sandi, hapus akun |
+| **Avatar** | Ditambahkan 22 November 2026 atas permintaan pengguna: avatar orang tua sendiri (dipakai saat bermain di arena) dan avatar anak yang dipilih |
+| **Setting** | Per anak: kurikulum, kelas, negara, batas waktu, ganti PIN, buat kode masuk, dan hapus akun anak. Untuk orang tua: hapus akun |
 
 ### Dashboard anak (halaman baru, sebelum arena)
 Setelah anak masuk (PIN atau kode), ia melihat dashboard ini dulu, bukan langsung arena. Dari arena ada tombol kembali ke dashboard. Panel Kamarku di arena diganti tombol "Dashboard".

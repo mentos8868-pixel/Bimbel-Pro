@@ -431,10 +431,11 @@ const HAL = {
   keuangan: ["Keuangan", "Uang saku dan tabungan anak."],
   chat: ["Chat", "Pesan keluarga dan riwayat chat arena."],
   report: ["Report", "Waktu bermain dan kemajuan belajar."],
+  avatar: ["Avatar", "Avatar Anda dan avatar anak."],
   setting: ["Setting", "Data anak, batas waktu, PIN, dan akun Anda."],
 };
 // Menu yang isinya per anak (menampilkan pilihan anak di atas).
-const PER_ANAK = new Set(["tugas", "arena", "keuangan", "chat", "report", "setting"]);
+const PER_ANAK = new Set(["tugas", "arena", "keuangan", "chat", "report", "avatar", "setting"]);
 let hal = HAL[location.hash.slice(1)] ? location.hash.slice(1) : "home";
 let anakDipilih = null;
 try { anakDipilih = Number(sessionStorage.getItem("ortu_anak")) || null; } catch { /* abaikan */ }
@@ -475,6 +476,8 @@ function keHal(h, idAnak) {
   window.scrollTo(0, 0);
 }
 $("menu").addEventListener("click", (e) => { const b = e.target.closest("[data-ke]"); if (b) keHal(b.dataset.ke); });
+// Alamat #menu diubah dari luar (tautan, tombol Kembali): pindah menu juga.
+window.addEventListener("hashchange", () => { const h = location.hash.slice(1) || "home"; if (HAL[h] && h !== hal && !$("dash").hidden) keHal(h); });
 $("pilih-anak").addEventListener("click", (e) => { const b = e.target.closest("[data-anak]"); if (b) keHal(hal, Number(b.dataset.anak)); });
 
 // ---------------- menu Tugas ----------------
@@ -736,6 +739,29 @@ function kartuHome(c, soc) {
   return el;
 }
 
+// ---------------- menu Avatar: avatar orang tua ----------------
+// Pemilih dibuat sekali; load() bisa dipanggil berkali-kali (mis. setelah menyimpan pengaturan).
+const WARNA_ORTU = "#5b6b7c";
+let pemilihOrtu = null;
+function pasangAvatarOrtu(avatar) {
+  const dot = $("ortu-dot");
+  dot.innerHTML = avatarSvg(avatar, WARNA_ORTU);
+  if (pemilihOrtu) { pemilihOrtu.set(avatar); return; }
+  let okTimer = 0;
+  pemilihOrtu = avatarPicker($("ortu-avatar-picker"), {
+    value: avatar, accent: WARNA_ORTU,
+    onPick: async (pilih) => {
+      try {
+        await api("POST", "avatar", { avatar: pilih, sebagai: "ortu" });
+        dot.innerHTML = avatarSvg(pilih, WARNA_ORTU);
+        $("ortu-av-ok").hidden = false;
+        clearTimeout(okTimer);
+        okTimer = setTimeout(() => ($("ortu-av-ok").hidden = true), 2000);
+      } catch (x) { alert(x.message); }
+    },
+  });
+}
+
 // ---------------- muat ----------------
 async function load() {
   $("memuat").hidden = false;
@@ -754,6 +780,7 @@ async function load() {
   $("top-nav").hidden = !masuk;
   if (!masuk) return;
   namaOrtu = me.ortu.name;
+  pasangAvatarOrtu(me.ortu.avatar);
   const [{ children }, social, tugas, belum, uang] = await Promise.all([api("GET", "laporan"), api("GET", "teman"), api("GET", "tugas"), api("GET", "chat/belum?sebagai=ortu"), api("GET", "keuangan")]);
   dataTugas = tugas.anak;
   belumDibaca = belum.anak;
