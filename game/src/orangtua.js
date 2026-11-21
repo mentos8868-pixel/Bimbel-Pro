@@ -146,14 +146,40 @@ $("form-masuk").addEventListener("submit", async (e) => {
   } catch (x) { setErr(f, x.message); } finally { busy(f, false); }
 });
 
+// Pilihan berbentuk kartu bergambar (dipakai untuk peran Ayah/Ibu dan jenis anak). Mengembalikan { get, set }.
+function pilihKartu(wrap, opsi, awal, onPick = () => {}) {
+  let nilai = awal;
+  const gambar = () => {
+    wrap.replaceChildren(...opsi.map((o) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "kartu-peran" + (o.id === nilai ? " on" : "");
+      b.setAttribute("aria-pressed", o.id === nilai);
+      b.innerHTML = `<span class="av-face">${avatarSvg(o.avatar, o.warna || "#4f9cf0")}</span><b></b>`;
+      b.querySelector("b").textContent = o.label;
+      b.onclick = () => { nilai = o.id; gambar(); onPick(o.id); };
+      return b;
+    }));
+  };
+  gambar();
+  return { get: () => nilai, set: (v) => { nilai = v; gambar(); } };
+}
+const PILIH_PERAN = [
+  { id: "ayah", label: "Ayah", avatar: "manusia-ayah", warna: "#5b6b7c" },
+  { id: "ibu", label: "Ibu", avatar: "manusia-ibu", warna: "#5b6b7c" },
+];
+const peranDaftar = pilihKartu($("peran-daftar"), PILIH_PERAN, "");
+
 $("form-daftar").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
   setErr(f, "");
+  if (!peranDaftar.get()) return setErr(f, "Pilih dulu: Ayah atau Ibu.");
   if (!f.consent.checked) return setErr(f, "Centang persetujuan orang tua dulu.");
   busy(f, true);
   try {
-    await api("POST", "daftar", { name: f.name.value, email: f.email.value, password: f.password.value, consent: true });
+    await api("POST", "daftar", { name: f.name.value, email: f.email.value, password: f.password.value, consent: true, peran: peranDaftar.get(), kode: f.kode.value });
+    peranDaftar.set("");
     f.reset();
     await load();
   } catch (x) { setErr(f, x.message); } finally { busy(f, false); }
@@ -166,8 +192,13 @@ $("btn-keluar").onclick = async () => {
 
 // ---------------- tambah anak ----------------
 let newColor = COLORS[0];
-const newAvatar = avatarPicker($("avatar-baru"), { accent: newColor, dimiliki: AVATAR_AWAL_ANAK });
-colorPicker($("warna-baru"), newColor, (c) => { newColor = c; newAvatar.setAccent(c); });
+// Anak baru langsung memilih Anak laki-laki atau Anak perempuan (avatar manusia; avatar lain dibeli di Toko).
+const PILIH_ANAK = [
+  { id: AVATAR_AWAL_ANAK[0], label: "Anak laki-laki", avatar: AVATAR_AWAL_ANAK[0] },
+  { id: AVATAR_AWAL_ANAK[1], label: "Anak perempuan", avatar: AVATAR_AWAL_ANAK[1] },
+];
+const newAvatar = pilihKartu($("avatar-baru"), PILIH_ANAK, AVATAR_AWAL_ANAK[0]);
+colorPicker($("warna-baru"), newColor, (c) => { newColor = c; });
 fillKelasNegara($("form-anak"), 0, DEFAULT_NEGARA);
 $("form-anak").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -674,7 +705,7 @@ async function gambarChat() {
     try {
       const { pesan } = await api("GET", `chat/keluarga?sebagai=ortu&anak=${id}`);
       if (!aktif() || versi !== versiMuat) return;
-      const isi = pesan.length ? pesan.map((p) => gelembungChat(p, "ortu", `sebagai=ortu&anak=${id}`, jam)).join("") : `<p class="muted chat-kosong">Belum ada pesan dengan ${nama}.</p>`;
+      const isi = pesan.length ? pesan.map((p) => gelembungChat(p, "ortu", `sebagai=ortu&anak=${id}`, jam, { saya: dataOrtu.id })).join("") : `<p class="muted chat-kosong">Belum ada pesan dengan ${nama}.</p>`;
       if (isi !== isiTerakhir && ![...g.querySelectorAll("audio")].some((audio) => !audio.paused)) {
         const bawah = g.scrollTop + g.clientHeight >= g.scrollHeight - 20;
         g.innerHTML = isi;
@@ -952,6 +983,56 @@ $("avatar-ortu-isi").addEventListener("click", async (e) => {
   } catch (x) { alert(x.message); b.disabled = false; }
 });
 
+// ---------------- Keluarga (menu Setting) ----------------
+// Kepala keluarga dan orang tua kedua punya hak yang sama atas anak-anak. Orang tua kedua bergabung
+// dengan kode undangan (berlaku 24 jam, sekali pakai). Hanya kepala keluarga yang bisa mengeluarkannya.
+let dataKeluarga = { anggota: [], undangan: null, sayaKepala: true };
+const NAMA_PERAN = { ayah: "Ayah", ibu: "Ibu" };
+function gambarKeluarga() {
+  const k = dataKeluarga;
+  const saya = k.anggota.find((a) => a.saya);
+  const pasangan = saya?.peran === "ayah" ? "Ibu" : "Ayah";
+  const baris = k.anggota.map((a) => `<li><span class="av-face kecil-ava">${avatarSvg(a.peran === "ibu" ? "manusia-ibu" : "manusia-ayah", WARNA_ORTU)}</span>
+    <span class="tugas-judul"><b>${esc(a.name)}${a.saya ? " (Anda)" : ""}</b><span class="muted kecil">${NAMA_PERAN[a.peran] || a.peran} · ${esc(a.email)}</span></span>
+    ${a.kepala ? '<span class="lencana">👑 Kepala keluarga</span>' : ""}
+    ${k.sayaKepala && !a.kepala ? `<button class="ghost danger-text" data-keluarkan="${a.id}">Keluarkan</button>` : ""}</li>`).join("");
+  const undang = k.anggota.length >= 2 ? ""
+    : k.undangan
+      ? `<p class="kode-box">Kode undangan untuk ${pasangan}: <strong>${esc(k.undangan.kode)}</strong> — berlaku sampai ${new Date(k.undangan.sampai).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}.
+          ${pasangan} membuka halaman ini, memilih <b>Daftar</b>, memilih "${pasangan}", lalu memasukkan kode ini.</p>
+        <div class="row"><button data-undang>Buat kode baru</button><button class="ghost" data-batal-undang>Batalkan kode</button></div>`
+      : `<p class="muted">Ajak ${pasangan} bergabung supaya bisa mengurus anak-anak bersama: tugas, uang saku, chat, dan pengaturan.</p>
+        <div><button class="primary" data-undang>➕ Undang ${pasangan}</button></div>`;
+  $("keluarga-box").innerHTML = `<h2>👪 Keluarga</h2>
+    <ul class="tugas-list">${baris}</ul>
+    ${undang}
+    <label class="peran-saya">Peran saya
+      <select id="peran-saya">${Object.entries(NAMA_PERAN).map(([id, n]) => `<option value="${id}" ${saya?.peran === id ? "selected" : ""}>${n}</option>`).join("")}</select>
+    </label>
+    <p class="error" hidden></p>`;
+  $("hapus-akun-teks").textContent = k.sayaKepala
+    ? "Anda kepala keluarga: seluruh keluarga ikut terhapus, termasuk akun anak, laporan, riwayat permainan, dan akun pasangan Anda. Ini permanen dan tidak bisa dikembalikan."
+    : "Hanya akun Anda yang terhapus. Anak-anak dan data keluarga tetap ada dan diurus kepala keluarga.";
+  $("peran-saya").onchange = (e) => kirimKeluarga("PATCH", "keluarga/peran", { peran: e.target.value });
+}
+async function kirimKeluarga(metode, alamat, isi) {
+  setErr($("keluarga-box"), "");
+  try { dataKeluarga = await api(metode, alamat, isi); }
+  catch (x) { gambarKeluarga(); return setErr($("keluarga-box"), x.message); }
+  gambarKeluarga();
+}
+$("keluarga-box").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.hasAttribute("data-undang")) return kirimKeluarga("POST", "keluarga/undang");
+  if (b.hasAttribute("data-batal-undang")) return kirimKeluarga("DELETE", "keluarga/undang");
+  if (b.dataset.keluarkan) {
+    const nama = b.closest("li").querySelector("b").textContent;
+    if (!confirm(`Keluarkan ${nama} dari keluarga? Akunnya tetap ada, tetapi tidak bisa lagi mengurus anak-anak.`)) return;
+    return kirimKeluarga("POST", `keluarga/anggota/${b.dataset.keluarkan}/keluarkan`);
+  }
+});
+
 // ---------------- muat ----------------
 async function load() {
   $("memuat").hidden = false;
@@ -971,12 +1052,14 @@ async function load() {
   if (!masuk) { clearInterval(chatTimer); bersihkanSuara?.(); bersihkanSuara = null; return; }
   namaOrtu = me.ortu.name;
   dataOrtu = { ...me.ortu, aksesori: me.ortu.aksesori || [] };
-  const [{ children }, social, tugas, belum, uang, hadiah] = await Promise.all([api("GET", "laporan"), api("GET", "teman"), api("GET", "tugas"), api("GET", "chat/belum?sebagai=ortu"), api("GET", "keuangan"), api("GET", "hadiah")]);
+  const [{ children }, social, tugas, belum, uang, hadiah, keluarga] = await Promise.all([api("GET", "laporan"), api("GET", "teman"), api("GET", "tugas"), api("GET", "chat/belum?sebagai=ortu"), api("GET", "keuangan"), api("GET", "hadiah"), api("GET", "keluarga")]);
   dataTugas = tugas.anak;
   kuotaBintangTugas = tugas.kuotaBintang;
   belumDibaca = belum.anak;
   dataUang = uang.anak;
   dataHadiah = hadiah;
+  dataKeluarga = keluarga;
+  gambarKeluarga();
   const byId = Object.fromEntries(social.children.map((s) => [s.childId, s]));
   $("kids").replaceChildren(...children.map((c) => {
     const el = renderKid(c, byId[c.id]);

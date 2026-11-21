@@ -71,6 +71,8 @@
 
         <form id="form-daftar" class="panel" hidden>
           <h2>Buat akun orang tua</h2>
+          <div class="label">Saya adalah</div>
+          <div class="pilih-peran" id="peran-daftar"></div>
           <label>Nama (ditampilkan ke anak, misalnya "Bunda Sari") <input name="name" maxlength="40" required /></label>
           <label>Email <input type="email" name="email" autocomplete="email" required /></label>
           <label>Kata sandi (minimal 8 karakter)
@@ -79,7 +81,7 @@
           <details class="privacy">
             <summary>Data apa yang disimpan?</summary>
             <ul>
-              <li>Orang tua: nama, email, dan kata sandi (disimpan dalam bentuk acak, tidak bisa dibaca).</li>
+              <li>Orang tua: nama, email, kata sandi (disimpan dalam bentuk acak, tidak bisa dibaca), peran (Ayah/Ibu), dan keterkaitan dengan pasangan dalam satu keluarga.</li>
               <li>Anak: nama panggilan, jenjang, avatar beserta warnanya, dan PIN (disimpan dalam bentuk acak).</li>
               <li>Kegiatan anak: lama bermain per hari, hasil permainan, kemajuan belajar, dan tugas yang Anda berikan beserta statusnya, untuk laporan di halaman ini.</li>
               <li>Chat keluarga antara Anda dan anak (500 pesan terakhir per anak), dan chat yang dikirim anak di arena (hanya 7 hari, lalu dihapus otomatis) supaya bisa Anda baca di menu Chat.</li>
@@ -87,6 +89,11 @@
               <li>Tidak ada nama lengkap, sekolah, alamat, foto, atau lokasi anak.</li>
               <li>Orang tua bisa menghapus akun anak atau seluruh akun kapan saja, dan semua datanya ikut terhapus.</li>
             </ul>
+          </details>
+          <details class="kode-undangan">
+            <summary>Diundang pasangan? Masukkan kode undangan</summary>
+            <p class="muted">Tanpa kode, Anda menjadi <b>kepala keluarga</b> dan nanti bisa mengundang pasangan dari menu Setting. Dengan kode dari pasangan, Anda bergabung ke keluarganya dan bisa mengurus anak-anak yang sama.</p>
+            <input name="kode" maxlength="8" autocomplete="off" placeholder="Contoh: 2XF65T" class="kode-input" />
           </details>
           <label class="check">
             <input type="checkbox" name="consent" />
@@ -135,6 +142,9 @@
           <div id="keuangan-isi" class="tugas-isi" data-hal="keuangan"></div>
           <div id="chat-isi" class="chat-isi" data-hal="chat"></div>
 
+        <!-- Keluarga: kepala keluarga, orang tua kedua (lewat kode undangan), dan peran Ayah/Ibu -->
+        <section id="keluarga-box" class="panel" data-hal="setting"></section>
+
         <form id="form-anak" class="panel" data-hal="setting">
           <h2>Tambah akun anak</h2>
           <div class="grid2">
@@ -156,15 +166,15 @@
               <div class="colors" id="warna-baru"></div>
             </div>
           </div>
-          <div class="label">Avatar anak (satu keluarga: ayah, ibu, anak perempuan, anak laki-laki)</div>
-          <div id="avatar-baru"></div>
+          <div class="label">Anak ini</div>
+          <div class="pilih-peran" id="avatar-baru"></div>
           <p class="error" hidden></p>
           <button class="primary" type="submit">Tambah anak</button>
         </form>
 
         <details class="panel danger" data-hal="setting">
           <summary>Hapus akun saya</summary>
-          <p>Semua akun anak, laporan, dan riwayat permainan akan terhapus permanen dan tidak bisa dikembalikan.</p>
+          <p id="hapus-akun-teks">Semua akun anak, laporan, dan riwayat permainan akan terhapus permanen dan tidak bisa dikembalikan.</p>
           <form id="form-hapus-akun" class="row">
             <input type="password" name="password" placeholder="Kata sandi" autocomplete="current-password" required />
             <button class="danger-btn" type="submit">Hapus permanen</button>

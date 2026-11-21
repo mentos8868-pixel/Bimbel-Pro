@@ -24,13 +24,14 @@ Lalu buka:
 
 ## Cara memakai akun
 
-1. **Orang tua** membuka dashboard, lalu mendaftar (nama, email, kata sandi, dan centang persetujuan data anak).
-2. Di dashboard, orang tua **menambah akun anak**: nama panggilan, jenjang, warna avatar, dan PIN 4 angka.
-3. Anak masuk dengan salah satu cara berikut:
+1. **Orang tua** membuka dashboard, lalu mendaftar: memilih **Ayah** atau **Ibu**, mengisi nama, email, kata sandi, dan mencentang persetujuan data anak. Yang mendaftar pertama menjadi **kepala keluarga**.
+2. Pasangan bisa bergabung: kepala keluarga menekan **Undang Ibu/Ayah** di menu Setting dan mendapat kode 6 huruf (berlaku 24 jam). Pasangan mendaftar seperti biasa, memilih perannya, lalu mengisi kode itu. Kedua orang tua punya hak yang sama atas anak-anak; hanya kepala keluarga yang bisa mengeluarkan pasangan atau menghapus seluruh keluarga.
+3. Di dashboard, orang tua **menambah akun anak**: nama panggilan, kelas, pilihan **Anak laki-laki** atau **Anak perempuan**, warna, dan PIN 4 angka.
+4. Anak masuk dengan salah satu cara berikut:
    - **Perangkat keluarga** (orang tua sudah masuk di browser itu): buka arena, pilih nama anak, lalu masukkan PIN.
    - **Perangkat anak sendiri**: orang tua menekan "Buat kode masuk" di dashboard. Di perangkat anak, pilih "Saya anak: pakai kode masuk" lalu ketik kodenya. Kode berlaku 15 menit dan hanya sekali pakai.
-4. Orang tua juga bisa **main sebagai orang tua**: pilih tingkat soal, lalu ajak anak bermain lewat kode meja.
-5. **Tanpa akun** (mode tamu), pemain hanya bisa berjalan di arena dan melawan bot.
+5. Orang tua juga bisa **main sebagai orang tua**: pilih tingkat soal, lalu ajak anak bermain lewat kode meja.
+6. **Tanpa akun** (mode tamu), pemain hanya bisa berjalan di arena dan melawan bot.
 
 ## Isi folder
 

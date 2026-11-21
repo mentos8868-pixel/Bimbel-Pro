@@ -207,3 +207,18 @@ Setelah anak masuk (PIN atau kode), ia melihat dashboard ini dulu, bukan langsun
 2. **Tugas**: membuat, menandai, dan menyetujui tugas, serta bintang hadiah.
 3. **Chat**: chat keluarga, lalu riwayat chat arena untuk orang tua.
 4. **Keuangan**: setelah isinya dipastikan.
+
+---
+
+## 9. Keluarga: kepala keluarga, Ayah dan Ibu
+
+Dibangun 22 November 2026 atas permintaan pengguna.
+
+- **Daftar:** pendaftar memilih **Ayah** atau **Ibu** (kartu bergambar; avatar awal `manusia-ayah` / `manusia-ibu`). Tanpa kode undangan, ia menjadi **kepala keluarga** (`parents.kepala_id` kosong).
+- **Orang tua kedua:** kepala keluarga (atau anggota) membuat **kode undangan** 6 huruf di Setting → Keluarga (`POST /api/keluarga/undang`, tabel `undangan_ortu`, berlaku 24 jam, sekali pakai). Pasangan mendaftar dengan email dan kata sandinya sendiri, memilih peran yang belum terisi, lalu mengisi kode; `kepala_id` diisi id kepala keluarga. Satu keluarga paling banyak dua orang tua (satu Ayah, satu Ibu).
+- **Hak:** sama persis untuk kedua orang tua (keputusan pengguna): anak, tugas, hadiah, uang saku, chat, pengaturan, tambah dan hapus anak. Semua data anak tetap atas nama kepala keluarga (`children.parent_id`); di server, `keluargaId` dipakai untuk data anak dan `ortuSaya` untuk hal pribadi (avatar, aksesori, hapus akun saya).
+- **Khusus kepala keluarga:** mengeluarkan orang tua kedua (`POST /api/keluarga/anggota/:id/keluarkan`; akunnya tetap ada tetapi tidak terhubung lagi, dan sesinya diakhiri) dan menghapus seluruh keluarga. Orang tua kedua yang menghapus akunnya hanya menghapus akunnya sendiri.
+- **Peran** bisa diganti di Setting (`PATCH /api/keluarga/peran`), asal tidak sama dengan pasangan.
+- **Chat keluarga** mencatat orang tua pengirim (`pesan_keluarga.ortu_id`): pesan pasangan tampil di sisi kiri beserta namanya, anak melihat nama Ayah/Ibu di atas pesan, dan judul chat anak menampilkan nama keduanya. Pemberitahuan uang saku dan chat ke anak memakai nama orang tua yang mengirim.
+- **Tambah anak:** langsung memilih **Anak laki-laki** atau **Anak perempuan** (avatar `manusia-putra` / `manusia-putri`).
+- Akun lama otomatis menjadi kepala keluarga dengan peran Ayah; perannya bisa diganti di Setting.

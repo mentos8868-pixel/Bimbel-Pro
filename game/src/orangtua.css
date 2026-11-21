@@ -251,3 +251,18 @@ main:has(#dash:not([hidden])) { max-width: 1200px; }
 .toko-item .av-face svg { width: 100%; height: 100%; }
 .toko-item.pakai { border-color: var(--primary); background: #eef6ff; }
 .toko-item button { width: 100%; padding: 6px 12px; font-size: 14px; }
+
+/* Pilihan peran (Ayah/Ibu) dan jenis anak, bagian Keluarga */
+.pilih-peran { display: flex; gap: 10px; }
+.kartu-peran { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px; border: 2px solid var(--border); border-radius: 14px; background: #fff; }
+.kartu-peran .av-face { width: 72px; height: 72px; display: block; }
+.kartu-peran .av-face svg { width: 100%; height: 100%; }
+.kartu-peran.on { border-color: var(--primary); background: #eef6ff; color: #1d4f91; }
+.kode-undangan summary { cursor: pointer; font-weight: 700; color: var(--primary); }
+.kode-undangan p { margin: 6px 0; }
+.kode-input { text-transform: uppercase; letter-spacing: 3px; font-weight: 700; }
+.kecil-ava { width: 40px; height: 40px; flex: none; display: block; }
+.kecil-ava svg { width: 100%; height: 100%; }
+.lencana { background: #fff4d6; color: #7a5200; border-radius: 999px; padding: 2px 10px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.peran-saya { max-width: 240px; }
+.gel-nama { margin-bottom: 2px; }

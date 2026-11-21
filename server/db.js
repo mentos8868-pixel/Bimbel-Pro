@@ -95,6 +95,19 @@ if (!db.prepare("PRAGMA table_info(parents)").all().some((c) => c.name === "akse
   db.exec("ALTER TABLE parents ADD COLUMN aksesori_pakai TEXT NOT NULL DEFAULT ''");
 }
 
+// Keluarga: satu kepala keluarga (Ayah atau Ibu) memegang data anak. Orang tua kedua ditautkan lewat
+// kepala_id (NULL = kepala keluarga) dan bergabung dengan kode undangan. Peran: ayah | ibu.
+{
+  const cols = db.prepare("PRAGMA table_info(parents)").all().map((c) => c.name);
+  if (!cols.includes("peran")) db.exec("ALTER TABLE parents ADD COLUMN peran TEXT NOT NULL DEFAULT 'ayah'");
+  if (!cols.includes("kepala_id")) db.exec("ALTER TABLE parents ADD COLUMN kepala_id INTEGER REFERENCES parents(id) ON DELETE CASCADE");
+  db.exec(`CREATE TABLE IF NOT EXISTS undangan_ortu (
+    kode TEXT PRIMARY KEY,
+    kepala_id INTEGER NOT NULL REFERENCES parents(id) ON DELETE CASCADE,
+    expires_at INTEGER NOT NULL
+  )`);
+}
+
 // Kolom negara dan kelas anak (diisi orang tua; 0 = kelas belum diisi).
 {
   const cols = db.prepare("PRAGMA table_info(children)").all().map((c) => c.name);

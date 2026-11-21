@@ -11,8 +11,12 @@ export function kotakPesanChat(nama) {
     ${panelSuara}`;
 }
 
-export function gelembungChat(pesan, sebagai, query, formatWaktu) {
-  const milikSaya = pesan.dari === sebagai;
+// opsi.saya = id orang tua yang sedang membuka (keluarga bisa punya Ayah dan Ibu): pesan orang tua lain
+// tampil di sisi kiri beserta namanya. Anak melihat nama orang tua pengirim di atas pesannya.
+export function gelembungChat(pesan, sebagai, query, formatWaktu, opsi = {}) {
+  const pesanOrtuLain = sebagai === "ortu" && pesan.dari === "ortu" && opsi.saya != null && pesan.ortuId != null && pesan.ortuId !== opsi.saya;
+  const milikSaya = pesan.dari === sebagai && !pesanOrtuLain;
+  const nama = !milikSaya && pesan.dari === "ortu" && pesan.nama ? `<span class="muted kecil gel-nama">${esc(pesan.nama)}</span>` : "";
   const isi = pesan.suara ? pemutarSuara(pesan, query) : esc(pesan.isi).replace(/\n/g, "<br>");
-  return `<div class="gel ${milikSaya ? "saya" : "dia"}"><div>${isi}</div><span class="muted kecil">${formatWaktu(pesan.at)}${milikSaya && pesan.dibaca ? " · dibaca" : ""}</span></div>`;
+  return `<div class="gel ${milikSaya ? "saya" : "dia"}">${nama}<div>${isi}</div><span class="muted kecil">${formatWaktu(pesan.at)}${milikSaya && pesan.dibaca ? " · dibaca" : ""}</span></div>`;
 }

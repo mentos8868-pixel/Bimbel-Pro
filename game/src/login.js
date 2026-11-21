@@ -1,8 +1,7 @@
 // Layar masuk: anak (kode masuk atau PIN di perangkat keluarga) atau orang tua. Tanpa akun tidak bisa masuk.
 import { api } from "./api.js";
-import { avatarPicker } from "./avatar-picker.js";
 import { avatarSvg } from "./avatar-svg.js";
-import { AVATAR_AWAL_ORTU, DEFAULT_ORTU_AVATAR } from "../../shared/avatars.js";
+import { DEFAULT_ORTU_AVATAR } from "../../shared/avatars.js";
 
 const $ = (id) => document.getElementById(id);
 const box = () => $("login");
@@ -31,27 +30,9 @@ export function setupLogin(onStart) {
   let me = null;
   let pinChild = null;
   let ortuLevel = "SD";
-  // Avatar disimpan langsung saat dipilih: orang tua (sebagai=ortu) atau anak sendiri (sebagai=anak).
-  // Orang tua juga tetap bisa mengganti avatar anak di dashboard.
-  const save = (body) => api("POST", "avatar", body).catch(() => {});
-  const ortuPicker = avatarPicker($("ortu-avatar"), {
-    value: DEFAULT_ORTU_AVATAR, accent: "#5b6b7c", dimiliki: AVATAR_AWAL_ORTU,
-    onPick: (avatar) => { if (me?.ortu) { me.ortu.avatar = avatar; save({ avatar, sebagai: "ortu" }); } },
-  });
-  let okTimer = 0;
-  const anakPicker = avatarPicker($("anak-avatar"), {
-    onPick: async (avatar) => {
-      if (!me?.anak) return;
-      try {
-        await api("POST", "avatar", { avatar, sebagai: "anak" });
-        me.anak.avatar = avatar;
-        $("siap-avatar").innerHTML = avatarSvg(avatar, me.anak.color, { aksesori: me.anak.aksesori, aura: me.anak.aura });
-        $("anak-avatar-ok").hidden = false;
-        clearTimeout(okTimer);
-        okTimer = setTimeout(() => ($("anak-avatar-ok").hidden = true), 2000);
-      } catch (x) { err("siap", x.message); }
-    },
-  });
+  // Avatar tidak dipilih di sini lagi: layar masuk menampilkan avatar yang dipilih di dashboard
+  // (menu Avatar orang tua / anak), lengkap dengan aksesori. Gantinya lewat tautan ke dashboard.
+  const WARNA_ORTU = "#5b6b7c";
 
   const go = (step) => show(step);
   const refresh = async () => {
@@ -69,10 +50,6 @@ export function setupLogin(onStart) {
       $("siap-judul").textContent = `Halo, ${me.anak.name}!`;
       const sisa = me.anak.limitMin ? Math.max(0, me.anak.limitMin - me.anak.usedMin) : null;
       $("siap-avatar").innerHTML = avatarSvg(me.anak.avatar, me.anak.color, { aksesori: me.anak.aksesori, aura: me.anak.aura });
-      anakPicker.setAccent(me.anak.color);
-      anakPicker.setDimiliki(me.anak.avatarPunya);
-      anakPicker.set(me.anak.avatar);
-      $("anak-avatar-ok").hidden = true;
       $("siap-info").textContent = `${me.anak.jenjang}` + (sisa !== null ? ` · sisa waktu bermain hari ini ${sisa} menit` : "");
       // Langsung masuk arena. Bila gagal (mis. waktu bermain habis), tampilkan layar siap beserta pesannya.
       try {
@@ -86,8 +63,7 @@ export function setupLogin(onStart) {
       return;
     }
     if (me.ortu) {
-      ortuPicker.setDimiliki(me.ortu.avatarPunya || AVATAR_AWAL_ORTU);
-      ortuPicker.set(me.ortu.avatar || DEFAULT_ORTU_AVATAR);
+      $("ortu-avatar").innerHTML = avatarSvg(me.ortu.avatar || DEFAULT_ORTU_AVATAR, WARNA_ORTU, { aksesori: me.ortu.aksesori || [] });
       return renderFamily();
     }
     go("pilih");
@@ -152,7 +128,7 @@ export function setupLogin(onStart) {
     }
     if (act === "main-ortu") {
       box().hidden = true;
-      onStart({ role: "ortu", name: me.ortu.name, jenjang: "Orang tua", gameJenjang: ortuLevel, color: "#5b6b7c", avatar: ortuPicker.get(), aksesori: (me.ortu.aksesori || []).join(",") }, "ortu");
+      onStart({ role: "ortu", name: me.ortu.name, jenjang: "Orang tua", gameJenjang: ortuLevel, color: WARNA_ORTU, avatar: me.ortu.avatar || DEFAULT_ORTU_AVATAR, aksesori: (me.ortu.aksesori || []).join(",") }, "ortu");
     }
   });
 
