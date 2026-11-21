@@ -14,6 +14,7 @@ import { handleProgres, ringkasBelajar } from "./progres.js";
 import { handleTugas } from "./tugas.js";
 import { handleChat } from "./chat.js";
 import { handleKeuangan } from "./keuangan.js";
+import { handleHadiah } from "./hadiah.js";
 import { negaraOr, isNegara, jenjangDariKelas } from "../shared/negara.js";
 import { parentView, parentDecide, unblock, purgeUid, notify, kick } from "./social.js";
 import { sendMail, APP_URL } from "./mailer.js";
@@ -552,6 +553,9 @@ export async function handleApi(req, res) {
 
     // --- keuangan anak: uang saku dan tabungan (diisi orang tua, anak hanya melihat) ---
     if (handleKeuangan({ m, path, body, ortuId: ortu?.parent_id ?? null, anak, ownChild, send, ApiError })) return true;
+
+    // --- hadiah tukar bintang (orang tua membuat, anak menukar, orang tua menyetujui) ---
+    if (handleHadiah({ m, path, body, ortuId: ortu?.parent_id ?? null, anak, send, ApiError })) return true;
 
     // --- kemajuan Ruang Pintar (anak) ---
     if (handleProgres({ m, path, body, anak, send, ApiError })) return true;

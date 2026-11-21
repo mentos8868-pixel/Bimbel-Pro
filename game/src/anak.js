@@ -33,6 +33,7 @@ let tg = null;     // tugas dari orang tua: /api/tugas/saya
 let ch = { n: 0, terakhir: null, namaOrtu: "Orang tua" };   // ringkasan chat keluarga: /api/chat/belum
 let chatTimer = 0;
 let uang = null;   // uang saku (diberi orang tua) dan belanja/tabungan (dicatat anak): /api/keuangan/saya
+let hd = null;     // hadiah tukar bintang dari orang tua: /api/hadiah/saya
 let yakinBeli = null;
 // Menu Avatar dibagi tiga tab: Karakter, Aksesori (yang sudah dimiliki), Aura (terbuka sesuai level).
 const TAB_AVATAR = [["karakter", "🐻 Karakter"], ["aksesori", "🎀 Aksesori"], ["aura", "✨ Aura"]];
@@ -165,7 +166,8 @@ const ISI = {
         <div class="row"><button class="primary" type="submit">${uang?.target ? "Ubah target" : "Pasang target"}</button>${uang?.target ? `<button type="button" class="ghost" id="hapus-targetku">Hapus target</button>` : ""}</div></form>
     </div>
     ${uangSakuku(true)}
-    <p class="muted kecil">Ini hanya catatan, bukan uang sungguhan di aplikasi. Bintang tetap untuk Toko Avatar.</p>`;
+    ${tukarBintang()}
+    <p class="muted kecil">Ini hanya catatan, bukan uang sungguhan di aplikasi.</p>`;
   },
   tugas: () => `<div class="tiga">
       <div class="kotak"><span class="judul">✅ Hari ini</span><span class="besar">${tg ? `${tg.hariIni.disetujui} / ${tg.hariIni.total}` : "–"}</span><span class="kecil">tugas disetujui orang tua</span></div>
@@ -343,6 +345,41 @@ function pasangAvatar() {
   });
 }
 // Menu Keuangan: mencatat belanja/menabung/ambil tabungan, memasang target, menghapus catatan sendiri.
+// Hadiah dari orang tua yang bisa ditukar dengan bintang. Bintang berkurang setelah orang tua menyetujui.
+function tukarBintang() {
+  if (!hd) return "";
+  const status = { menunggu: "⏳ menunggu orang tua", disetujui: "✔ disetujui", ditolak: "✕ belum disetujui", batal: "↩ dibatalkan" };
+  const menunggu = hd.riwayat.filter((t) => t.status === "menunggu");
+  const lain = hd.riwayat.filter((t) => t.status !== "menunggu").slice(0, 5);
+  return `<section class="panel"><h3>🎁 Tukar bintang <span class="saldo">★ ${hd.bisaDipakai} bisa dipakai</span></h3>
+    ${hd.ditahan ? `<p class="muted kecil">${hd.ditahan} bintang sedang ditahan untuk penukaran yang menunggu.</p>` : ""}
+    ${hd.hadiah.length ? `<div class="hadiah-grid">${hd.hadiah.map((h) => {
+      const cukup = hd.bisaDipakai >= h.bintang;
+      return `<div class="hadiah-item"><span class="ikon">${h.rupiah ? "💵" : "🎁"}</span><b>${esc(h.nama)}</b>
+        <span class="muted">${h.bintang} ★ → ${h.rupiah ? rp(h.rupiah) : "hadiah"}</span>
+        <button class="${cukup ? "primary" : ""}" data-tukar="${h.id}" ${cukup ? "" : "disabled"}>${cukup ? "Tukar" : `Kurang ${h.bintang - hd.bisaDipakai} ★`}</button></div>`;
+    }).join("")}</div>` : `<p class="muted">Orang tuamu belum membuat hadiah. Kumpulkan bintang dulu, ya!</p>`}
+    ${menunggu.length ? `<h4>Menunggu orang tua</h4><ul class="daftar">${menunggu.map((t) => `<li><span class="cek">⏳</span><span>${esc(t.nama)} <span class="muted">· ${t.bintang} ★</span></span><button class="ghost kecil" data-batal-tukar="${t.id}">Batalkan</button></li>`).join("")}</ul>` : ""}
+    ${lain.length ? `<h4>Riwayat</h4><ul class="daftar">${lain.map((t) => `<li><span class="cek">🎁</span><span>${esc(t.nama)} <span class="muted">· ${t.bintang} ★</span></span><span class="muted">${status[t.status] || t.status}</span></li>`).join("")}</ul>` : ""}
+  </section>`;
+}
+$("halaman").addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-tukar], button[data-batal-tukar]");
+  if (!b || b.disabled) return;
+  galat("");
+  try {
+    if (b.dataset.tukar) {
+      const h = hd.hadiah.find((x) => String(x.id) === b.dataset.tukar);
+      if (!confirm(`Tukar ${h.bintang} bintang dengan "${h.nama}"? Orang tuamu akan menyetujui dulu.`)) return;
+      b.disabled = true;
+      hd = await api("POST", `hadiah/${b.dataset.tukar}/tukar`);
+    } else {
+      b.disabled = true;
+      hd = await api("POST", `hadiah/tukar/${b.dataset.batalTukar}/batal`);
+    }
+    gambar();
+  } catch (x) { galat(x.message); b.disabled = false; }
+});
 function pasangKeuangan() {
   const kirim = async (form, fn) => {
     galat("");
@@ -424,6 +461,7 @@ async function muat() {
   try { k = await api("GET", "kamarku"); } catch (x) { $("memuat").hidden = false; $("memuat").textContent = x.message; return; }
   tg = await api("GET", "tugas/saya").catch(() => null);
   uang = await api("GET", "keuangan/saya").catch(() => null);
+  hd = await api("GET", "hadiah/saya").catch(() => null);
   ch = await api("GET", "chat/belum?sebagai=anak").catch(() => ch);
   // Bintang bisa bertambah saat orang tua menyetujui tugas: segarkan ringkasan sesekali.
   setInterval(async () => {
@@ -433,6 +471,8 @@ async function muat() {
     if (k2) k = k2;
     if (tg2) tg = tg2;
     if (u2) { if (JSON.stringify(u2) !== JSON.stringify(uang)) beda = true; uang = u2; }
+    const h2 = await api("GET", "hadiah/saya").catch(() => null);
+    if (h2) { if (JSON.stringify(h2) !== JSON.stringify(hd)) beda = true; hd = h2; }
     if (ch2 && hal !== "chat") ch = ch2;
     if (beda && !["avatar", "toko", "chat", "keuangan"].includes(hal)) gambar(); else tandaChat();
   }, 30000);

@@ -431,11 +431,11 @@ const HAL = {
   keuangan: ["Keuangan", "Uang saku dan tabungan anak."],
   chat: ["Chat", "Pesan keluarga dan riwayat chat arena."],
   report: ["Report", "Waktu bermain dan kemajuan belajar."],
-  avatar: ["Avatar", "Avatar Anda dan avatar anak."],
+  avatar: ["Avatar", "Avatar Anda sendiri, dipakai saat bermain di arena."],
   setting: ["Setting", "Data anak, batas waktu, PIN, dan akun Anda."],
 };
 // Menu yang isinya per anak (menampilkan pilihan anak di atas).
-const PER_ANAK = new Set(["tugas", "arena", "keuangan", "chat", "report", "avatar", "setting"]);
+const PER_ANAK = new Set(["tugas", "arena", "keuangan", "chat", "report", "setting"]);
 let hal = HAL[location.hash.slice(1)] ? location.hash.slice(1) : "home";
 let anakDipilih = null;
 try { anakDipilih = Number(sessionStorage.getItem("ortu_anak")) || null; } catch { /* abaikan */ }
@@ -697,12 +697,74 @@ function gambarKeuangan() {
       gambarKeuangan();
     } catch (x) { setErr(fu, x.message); busy(fu, false); }
   };
+  gambarHadiah(box, nama);
 }
+
+// ---------------- Hadiah tukar bintang (di menu Keuangan) ----------------
+// Daftar hadiah berlaku untuk semua anak. Penukaran per anak menunggu persetujuan orang tua;
+// bintang baru berkurang saat disetujui, dan hadiah uang otomatis tercatat sebagai uang saku masuk.
+let dataHadiah = { hadiah: [], anak: {} };
+const STATUS_TUKAR = { menunggu: ["⏳", "menunggu", "tunggu"], disetujui: ["✔", "disetujui", "ok"], ditolak: ["✕", "ditolak", "ulang"], batal: ["↩", "dibatalkan anak", ""] };
+function gambarHadiah(box, nama) {
+  const a = dataHadiah.anak[anakDipilih] || { bintang: 0, riwayat: [] };
+  const menunggu = a.riwayat.filter((t) => t.status === "menunggu");
+  const lain = a.riwayat.filter((t) => t.status !== "menunggu").slice(0, 8);
+  const harga = (h) => `${h.bintang} ⭐ → ${h.rupiah ? rp(h.rupiah) : "hadiah bukan uang"}`;
+  box.insertAdjacentHTML("beforeend", `
+    <section class="panel"><h2>🎁 Hadiah tukar bintang <span class="saldo-ortu">${nama} punya ${a.bintang} ⭐</span></h2>
+      <p class="muted">Anak menukar bintang dengan hadiah yang Anda buat. Bintang baru berkurang setelah Anda setujui; hadiah uang otomatis tercatat sebagai uang saku masuk.</p>
+      <h3>Menunggu persetujuan</h3>
+      <ul class="tugas-list">${menunggu.length ? menunggu.map((t) => `<li class="approval"><span>🎁 <b>${esc(t.nama)}</b> · ${t.bintang} ⭐${t.rupiah ? ` → ${rp(t.rupiah)}` : ""} · ${jam(t.at)}</span>
+        <span class="row"><button class="primary" data-tukar-setujui="${t.id}">Setujui</button><button data-tukar-tolak="${t.id}">Tolak</button></span></li>`).join("")
+        : `<li class="muted kosong">Tidak ada penukaran yang menunggu.</li>`}</ul>
+      <h3>Daftar hadiah keluarga</h3>
+      <ul class="tugas-list">${dataHadiah.hadiah.length ? dataHadiah.hadiah.map((h) => `<li><span class="tugas-ikon">${h.rupiah ? "💵" : "🎁"}</span>
+        <span class="tugas-judul"><b>${esc(h.nama)}</b><span class="muted kecil">${harga(h)}</span></span><button class="ghost danger-text" data-hapus-hadiah="${h.id}">Hapus</button></li>`).join("")
+        : `<li class="muted kosong">Belum ada hadiah. Contoh: "Uang saku", 50 bintang, Rp10.000.</li>`}</ul>
+      <form id="form-hadiah" class="hadiah-form">
+        <label>Nama hadiah <input name="nama" maxlength="50" required placeholder="Contoh: Uang saku, Jalan-jalan ke taman" /></label>
+        <label>Harga (bintang) <input name="bintang" inputmode="numeric" required placeholder="50" autocomplete="off" /></label>
+        <label>Uang (Rp, kosongkan bila bukan uang) <input name="rupiah" inputmode="numeric" placeholder="10000" autocomplete="off" /></label>
+        <div><button class="primary" type="submit">Tambah hadiah</button></div>
+      </form>
+      <p class="error" hidden></p>
+      ${lain.length ? `<h3>Riwayat penukaran ${nama}</h3><ul class="tugas-list">${lain.map((t) => {
+        const [ik, tx, kelas] = STATUS_TUKAR[t.status] || ["", t.status, ""];
+        return `<li><span class="tugas-judul"><b>${esc(t.nama)}</b><span class="muted kecil">${t.bintang} ⭐${t.rupiah ? ` → ${rp(t.rupiah)}` : ""} · ${jam(t.at)}</span></span><span class="tugas-status ${kelas}">${ik} ${tx}</span></li>`;
+      }).join("")}</ul>` : ""}
+    </section>`);
+  const f = $("form-hadiah");
+  const sec = f.closest("section");
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    setErr(sec, "");
+    busy(f, true);
+    try {
+      dataHadiah = await api("POST", "hadiah", { nama: f.nama.value, bintang: f.bintang.value, rupiah: f.rupiah.value });
+      gambarKeuangan();
+    } catch (x) { setErr(sec, x.message); busy(f, false); }
+  };
+}
+
 $("keuangan-isi").addEventListener("click", async (e) => {
-  const b = e.target.closest("button[data-hapus-uang]");
-  if (!b || !confirm("Hapus catatan pemberian uang ini?")) return;
-  try { dataUang[anakDipilih] = await api("DELETE", `keuangan/${b.dataset.hapusUang}`); gambarKeuangan(); }
-  catch (x) { alert(x.message); }
+  const b = e.target.closest("button[data-hapus-uang], button[data-tukar-setujui], button[data-tukar-tolak], button[data-hapus-hadiah]");
+  if (!b) return;
+  try {
+    if (b.dataset.hapusUang) {
+      if (!confirm("Hapus catatan pemberian uang ini?")) return;
+      dataUang[anakDipilih] = await api("DELETE", `keuangan/${b.dataset.hapusUang}`);
+    } else if (b.dataset.hapusHadiah) {
+      if (!confirm("Hapus hadiah ini? Penukaran yang masih menunggu ikut dibatalkan.")) return;
+      dataHadiah = await api("DELETE", `hadiah/${b.dataset.hapusHadiah}`);
+    } else {
+      b.disabled = true;
+      const id = b.dataset.tukarSetujui || b.dataset.tukarTolak;
+      dataHadiah = await api("POST", `hadiah/tukar/${id}/${b.dataset.tukarSetujui ? "setujui" : "tolak"}`);
+      // Hadiah uang menambah uang saku: muat ulang angka Keuangan anak.
+      if (b.dataset.tukarSetujui) dataUang = (await api("GET", "keuangan")).anak;
+    }
+    gambarKeuangan();
+  } catch (x) { alert(x.message); b.disabled = false; }
 });
 
 // Kartu ringkas per anak di Home.
@@ -730,6 +792,7 @@ function kartuHome(c, soc) {
     tg && tg.hariIni.total ? `✅ Tugas hari ini ${tg.hariIni.disetujui}/${tg.hariIni.total} disetujui` : "✅ Belum ada tugas hari ini",
     tg?.menunggu.length ? `⏳ ${tg.menunggu.length} tugas menunggu Anda cek` : "",
     belumDibaca[c.id] ? `💬 ${belumDibaca[c.id]} pesan baru dari ${c.name}` : "",
+    (dataHadiah.anak[c.id]?.riwayat || []).some((t) => t.status === "menunggu") ? `🎁 ${c.name} ingin menukar bintang dengan hadiah` : "",
     dataUang[c.id] ? `💰 Dompet ${rp(dataUang[c.id].dompet)} · Tabungan ${rp(dataUang[c.id].tabungan)}` : "",
     `🎮 ${main} permainan · ${menang} menang`,
     tunggu ? `⚠️ ${tunggu} permintaan teman menunggu persetujuan Anda` : "",
@@ -781,10 +844,11 @@ async function load() {
   if (!masuk) return;
   namaOrtu = me.ortu.name;
   pasangAvatarOrtu(me.ortu.avatar);
-  const [{ children }, social, tugas, belum, uang] = await Promise.all([api("GET", "laporan"), api("GET", "teman"), api("GET", "tugas"), api("GET", "chat/belum?sebagai=ortu"), api("GET", "keuangan")]);
+  const [{ children }, social, tugas, belum, uang, hadiah] = await Promise.all([api("GET", "laporan"), api("GET", "teman"), api("GET", "tugas"), api("GET", "chat/belum?sebagai=ortu"), api("GET", "keuangan"), api("GET", "hadiah")]);
   dataTugas = tugas.anak;
   belumDibaca = belum.anak;
   dataUang = uang.anak;
+  dataHadiah = hadiah;
   const byId = Object.fromEntries(social.children.map((s) => [s.childId, s]));
   $("kids").replaceChildren(...children.map((c) => {
     const el = renderKid(c, byId[c.id]);
