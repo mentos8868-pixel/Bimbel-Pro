@@ -1,8 +1,9 @@
 import { KATALOG_AVATAR } from "../../shared/avatars.js";
 import { avatarSvg } from "./avatar-svg.js";
 
-export function katalogAvatar(toko, warna, konfirmasi, terbuka) {
-  const kartu = KATALOG_AVATAR.map(({ id, nama, harga }) => {
+// daftar: katalog yang ditampilkan (bawaan semua; orang tua hanya karakter sesuai perannya).
+export function katalogAvatar(toko, warna, konfirmasi, terbuka, daftar = KATALOG_AVATAR) {
+  const kartu = daftar.map(({ id, nama, harga }) => {
     const dipakai = toko.avatar === id;
     const dimiliki = toko.avatarPunya.includes(id);
     const tombol = dimiliki

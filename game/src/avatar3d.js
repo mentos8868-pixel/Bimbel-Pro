@@ -1,6 +1,6 @@
 // Avatar 3D di arena: hewan/robot lucu dari bentuk sederhana (bola, kotak, tabung).
 // Ukuran mengikuti anggota keluarga (ayah paling besar, anak lebih kecil).
-import { MeshBuilder, StandardMaterial, Color3, TransformNode } from "@babylonjs/core";
+import { MeshBuilder, StandardMaterial, Color3, TransformNode, FresnelParameters, DynamicTexture } from "@babylonjs/core";
 import { parseAvatar, DEFAULT_AVATAR } from "../../shared/avatars.js";
 import { rapikanAksesori, aksesoriById } from "../../shared/aksesori.js";
 import { auraById, auraUrutan } from "../../shared/aura.js";
@@ -82,10 +82,54 @@ function mat(scene, hex) {
   if (mats.has(key)) return mats.get(key);
   const m = new StandardMaterial("av" + hex, scene);
   m.diffuseColor = Color3.FromHexString(hex);
-  m.specularColor = new Color3(0.08, 0.08, 0.08);
+  if (hex === INK) {
+    // Mata/hidung: mengilap supaya terlihat hidup.
+    m.specularColor = new Color3(0.7, 0.7, 0.7);
+    m.specularPower = 64;
+  } else {
+    // Kilau lembut seperti boneka plastik halus, plus cahaya tepi tipis supaya bentuknya terasa bulat.
+    m.specularColor = new Color3(0.16, 0.16, 0.16);
+    m.specularPower = 22;
+    const tepi = new FresnelParameters();
+    tepi.leftColor = m.diffuseColor.scale(0.35).add(new Color3(0.12, 0.12, 0.12));
+    tepi.rightColor = Color3.Black();
+    tepi.bias = 0.55;
+    tepi.power = 2.5;
+    m.emissiveFresnelParameters = tepi;
+  }
   m.metadata = { bersama: true };   // dipakai banyak avatar: jangan dibuang bersama satu avatar
   mats.set(key, m);
   return m;
+}
+
+// Bayangan lembut di bawah kaki (satu material bersama per adegan).
+const bayangMat = new Map();
+function bayangan(scene, parent) {
+  let m = bayangMat.get(scene.uid);
+  if (!m) {
+    const tex = new DynamicTexture("bayang", 64, scene, false);
+    const ctx = tex.getContext();
+    const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 32);
+    g.addColorStop(0, "rgba(0,0,0,0.42)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 64, 64);
+    tex.hasAlpha = true;
+    tex.update();
+    m = new StandardMaterial("bayang", scene);
+    m.diffuseTexture = tex;
+    m.useAlphaFromDiffuseTexture = true;
+    m.specularColor = Color3.Black();
+    m.disableLighting = true;
+    m.emissiveColor = Color3.White();
+    m.metadata = { bersama: true };
+    bayangMat.set(scene.uid, m);
+  }
+  const d = MeshBuilder.CreateGround("bayang", { width: 1.25, height: 1.1 }, scene);
+  d.material = m;
+  d.position.y = 0.015;
+  d.isPickable = false;
+  d.parent = parent;
 }
 
 // Pembuat bentuk yang langsung ditempel ke induk.
@@ -98,22 +142,53 @@ function kit(scene, parent) {
     mesh.parent = parent;
     return mesh;
   };
+  // Bola besar lebih banyak segi supaya mulus; bola kecil (mata, hiasan) cukup sedikit.
+  const seg = (d) => (d >= 0.3 ? 24 : 12);
+  const mata = [];   // mesh mata, dikecilkan sebentar saat berkedip
   return {
-    ball: (d, color, pos, s, rot) => place(MeshBuilder.CreateSphere("av", { diameter: d, segments: 12 }, scene), color, pos, s, rot),
+    mata,
+    ball: (d, color, pos, s, rot) => place(MeshBuilder.CreateSphere("av", { diameter: d, segments: seg(d) }, scene), color, pos, s, rot),
     box: (w, h, d, color, pos, rot) => place(MeshBuilder.CreateBox("av", { width: w, height: h, depth: d }, scene), color, pos, null, rot),
-    rod: (h, d, color, pos, rot) => place(MeshBuilder.CreateCylinder("av", { height: h, diameter: d, tessellation: 10 }, scene), color, pos, null, rot),
-    dome: (d, color, pos, s) => place(MeshBuilder.CreateSphere("av", { diameter: d, segments: 12, slice: 0.5 }, scene), color, pos, s),
-    cone: (h, d, color, pos, rot) => place(MeshBuilder.CreateCylinder("av", { height: h, diameterTop: 0, diameterBottom: d, tessellation: 14 }, scene), color, pos, null, rot),
-    ring: (d, t, color, pos, rot) => place(MeshBuilder.CreateTorus("av", { diameter: d, thickness: t, tessellation: 18 }, scene), color, pos, null, rot),
+    rod: (h, d, color, pos, rot) => place(MeshBuilder.CreateCylinder("av", { height: h, diameter: d, tessellation: 20 }, scene), color, pos, null, rot),
+    dome: (d, color, pos, s) => place(MeshBuilder.CreateSphere("av", { diameter: d, segments: 24, slice: 0.5 }, scene), color, pos, s),
+    cone: (h, d, color, pos, rot) => place(MeshBuilder.CreateCylinder("av", { height: h, diameterTop: 0, diameterBottom: d, tessellation: 20 }, scene), color, pos, null, rot),
+    ring: (d, t, color, pos, rot) => place(MeshBuilder.CreateTorus("av", { diameter: d, thickness: t, tessellation: 28 }, scene), color, pos, null, rot),
   };
 }
 
 function eyesAndCheeks(k, { y, z, gap = 0.14, cheekY = y - 0.12 }) {
   for (const sx of [-1, 1]) {
-    k.ball(0.11, INK, [sx * gap, y, z]);
-    k.ball(0.035, "#ffffff", [sx * gap + 0.02, y + 0.025, z + 0.045]);
+    k.mata.push(k.ball(0.11, INK, [sx * gap, y, z], [1, 1.12, 1]));
+    k.mata.push(k.ball(0.035, "#ffffff", [sx * gap + 0.02, y + 0.028, z + 0.045]));
+    k.mata.push(k.ball(0.018, "#ffffff", [sx * gap - 0.018, y - 0.022, z + 0.05]));
     k.ball(0.11, "#ff9fb4", [sx * (gap + 0.11), cheekY, z - 0.04], [1.2, 0.6, 0.4]);
   }
+}
+
+// Tangan kecil untuk hewan yang belum punya tangan/sayap/sirip. x = jarak dari tengah badan.
+const TANGAN = { beruang: 0.43, kelinci: 0.41, kodok: 0.44, robo: 0.4, tikus: 0.41, kerbau: 0.41, macan: 0.41, naga: 0.41,
+  kuda: 0.41, kambing: 0.41, monyet: 0.41, anjing: 0.41, babi: 0.41 };
+function tangan(k, f, scene, induk) {
+  const x = TANGAN[f.id];
+  if (!x) return [];
+  return [-1, 1].map((sx) => {
+    const pivot = new TransformNode("tangan", scene);
+    pivot.parent = induk;
+    pivot.position.set(sx * x, 0.74, 0.04);
+    const m = k.ball(0.2, f.id === "robo" ? f.accent : f.body, [0, -0.13, 0], [0.75, 1.4, 0.75]);
+    m.parent = pivot;
+    pivot.rotation.z = sx * 0.28;
+    return pivot;
+  });
+}
+
+// Badan dan kepala bulat dasar untuk shio; ciri khas tiap hewan ditambahkan di buildFamily.
+function dasar(k, c, b, kaki, feet) {
+  k.ball(0.88, c, [0, 0.5, 0], [1, 0.95, 0.9]); k.ball(0.52, b, [0, 0.5, 0.24], [1, 1, 0.5]);
+  feet(c);
+  const h = { y: 1.28, r: 0.42, z: 0, front: 0.42, neck: 0.9, eye: { y: 1.36, z: 0.36, gap: 0.14 } };
+  k.ball(0.84, c, [0, h.y, 0]);
+  return h;
 }
 
 // Bentuk badan per jenis. Mengembalikan info kepala untuk aksesori anggota keluarga.
@@ -200,6 +275,117 @@ function buildFamily(k, f, kaki) {
       eyesAndCheeks(k, { y: head.y + 0.06, z: 0.39, gap: 0.12 });
       return { ...head, z: 0, front: 0.44, neck: 0.94, eye: { y: head.y + 0.06, z: 0.39, gap: 0.12 } };
     }
+    // ---------- 12 shio (Kelinci di atas) ----------
+    case "tikus": {
+      const h = dasar(k, c, b, kaki, feet);
+      for (const sx of [-1, 1]) { k.ball(0.36, c, [sx * 0.32, h.y + 0.34, 0], [1, 1, 0.4]); k.ball(0.22, a, [sx * 0.32, h.y + 0.34, 0.06], [1, 1, 0.3]); }
+      k.ball(0.09, a, [0, h.y - 0.08, 0.42]);
+      k.rod(0.7, 0.05, a, [0, 0.3, -0.6], [1.1, 0, 0]);
+      eyesAndCheeks(k, { y: h.y + 0.06, z: 0.36 });
+      return h;
+    }
+    case "kerbau": {
+      const h = dasar(k, c, b, kaki, feet);
+      for (const sx of [-1, 1]) {
+        k.cone(0.4, 0.14, a, [sx * 0.42, h.y + 0.3, 0], [0, 0, -sx * 0.9]);
+        k.ball(0.2, c, [sx * 0.44, h.y + 0.02, 0], [1.4, 0.6, 0.6]);
+      }
+      k.ball(0.4, b, [0, h.y - 0.14, 0.32], [1.2, 0.8, 0.6]);
+      for (const sx of [-1, 1]) k.ball(0.06, INK, [sx * 0.07, h.y - 0.14, 0.44]);
+      eyesAndCheeks(k, { y: h.y + 0.1, z: 0.36, cheekY: h.y - 0.02 });
+      return h;
+    }
+    case "macan": {
+      const h = dasar(k, c, b, kaki, feet);
+      for (const sx of [-1, 1]) { k.ball(0.24, c, [sx * 0.28, h.y + 0.33, 0]); k.ball(0.12, b, [sx * 0.28, h.y + 0.33, 0.08], [1, 1, 0.5]); }
+      for (const x of [-0.1, 0, 0.1]) k.box(0.04, 0.16, 0.04, a, [x, h.y + 0.32, 0.27], [-0.6, 0, 0]);
+      for (const sx of [-1, 1]) k.box(0.16, 0.04, 0.04, a, [sx * 0.38, h.y + 0.02, 0.14], [0, sx * 0.5, 0]);
+      k.ball(0.3, b, [0, h.y - 0.12, 0.33], [1.1, 0.7, 0.6]);
+      k.ball(0.08, "#e2687e", [0, h.y - 0.06, 0.44]);
+      eyesAndCheeks(k, { y: h.y + 0.08, z: 0.37 });
+      return h;
+    }
+    case "naga": {
+      const h = dasar(k, c, b, kaki, feet);
+      for (const sx of [-1, 1]) {
+        k.rod(0.4, 0.06, a, [sx * 0.15, h.y + 0.52, -0.02], [0, 0, -sx * 0.35]);
+        k.rod(0.16, 0.05, a, [sx * 0.24, h.y + 0.55, -0.02], [0, 0, -sx * 1.1]);
+        k.rod(0.4, 0.035, a, [sx * 0.3, h.y - 0.18, 0.3], [0, 0, sx * 1.2]);
+      }
+      for (const y of [0.85, 0.55]) k.cone(0.16, 0.14, a, [0, y, -0.42], [-0.9, 0, 0]);
+      k.ball(0.36, c, [0, 0.3, -0.55], [0.6, 0.6, 1.4]);
+      k.ball(0.38, b, [0, h.y - 0.14, 0.32], [1.15, 0.75, 0.6]);
+      eyesAndCheeks(k, { y: h.y + 0.08, z: 0.37 });
+      return h;
+    }
+    case "ular": {
+      // Badan melingkar; kepala di atas lingkaran.
+      k.ring(0.95, 0.3, c, [0, 0.15, 0]);
+      k.ring(0.6, 0.26, c, [0, 0.4, 0]);
+      kaki.push(k.ball(0.3, c, [0, 0.66, 0.05]));
+      k.rod(0.4, 0.3, c, [0, 0.82, 0.05]);
+      const h = { y: 1.2, r: 0.4, z: 0.05, front: 0.4, neck: 0.85, eye: { y: 1.24, z: 0.4, gap: 0.14 } };
+      k.ball(0.8, c, [0, h.y, h.z], [1.1, 0.9, 1]);
+      k.rod(0.18, 0.025, a, [0, h.y - 0.28, h.z + 0.38], [Math.PI / 2, 0, 0]);
+      eyesAndCheeks(k, { y: h.y + 0.04, z: h.z + 0.36 });
+      return h;
+    }
+    case "kuda": {
+      const h = dasar(k, c, b, kaki, feet);
+      for (const sx of [-1, 1]) k.cone(0.24, 0.14, c, [sx * 0.2, h.y + 0.42, 0]);
+      k.ball(0.3, a, [0, h.y + 0.36, 0.05], [0.9, 0.6, 1.2]);
+      k.ball(0.26, a, [0, h.y + 0.05, -0.32], [0.5, 1.6, 0.8]);
+      k.ball(0.44, b, [0, h.y - 0.16, 0.3], [1.1, 0.8, 0.7]);
+      for (const sx of [-1, 1]) k.ball(0.06, INK, [sx * 0.08, h.y - 0.16, 0.45]);
+      eyesAndCheeks(k, { y: h.y + 0.1, z: 0.36, cheekY: h.y - 0.02 });
+      return h;
+    }
+    case "kambing": {
+      const h = dasar(k, c, b, kaki, feet);
+      for (const sx of [-1, 1]) {
+        k.ring(0.24, 0.07, a, [sx * 0.24, h.y + 0.34, -0.06], [0, Math.PI / 2, 0]);
+        k.ball(0.2, c, [sx * 0.44, h.y + 0.04, 0], [1.5, 0.6, 0.6]);
+      }
+      k.cone(0.2, 0.12, a, [0, h.y - 0.42, 0.3], [Math.PI, 0, 0]);
+      k.ball(0.07, "#e2687e", [0, h.y - 0.08, 0.42]);
+      eyesAndCheeks(k, { y: h.y + 0.08, z: 0.36 });
+      return h;
+    }
+    case "monyet": {
+      const h = dasar(k, c, b, kaki, feet);
+      for (const sx of [-1, 1]) { k.ball(0.28, c, [sx * 0.44, h.y + 0.02, 0]); k.ball(0.16, b, [sx * 0.46, h.y + 0.02, 0.06], [1, 1, 0.5]); }
+      k.ball(0.62, b, [0, h.y - 0.02, 0.18], [1.05, 0.95, 0.7]);
+      k.ring(0.4, 0.06, c, [0, 0.45, -0.55], [Math.PI / 2, 0, 0]);
+      eyesAndCheeks(k, { y: h.y + 0.08, z: 0.4, gap: 0.12 });
+      return { ...h, eye: { y: h.y + 0.08, z: 0.4, gap: 0.12 } };
+    }
+    case "ayam": {
+      const h = dasar(k, c, b, kaki, () => { for (const sx of [-1, 1]) kaki.push(k.ball(0.18, "#f5a524", [sx * 0.16, 0.05, 0.12], [1, 0.4, 1.4])); });
+      for (const sx of [-1, 1]) k.ball(0.22, b, [sx * 0.46, 0.55, 0], [0.5, 1.4, 1.1]);
+      for (const [x, y] of [[-0.1, 0.38], [0, 0.44], [0.1, 0.38]]) k.ball(0.15, a, [x, h.y + y, 0.05], [0.6, 1, 1]);
+      k.cone(0.2, 0.14, "#f5a524", [0, h.y - 0.08, 0.46], [Math.PI / 2, 0, 0]);
+      k.ball(0.1, a, [0, h.y - 0.22, 0.38], [0.8, 1.2, 0.8]);
+      eyesAndCheeks(k, { y: h.y + 0.1, z: 0.36 });
+      return h;
+    }
+    case "anjing": {
+      const h = dasar(k, c, b, kaki, feet);
+      for (const sx of [-1, 1]) k.ball(0.22, a, [sx * 0.4, h.y, 0], [0.7, 1.6, 0.7], [0, 0, sx * 0.3]);
+      k.ball(0.34, b, [0, h.y - 0.12, 0.32], [1.1, 0.75, 0.6]);
+      k.ball(0.12, INK, [0, h.y - 0.04, 0.45], [1.3, 0.9, 1]);
+      k.ball(0.2, c, [0, 0.5, -0.45], [0.5, 0.5, 1.2]);
+      eyesAndCheeks(k, { y: h.y + 0.1, z: 0.36, cheekY: h.y - 0.04 });
+      return h;
+    }
+    case "babi": {
+      const h = dasar(k, c, b, kaki, feet);
+      for (const sx of [-1, 1]) k.cone(0.22, 0.2, a, [sx * 0.24, h.y + 0.38, 0], [0.3, 0, -sx * 0.3]);
+      k.rod(0.1, 0.3, a, [0, h.y - 0.08, 0.42], [Math.PI / 2, 0, 0]);
+      for (const sx of [-1, 1]) k.ball(0.06, "#b8506a", [sx * 0.06, h.y - 0.08, 0.48]);
+      k.ring(0.16, 0.04, a, [0, 0.5, -0.46], [0, Math.PI / 2, 0]);
+      eyesAndCheeks(k, { y: h.y + 0.12, z: 0.36, gap: 0.16 });
+      return { ...h, eye: { y: h.y + 0.12, z: 0.36, gap: 0.16 } };
+    }
     case "kodok":
     default: {
       k.ball(0.9, c, [0, 0.45, 0], [1.05, 0.85, 0.9]); k.ball(0.55, b, [0, 0.45, 0.25], [1, 1, 0.5]);
@@ -209,7 +395,8 @@ function buildFamily(k, f, kaki) {
       for (const sx of [-1, 1]) {
         k.ball(0.32, c, [sx * 0.24, head.y + 0.33, 0.12]);
         k.ball(0.24, "#ffffff", [sx * 0.24, head.y + 0.35, 0.2]);
-        k.ball(0.11, INK, [sx * 0.24, head.y + 0.36, 0.31]);
+        k.mata.push(k.ball(0.11, INK, [sx * 0.24, head.y + 0.36, 0.31]));
+        k.mata.push(k.ball(0.035, "#ffffff", [sx * 0.24 + 0.02, head.y + 0.385, 0.355]));
         k.ball(0.11, "#ff9fb4", [sx * 0.33, head.y - 0.08, 0.32], [1.2, 0.6, 0.4]);
       }
       k.box(0.32, 0.03, 0.03, INK, [0, head.y - 0.1, 0.42]);
@@ -318,6 +505,32 @@ export function buildManekin(scene, parent, aksesori = []) {
   for (const id of rapikanAksesori(aksesori)) buildAksesori(k, id, h);
 }
 
+// Gerak kecil supaya avatar terasa hidup: bernapas dan berkedip saat diam, tangan berayun saat berjalan.
+// Berjalan dikenali dari bob yang dinaikturunkan oleh arena (main.js), jadi arena tidak perlu diubah.
+function hidupkan(scene, fig, bob, napas, mata, lengan) {
+  let t = Math.random() * 10, kedipLagi = 1 + Math.random() * 3, kedip = 0, gerak = 0, yLama = 0, tertutup = false;
+  const sy = mata.map((m) => m.scaling.y);   // tinggi mata asli
+  const obs = scene.onBeforeRenderObservable.add(() => {
+    const dt = Math.min(0.1, scene.getEngine().getDeltaTime() / 1000);
+    t += dt;
+    // Berjalan bila bob bergerak naik-turun dalam 0,2 detik terakhir.
+    if (Math.abs(bob.position.y - yLama) > 0.0005) gerak = 0.2; else gerak = Math.max(0, gerak - dt);
+    yLama = bob.position.y;
+    const jalan = gerak > 0;
+    const s = jalan ? 0 : Math.sin(t * 2.2) * 0.018;
+    napas.scaling.set(1 - s * 0.5, 1 + s, 1 - s * 0.5);
+    lengan.forEach((p, i) => { p.rotation.x = jalan ? Math.sin(t * 10 + i * Math.PI) * 0.7 : Math.sin(t * 2.2) * 0.06; });
+    kedipLagi -= dt;
+    if (kedipLagi <= 0) { kedip = 0.14; kedipLagi = 2.5 + Math.random() * 3.5; }
+    kedip = Math.max(0, kedip - dt);
+    if ((kedip > 0) !== tertutup) {
+      tertutup = kedip > 0;
+      mata.forEach((m, i) => { m.scaling.y = sy[i] * (tertutup ? 0.12 : 1); });
+    }
+  });
+  fig.onDisposeObservable.add(() => scene.onBeforeRenderObservable.remove(obs));
+}
+
 // Membuat figur di bawah induk; mengembalikan { fig, bob, height }.
 // bob = simpul yang dinaikturunkan saat berjalan.
 export function buildAvatar3d(scene, parent, avatarId, accent, aksesori = [], aura = "") {
@@ -326,14 +539,20 @@ export function buildAvatar3d(scene, parent, avatarId, accent, aksesori = [], au
   fig.parent = parent;
   fig.scaling.setAll(a.member.scale);
   buildAura(scene, fig, aura);   // di luar "bob" supaya tetap di tanah saat berjalan
+  bayangan(scene, fig);   // tetap di tanah saat berjalan
   const bob = new TransformNode("bob", scene);
   bob.parent = fig;
-  const k = kit(scene, bob);
+  // "napas": simpul di dalam bob yang sedikit mengembang-mengempis saat diam.
+  const napas = new TransformNode("napas", scene);
+  napas.parent = bob;
+  const k = kit(scene, napas);
   const kaki = [];
   const head = buildFamily(k, a.family, kaki);
+  const lengan = tangan(k, a.family, scene, napas);
   const pakai = rapikanAksesori(aksesori);
   buildMember(k, a.member.id, head, accent, new Set(pakai.map((x) => aksesoriById(x).slot)));
   for (const id of pakai) buildAksesori(k, id, head);
+  hidupkan(scene, fig, bob, napas, k.mata, lengan);
   const meshes = bob.getChildMeshes();
   const tinggi = pakai.some((x) => x === "topi-penyihir" || x === "topi-pesta") ? 0.55 : 0;   // papan nama di atas topi
   const height = (head.y + head.r + 0.35 + tinggi) * a.member.scale;

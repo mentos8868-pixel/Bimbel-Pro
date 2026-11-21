@@ -9,6 +9,7 @@ import { avatarSvg } from "./avatar-svg.js";
 import { namaKelas, kurikulumName, negaraName } from "../../shared/negara.js";
 import { SLOT } from "../../shared/aksesori.js";
 import { AURA } from "../../shared/aura.js";
+import { KATALOG_AVATAR, parseAvatar } from "../../shared/avatars.js";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -236,7 +237,13 @@ const ISI = {
 };
 
 function isiToko() {
-  const katalog = katalogAvatar(toko, anak.color, yakinBeli, document.querySelector("[data-katalog-avatar]")?.open);
+  // Avatar binatang langsung terlihat saat toko dibuka; anak tetap bisa menutupnya.
+  // Satu kartu per karakter (Ulat, Robo, ...), dalam versi anak itu sendiri (laki-laki/perempuan),
+  // jadi tidak perlu menulis ayah/ibu/anak.
+  const milik = parseAvatar(anak.avatar)?.member.id;
+  const anggota = milik === "putri" ? "putri" : "putra";
+  const daftar = KATALOG_AVATAR.filter((a) => a.id.endsWith(`-${anggota}`)).map((a) => ({ ...a, nama: parseAvatar(a.id).family.name }));
+  const katalog = katalogAvatar(toko, anak.color, yakinBeli, document.querySelector("[data-katalog-avatar]")?.open ?? true, daftar);
   return katalog + SLOT.map((sl) => {
     const items = toko.items.filter((a) => a.slot === sl.id);
     if (!items.length) return "";

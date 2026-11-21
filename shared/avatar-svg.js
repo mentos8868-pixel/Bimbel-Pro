@@ -40,6 +40,9 @@ function eyes(cx, cy, gap = 9, r = 4) {
 const cheeks = (cy, gap = 15) => `<ellipse cx="${50 - gap}" cy="${cy}" rx="4.5" ry="2.8" fill="#ff8fa8" opacity=".55"/><ellipse cx="${50 + gap}" cy="${cy}" rx="4.5" ry="2.8" fill="#ff8fa8" opacity=".55"/>`;
 const smile = (cy, w = 6) => `<path d="M${50 - w} ${cy} Q50 ${cy + w * 0.9} ${50 + w} ${cy}" stroke="${INK}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`;
 
+// Badan bulat biasa (dipakai sebagian besar shio).
+const badan = (c, b) => `<ellipse cx="50" cy="78" rx="22" ry="18" fill="${c}"/><ellipse cx="50" cy="81" rx="13" ry="11" fill="${b}"/>`;
+
 // Bagian per jenis hewan. Mengembalikan { back, body, head, face, top } (y titik atas kepala untuk aksesori).
 function familyParts(f) {
   const { body: c, belly: b, accent: a } = f;
@@ -97,6 +100,123 @@ function familyParts(f) {
         head: `<circle cx="50" cy="42" r="26" fill="${c}"/><path d="M50 30 C 30 24, 24 50, 34 58 Q50 66 66 58 C 76 50, 70 24, 50 30 Z" fill="${b}"/><path d="M45 48 L55 48 L50 54 Z" fill="${a}"/>`,
         face: eyes(50, 41, 8, 3.8) + cheeks(51, 14),
         top: 17, eyeY: 41, gap: 8,
+      };
+    // ---------- 12 shio ----------
+    case "tikus":
+      return {
+        back: `<path d="M68 88 Q90 90 88 70" stroke="${a}" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+        body: badan(c, b),
+        head: `<circle cx="29" cy="25" r="12" fill="${c}"/><circle cx="71" cy="25" r="12" fill="${c}"/><circle cx="29" cy="25" r="7" fill="${a}"/><circle cx="71" cy="25" r="7" fill="${a}"/>
+               <circle cx="50" cy="45" r="23" fill="${c}"/><circle cx="50" cy="52" r="3" fill="${a}"/>
+               <path d="M38 52 H27 M38 55 L28 58 M62 52 H73 M62 55 L72 58" stroke="${INK}" stroke-width="1.2" stroke-linecap="round" opacity=".6"/>`,
+        face: eyes(50, 43, 9, 3.8) + cheeks(51, 15) + smile(56, 3),
+        top: 20, eyeY: 43, gap: 9,
+      };
+    case "kerbau":
+      return {
+        back: "",
+        body: badan(c, b),
+        head: `<path d="M31 28 Q13 26 14 9 Q22 22 37 21Z" fill="${a}"/><path d="M69 28 Q87 26 86 9 Q78 22 63 21Z" fill="${a}"/>
+               <ellipse cx="25" cy="38" rx="8" ry="4.5" fill="${c}" transform="rotate(-20 25 38)"/><ellipse cx="75" cy="38" rx="8" ry="4.5" fill="${c}" transform="rotate(20 75 38)"/>
+               <circle cx="50" cy="42" r="24" fill="${c}"/><ellipse cx="50" cy="54" rx="14" ry="9" fill="${b}"/>
+               <ellipse cx="45" cy="54" rx="2" ry="2.8" fill="${INK}"/><ellipse cx="55" cy="54" rx="2" ry="2.8" fill="${INK}"/>`,
+        face: eyes(50, 38, 10) + cheeks(46, 18),
+        top: 19, eyeY: 38, gap: 10,
+      };
+    case "macan":
+      return {
+        back: "",
+        body: badan(c, b) + `<path d="M30 72 q5 3 3 8 M70 72 q-5 3 -3 8" stroke="${a}" stroke-width="2.5" fill="none" stroke-linecap="round"/>`,
+        head: `<circle cx="31" cy="23" r="8" fill="${c}"/><circle cx="69" cy="23" r="8" fill="${c}"/><circle cx="31" cy="23" r="4" fill="${b}"/><circle cx="69" cy="23" r="4" fill="${b}"/>
+               <circle cx="50" cy="43" r="24" fill="${c}"/>
+               <path d="M50 20 v7 M43 21 l1.5 6 M57 21 l-1.5 6 M27 40 h6 M28 46 h5 M73 40 h-6 M72 46 h-5" stroke="${a}" stroke-width="2.5" stroke-linecap="round"/>
+               <ellipse cx="50" cy="53" rx="11" ry="7.5" fill="${b}"/><path d="M46.5 49 h7 l-3.5 3.5z" fill="#e2687e"/>`,
+        face: eyes(50, 40, 10) + smile(55, 4),
+        top: 19, eyeY: 40, gap: 10,
+      };
+    case "naga":
+      return {
+        back: `<path d="M70 82 Q88 84 90 70 Q84 76 78 74Z" fill="${c}"/>`,
+        body: badan(c, b) + `<path d="M36 64 l4 -6 l4 6 M46 62 l4 -6 l4 6 M56 64 l4 -6 l4 6" fill="${a}" stroke="${a}" stroke-width="1"/>`,
+        head: `<path d="M38 24 L31 6 M33 14 L26 12 M62 24 L69 6 M67 14 L74 12" stroke="${a}" stroke-width="4" stroke-linecap="round"/>
+               <ellipse cx="50" cy="43" rx="24" ry="23" fill="${c}"/><ellipse cx="50" cy="54" rx="13" ry="8.5" fill="${b}"/>
+               <circle cx="45" cy="52" r="1.6" fill="${INK}"/><circle cx="55" cy="52" r="1.6" fill="${INK}"/>
+               <path d="M38 56 Q26 58 22 50 M62 56 Q74 58 78 50" stroke="${a}" stroke-width="2" fill="none" stroke-linecap="round"/>`,
+        face: eyes(50, 39, 10) + smile(57, 4),
+        top: 20, eyeY: 39, gap: 10,
+      };
+    case "ular":
+      return {
+        back: "",
+        body: `<ellipse cx="50" cy="88" rx="30" ry="9" fill="${c}"/><ellipse cx="50" cy="77" rx="22" ry="8" fill="${c}"/>
+               <path d="M26 88 h48 M33 77 h34" stroke="${b}" stroke-width="2.5" stroke-dasharray="4 5" stroke-linecap="round"/>`,
+        head: `<rect x="44" y="56" width="12" height="16" fill="${c}"/><ellipse cx="50" cy="44" rx="23" ry="20" fill="${c}"/>
+               <path d="M50 58 v7 l-3 4 M50 65 l3 4" stroke="${a}" stroke-width="2" fill="none" stroke-linecap="round"/>
+               <path d="M40 28 q10 -6 20 0" stroke="${b}" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+        face: eyes(50, 42, 9) + cheeks(50, 16) + smile(52, 5),
+        top: 24, eyeY: 42, gap: 9,
+      };
+    case "kuda":
+      return {
+        back: "",
+        body: badan(c, b),
+        head: `<path d="M33 26 L37 8 L44 22Z M67 26 L63 8 L56 22Z" fill="${c}"/>
+               <ellipse cx="50" cy="44" rx="21" ry="25" fill="${c}"/><ellipse cx="50" cy="58" rx="14" ry="9.5" fill="${b}"/>
+               <ellipse cx="45" cy="58" rx="2" ry="2.6" fill="${INK}"/><ellipse cx="55" cy="58" rx="2" ry="2.6" fill="${INK}"/>
+               <path d="M42 20 Q50 13 58 20 Q55 26 50 23 Q45 27 42 20Z" fill="${a}"/><path d="M68 28 Q76 40 70 56 Q66 44 63 32Z" fill="${a}"/>`,
+        face: eyes(50, 38, 10) + cheeks(48, 17),
+        top: 18, eyeY: 38, gap: 10,
+      };
+    case "kambing":
+      return {
+        back: "",
+        body: badan(c, b),
+        head: `<path d="M39 24 Q26 6 18 20 Q24 16 31 28Z" fill="${a}"/><path d="M61 24 Q74 6 82 20 Q76 16 69 28Z" fill="${a}"/>
+               <ellipse cx="25" cy="40" rx="9" ry="4.5" fill="${c}" transform="rotate(15 25 40)"/><ellipse cx="75" cy="40" rx="9" ry="4.5" fill="${c}" transform="rotate(-15 75 40)"/>
+               <circle cx="50" cy="42" r="23" fill="${c}"/><path d="M45 63 L50 74 L55 63Z" fill="${a}"/><path d="M47 50 h6 l-3 3z" fill="#e2687e"/>`,
+        face: eyes(50, 40, 9) + cheeks(49, 16) + smile(55, 4),
+        top: 20, eyeY: 40, gap: 9,
+      };
+    case "monyet":
+      return {
+        back: `<path d="M70 86 Q92 84 86 66 Q82 60 78 66" stroke="${c}" stroke-width="4" fill="none" stroke-linecap="round"/>`,
+        body: badan(c, b),
+        head: `<circle cx="25" cy="44" r="9" fill="${c}"/><circle cx="75" cy="44" r="9" fill="${c}"/><circle cx="25" cy="44" r="5" fill="${b}"/><circle cx="75" cy="44" r="5" fill="${b}"/>
+               <circle cx="50" cy="43" r="24" fill="${c}"/>
+               <circle cx="42" cy="40" r="9.5" fill="${b}"/><circle cx="58" cy="40" r="9.5" fill="${b}"/><ellipse cx="50" cy="52" rx="14" ry="10" fill="${b}"/>
+               <circle cx="47" cy="49" r="1.4" fill="${INK}"/><circle cx="53" cy="49" r="1.4" fill="${INK}"/>`,
+        face: eyes(50, 40, 8, 3.6) + smile(54, 5),
+        top: 19, eyeY: 40, gap: 8,
+      };
+    case "ayam":
+      return {
+        back: `<ellipse cx="28" cy="76" rx="7" ry="11" fill="${b}" transform="rotate(25 28 76)"/><ellipse cx="72" cy="76" rx="7" ry="11" fill="${b}" transform="rotate(-25 72 76)"/>`,
+        body: badan(c, b) + `<path d="M42 95 v-5 M58 95 v-5" stroke="#f5a524" stroke-width="3" stroke-linecap="round"/>`,
+        head: `<circle cx="44" cy="20" r="5.5" fill="${a}"/><circle cx="50" cy="17" r="6" fill="${a}"/><circle cx="56" cy="20" r="5.5" fill="${a}"/>
+               <circle cx="50" cy="43" r="23" fill="${c}"/><path d="M44 47 L56 47 L50 55Z" fill="#f5a524"/><ellipse cx="50" cy="58" rx="3" ry="4" fill="${a}"/>`,
+        face: eyes(50, 40, 9) + cheeks(48, 15),
+        top: 20, eyeY: 40, gap: 9,
+      };
+    case "anjing":
+      return {
+        back: "",
+        body: badan(c, b),
+        head: `<circle cx="50" cy="43" r="24" fill="${c}"/><circle cx="60" cy="36" r="7" fill="${a}" opacity=".35"/>
+               <ellipse cx="27" cy="42" rx="7.5" ry="15" fill="${a}" transform="rotate(18 27 42)"/><ellipse cx="73" cy="42" rx="7.5" ry="15" fill="${a}" transform="rotate(-18 73 42)"/>
+               <ellipse cx="50" cy="53" rx="11" ry="8" fill="${b}"/><ellipse cx="50" cy="49" rx="4" ry="3" fill="${INK}"/>
+               <path d="M50 57 q0 6 4 5" stroke="#e2687e" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+        face: eyes(50, 39, 10) + smile(55, 5),
+        top: 19, eyeY: 39, gap: 10,
+      };
+    case "babi":
+      return {
+        back: `<path d="M71 82 q8 -2 6 -7 q-2 -4 -6 0" stroke="${a}" stroke-width="2.5" fill="none" stroke-linecap="round"/>`,
+        body: badan(c, b),
+        head: `<path d="M28 30 L30 14 L42 22Z M72 30 L70 14 L58 22Z" fill="${a}"/>
+               <circle cx="50" cy="43" r="25" fill="${c}"/><ellipse cx="50" cy="51" rx="10" ry="7" fill="${a}"/>
+               <ellipse cx="46.5" cy="51" rx="2" ry="3" fill="#b8506a"/><ellipse cx="53.5" cy="51" rx="2" ry="3" fill="#b8506a"/>`,
+        face: eyes(50, 38, 11) + cheeks(47, 19) + smile(59, 4),
+        top: 18, eyeY: 38, gap: 11,
       };
     case "kodok":
     default:

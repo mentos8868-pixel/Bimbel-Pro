@@ -9,6 +9,18 @@ export const FAMILIES = [
   { id: "kelinci", name: "Kelinci", body: "#f4f1ee", belly: "#ffd6e2", accent: "#f29bb5" },
   { id: "penguin", name: "Penguin", body: "#36475c", belly: "#ffffff", accent: "#f5a524" },
   { id: "kodok", name: "Kodok", body: "#5fc29a", belly: "#e6f7c9", accent: "#2f8f6b" },
+  // 12 shio (Kelinci sudah ada di atas).
+  { id: "tikus", name: "Tikus", body: "#a9adb8", belly: "#f3e9ef", accent: "#ff9fb4" },
+  { id: "kerbau", name: "Kerbau", body: "#646673", belly: "#d8c8b4", accent: "#efe3c8" },
+  { id: "macan", name: "Macan", body: "#f39a3d", belly: "#fff3e0", accent: "#3b2a20" },
+  { id: "naga", name: "Naga", body: "#e2483d", belly: "#ffd66b", accent: "#f5c542" },
+  { id: "ular", name: "Ular", body: "#6cc070", belly: "#f2e7a6", accent: "#e65c5c" },
+  { id: "kuda", name: "Kuda", body: "#b9773f", belly: "#f0d6b8", accent: "#4a2f1d" },
+  { id: "kambing", name: "Kambing", body: "#f1ece2", belly: "#fffaf0", accent: "#b59a7a" },
+  { id: "monyet", name: "Monyet", body: "#8a5a3b", belly: "#f0c9a0", accent: "#6b4329" },
+  { id: "ayam", name: "Ayam", body: "#fffdf8", belly: "#fff1c9", accent: "#e8463b" },
+  { id: "anjing", name: "Anjing", body: "#e0b07a", belly: "#fff1dc", accent: "#8a5a33" },
+  { id: "babi", name: "Babi", body: "#f7a8b8", belly: "#ffd1dc", accent: "#e07a92" },
 ];
 
 export const MEMBERS = [
