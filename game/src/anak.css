@@ -70,3 +70,9 @@ a.btn-utama, .btn-utama { background: var(--primary); color: #fff; border-color:
 .pesan-ortu { margin: 0; background: #fff8e6; border-radius: 10px; padding: 8px 12px; font-style: italic; }
 .badge { background: var(--error); color: #fff; border-radius: 999px; padding: 0 7px; font-size: 13px; margin-left: 4px; }
 button.link { background: none; border: none; padding: 0; color: var(--primary); font-size: inherit; font-weight: 700; }
+
+/* Uang saku dan tabungan */
+.dua-kecil { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.target { margin: 4px 0 0; }
+.daftar button.kecil { padding: 2px 8px; font-size: 13px; border: none; background: transparent; color: var(--muted); }
+.daftar button.kecil:hover { color: var(--error); }

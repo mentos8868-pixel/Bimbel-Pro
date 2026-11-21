@@ -156,6 +156,10 @@ Dirancang 21 November 2026 dari susunan menu pengguna, **fokus laptop**. Kedua d
 - Riwayat chat arena: tabel `chat_arena_log`, hanya pesan yang **dikirim** anak (pesan pemain lain tidak disimpan), dihapus otomatis setelah 7 hari, dibaca orang tua lewat `GET /api/chat/arena?anak=ID`.
 - "Data apa yang disimpan?" di halaman daftar sudah menyebut kedua jenis chat ini.
 
+**Tahap 4 (Keuangan) sudah dibangun (22 November 2026):** `server/keuangan.js` dengan tabel `keuangan_catatan` dan `keuangan_target`. Hanya catatan; tidak ada uang sungguhan yang berpindah, dan bintang tetap terpisah (hanya untuk Toko Avatar). Dua kantong: **dompet** (uang saku + pemasukan dari luar − dibelanjakan − ditabung + diambil) dan **tabungan** (ditabung − diambil). Saldo tidak boleh minus, baik saat mencatat maupun saat menghapus catatan. Satu target tabungan per anak. Setiap catatan menyimpan siapa yang mencatat (kolom `oleh`: ortu/anak).
+- **Orang tua hanya memberi uang** (keputusan pengguna 22 November 2026): `GET/POST /api/keuangan` (POST hanya jenis "masuk"; jenis lain ditolak 403) dan `DELETE /api/keuangan/:id` untuk pemberiannya sendiri. Anak yang sedang di arena diberi tahu saat menerima uang saku. Target tabungan hanya ditampilkan.
+- **Anak mencatat sendiri** di menu Keuangan dashboard anak: `POST /api/keuangan/saya` (pemasukan dari luar seperti hadiah dari nenek — jenis `luar`, terpisah dari uang saku orang tua —, belanja, menabung, ambil dari tabungan; paling banyak 30 catatan per hari; keterangan disaring kata kasar), `PUT/DELETE /api/keuangan/saya/target`, dan `DELETE /api/keuangan/saya/:id` untuk catatannya sendiri. Catatan dari orang tua tidak bisa dihapus anak. Panel "Uang sakuku" juga tampil di Home dan Report.
+
 ### Dashboard orang tua (`orangtua.html`)
 Di bagian atas ada pilihan anak (Budi / Liliya), kecuali di menu Home yang menampilkan semua anak.
 
@@ -164,7 +168,7 @@ Di bagian atas ada pilihan anak (Budi / Liliya), kecuali di menu Home yang menam
 | **Home** | Satu kartu per anak: sisa waktu main hari ini, tugas hari ini (selesai/menunggu dicek), ringkasan belajar, pesan baru, dan hal yang perlu tindakan (permintaan teman, tugas menunggu persetujuan) |
 | **Tugas** | Orang tua membuat tugas: judul, jenis (Ibadah, Rumah, Belajar, Lainnya), jadwal (sekali, setiap hari, atau hari tertentu), dan bintang hadiah (boleh 0). Anak menandai "Sudah", lalu orang tua menekan **Setujui** atau **Belum**. Tugas belajar (mis. "2 latihan Matematika") bisa tercentang otomatis dari Ruang Pintar |
 | **Arena** | Hasil Catur, Scramble, dan Kartu Kilat, permainan terakhir, daftar teman dan persetujuan pertemanan, pemain yang diblokir, dan izin arena (Cari lawan, jenis chat) |
-| **Keuangan** | Catatan keuangan anak: uang saku masuk, pengeluaran, tabungan, dan target tabungan. Hadiah tugas bisa dicatat sebagai uang saku. *(Isi menu ini perlu dipastikan lagi dengan pengguna.)* |
+| **Keuangan** | Orang tua **hanya memberi uang saku** (keputusan pengguna 22 November 2026). Anak sendiri mencatat pemasukan dari luar, belanja, menabung, dan mengambil tabungan, serta memasang target tabungan. Orang tua melihat semuanya. Terpisah dari bintang |
 | **Chat** | (1) Chat keluarga: pesan antara orang tua dan anaknya. (2) Riwayat chat arena anak, hanya bisa dibaca |
 | **Report** | Waktu main 7 hari, kemajuan Ruang Pintar per pelajaran, riwayat tryout, medali, dan tugas yang selesai minggu ini |
 | **Setting** | Per anak: kurikulum, kelas, negara, batas waktu, ganti PIN, buat kode masuk, avatar, dan hapus akun anak. Untuk orang tua: nama, avatar, ganti kata sandi, hapus akun |
@@ -178,6 +182,7 @@ Setelah anak masuk (PIN atau kode), ia melihat dashboard ini dulu, bukan langsun
 | **Tugas** | Daftar tugas dari orang tua dengan tombol **Sudah**, status (menunggu dicek / disetujui), dan bintang hadiah. Misi belajar harian juga di sini |
 | **Arena** | Tombol masuk dunia 3D, teman yang sedang di arena, dan hasil permainanku |
 | **Bimbel** | Tombol membuka Ruang Pintar, kemajuan per pelajaran, misi tryout hari ini, dan saran "coba ulangi" |
+| **Keuangan** | Uang saku dari orang tua, dompet dan tabungan, ringkasan bulan ini, dan riwayat. Anak mencatat sendiri pemasukan dari luar (mis. hadiah), belanja, menabung, dan ambil tabungan, serta memasang target tabungannya |
 | **Report** | Waktu main 7 hari, medali, riwayat tryout, dan hasil permainan |
 | **Chat** | Chat dengan orang tua. Chat dengan pemain lain tetap di dalam arena |
 | **Avatar** | Pilih avatar dan kemajuan aura |
@@ -193,7 +198,7 @@ Setelah anak masuk (PIN atau kode), ia melihat dashboard ini dulu, bukan langsun
 - Chat keluarga hanya antara orang tua dan anaknya sendiri. Tidak bisa dipakai untuk menghubungi keluarga lain.
 - Riwayat chat arena disimpan sesingkat mungkin (7 hari) dan disebutkan di "Data apa yang disimpan?" saat mendaftar (UU PDP).
 - Teks chat keluarga tetap melewati saringan kata yang sama dengan arena.
-- Anak tidak bisa mengubah tugas, keuangan, atau pengaturan. Anak hanya bisa menandai tugas "Sudah".
+- Anak tidak bisa mengubah tugas atau pengaturan. Anak hanya bisa menandai tugas "Sudah", dan mencatat belanja/tabungan serta target tabungannya sendiri (bukan uang saku dari orang tua).
 
 ### Tahapan pembangunan
 1. **Kerangka menu**: menu samping di kedua dashboard, halaman dashboard anak sebelum arena, dan isi yang sudah ada dipindah ke menu yang cocok (Home, Arena, Bimbel, Report, Setting, Avatar).

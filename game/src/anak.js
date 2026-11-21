@@ -18,6 +18,7 @@ const HAL = {
   tugas: ["Tugas", "Tugas dari orang tua dan misi belajar hari ini."],
   arena: ["Arena", "Dunia 3D tempat bermain bersama teman."],
   bimbel: ["Bimbel", "Belajar dan tryout di Ruang Pintar."],
+  keuangan: ["Keuangan", "Uang saku dari orang tua. Catat sendiri uang yang kamu dapat, belanja, dan tabunganmu."],
   report: ["Report", "Catatan bermain dan belajarmu."],
   chat: ["Chat", "Pesan dengan orang tua."],
   avatar: ["Avatar", "Pilih avatar kesukaanmu."],
@@ -30,6 +31,7 @@ let toko = null;   // isi toko dari /api/toko (dimuat saat menu Toko Avatar dibu
 let tg = null;     // tugas dari orang tua: /api/tugas/saya
 let ch = { n: 0, terakhir: null, namaOrtu: "Orang tua" };   // ringkasan chat keluarga: /api/chat/belum
 let chatTimer = 0;
+let uang = null;   // uang saku (diberi orang tua) dan belanja/tabungan (dicatat anak): /api/keuangan/saya
 let yakinBeli = null;
 
 const galat = (t) => { $("galat").textContent = t || ""; $("galat").hidden = !t; };
@@ -113,6 +115,22 @@ function grafikMinggu() {
     <span class="stick" style="height:${Math.round((d.minutes / max) * 70)}px"></span><span class="day">${HARI[new Date(d.day + "T12:00:00+07:00").getDay()]}</span></div>`).join("")}</div>`;
 }
 
+// Uang saku dari orang tua; belanja, tabungan, dan target dicatat anak sendiri.
+const rp = (n) => "Rp" + Number(n || 0).toLocaleString("id-ID");
+function uangSakuku(lengkap = false) {
+  if (!uang || (!uang.riwayat.length && !uang.target)) return lengkap ? `<section class="panel"><h3>💰 Uang sakuku</h3><p class="muted">Belum ada uang saku dari orang tua.</p></section>` : "";
+  const t = uang.target;
+  const riwayat = lengkap && uang.riwayat.length ? `<ul class="daftar">${uang.riwayat.slice(0, 8).map((r) => `<li><span class="cek">${{ masuk: "➕", luar: "🎁", keluar: "🛒", tabung: "🐷", ambil: "↩️" }[r.jenis]}</span>
+      <span>${{ masuk: `Uang saku dari ${esc(ch.namaOrtu)}`, luar: "Aku dapat uang", keluar: "Aku belanja", tabung: "Aku menabung", ambil: "Ambil dari tabungan" }[r.jenis]}${r.catatan ? ` <span class="muted">· ${esc(r.catatan)}</span>` : ""}</span>
+      <span class="muted">${rp(r.jumlah)}</span>${r.oleh === "anak" ? `<button class="ghost kecil" data-hapus-uangku="${r.id}" title="Hapus catatan ini">✕</button>` : ""}</li>`).join("")}</ul>` : "";
+  return `<section class="panel"><h3>💰 Uang sakuku</h3>
+    <div class="dua-kecil"><div class="kotak"><span class="judul">👛 Dompet</span><span class="besar">${rp(uang.dompet)}</span></div>
+      <div class="kotak"><span class="judul">🐷 Tabungan</span><span class="besar">${rp(uang.tabungan)}</span></div></div>
+    ${t ? `<p class="target">🎯 Target <b>${esc(t.nama)}</b>: ${rp(uang.tabungan)} dari ${rp(t.jumlah)}</p>${bar(t.persen)}
+      <p class="muted kecil">${t.kurang ? `Kurang ${rp(t.kurang)} lagi. Semangat menabung!` : "Target tercapai! 🎉"}</p>` : ""}
+    ${riwayat}</section>`;
+}
+
 // ---------- isi tiap menu ----------
 const ISI = {
   home: () => `${kepala()}${kotakAngka()}
@@ -122,7 +140,29 @@ const ISI = {
         <h3 class="sub-judul">💬 Pesan dari ${esc(ch.namaOrtu)}</h3>${ch.terakhir
           ? `<p class="pesan-ortu">"${esc(ch.terakhir.isi)}"</p><button data-ke-hal="chat">${ch.n ? `Baca ${ch.n} pesan baru` : "Balas"}</button>`
           : `<p class="muted kecil">Belum ada pesan. <button class="link" data-ke-hal="chat">Kirim pesan</button></p>`}</section>
-    </div>`,
+    </div>
+    ${uangSakuku()}`,
+  keuangan: () => {
+    const b = uang?.bulanIni;
+    return `<div class="tiga">
+      <div class="kotak"><span class="judul">➕ Uang saku bulan ini</span><span class="besar">${b ? rp(b.masuk) : "–"}</span><span class="kecil">diberikan orang tua${b?.luar ? ` · +${rp(b.luar)} dari luar` : ""}</span></div>
+      <div class="kotak"><span class="judul">🛒 Dibelanjakan</span><span class="besar">${b ? rp(b.keluar) : "–"}</span><span class="kecil">bulan ini</span></div>
+      <div class="kotak"><span class="judul">🐷 Ditabung</span><span class="besar">${b ? rp(Math.max(0, b.tabung)) : "–"}</span><span class="kecil">bulan ini</span></div></div>
+    <div class="dua">
+      <form class="panel" id="form-uangku"><h3>✏️ Catat uangku</h3>
+        <label>Apa yang kamu lakukan? <select name="jenis"><option value="keluar">🛒 Aku belanja</option><option value="luar">🎁 Aku dapat uang (bukan uang saku)</option><option value="tabung">🐷 Aku menabung</option><option value="ambil">↩️ Ambil dari tabungan</option></select></label>
+        <label>Berapa? (Rp) <input name="jumlah" inputmode="numeric" required placeholder="Contoh: 5000" autocomplete="off" /></label>
+        <label>Keterangan (boleh kosong) <input name="catatan" maxlength="80" placeholder="Contoh: jajan, beli buku, hadiah dari nenek" /></label>
+        <div><button class="primary" type="submit">Simpan</button></div></form>
+      <form class="panel" id="form-targetku"><h3>🎯 Target tabunganku</h3>
+        ${uang?.target ? `<p class="target"><b>${esc(uang.target.nama)}</b>: ${rp(uang.tabungan)} dari ${rp(uang.target.jumlah)}</p>${bar(uang.target.persen)}` : `<p class="muted">Mau menabung untuk apa?</p>`}
+        <label>Nama target <input name="nama" maxlength="40" value="${uang?.target ? esc(uang.target.nama) : ""}" placeholder="Contoh: Sepeda" /></label>
+        <label>Jumlah (Rp) <input name="jumlah" inputmode="numeric" value="${uang?.target ? uang.target.jumlah : ""}" placeholder="Contoh: 500000" autocomplete="off" /></label>
+        <div class="row"><button class="primary" type="submit">${uang?.target ? "Ubah target" : "Pasang target"}</button>${uang?.target ? `<button type="button" class="ghost" id="hapus-targetku">Hapus target</button>` : ""}</div></form>
+    </div>
+    ${uangSakuku(true)}
+    <p class="muted kecil">Ini hanya catatan, bukan uang sungguhan di aplikasi. Bintang tetap untuk Toko Avatar.</p>`;
+  },
   tugas: () => `<div class="tiga">
       <div class="kotak"><span class="judul">✅ Hari ini</span><span class="besar">${tg ? `${tg.hariIni.disetujui} / ${tg.hariIni.total}` : "–"}</span><span class="kecil">tugas disetujui orang tua</span></div>
       <div class="kotak"><span class="judul">⏳ Menunggu dicek</span><span class="besar">${tg ? tg.hariIni.menunggu : "–"}</span><span class="kecil">orang tua akan mengecek</span></div>
@@ -149,7 +189,8 @@ const ISI = {
     return `${kotakAngka()}
       <section class="panel"><h3>⏰ Waktu bermain 7 hari</h3>${grafikMinggu()}</section>
       <div class="dua"><section class="panel"><h3>📝 Tryout terakhir</h3>${tryout}</section>
-        <section class="panel"><h3>🎲 Permainanku</h3>${permainanku()}</section></div>`;
+        <section class="panel"><h3>🎲 Permainanku</h3>${permainanku()}</section></div>
+      ${uangSakuku(true)}`;
   },
   chat: () => `<section class="panel chat-keluarga"><h3>💬 Chat dengan ${esc(ch.namaOrtu)}</h3>
       <div class="gelembung" id="gelembung"><p class="muted">Memuat…</p></div>
@@ -191,6 +232,7 @@ function gambar() {
     api("GET", "toko").then((j) => { toko = j; if (hal === "toko") gambar(); }).catch((x) => galat(x.message));
   }
   if (hal === "chat") pasangChat();
+  if (hal === "keuangan") pasangKeuangan();
   tandaChat();
 }
 function tandaChat() { $("chat-badge").textContent = ch.n; $("chat-badge").hidden = !ch.n || hal === "chat"; }
@@ -257,6 +299,27 @@ function pasangAvatar() {
     },
   });
 }
+// Menu Keuangan: mencatat belanja/menabung/ambil tabungan, memasang target, menghapus catatan sendiri.
+function pasangKeuangan() {
+  const kirim = async (form, fn) => {
+    galat("");
+    form.querySelectorAll("button").forEach((b) => (b.disabled = true));
+    try { uang = await fn(); gambar(); }
+    catch (x) { galat(x.message); form.querySelectorAll("button").forEach((b) => (b.disabled = false)); }
+  };
+  const fu = $("form-uangku");
+  fu.onsubmit = (e) => { e.preventDefault(); kirim(fu, () => api("POST", "keuangan/saya", { jenis: fu.jenis.value, jumlah: fu.jumlah.value, catatan: fu.catatan.value })); };
+  const ft = $("form-targetku");
+  ft.onsubmit = (e) => { e.preventDefault(); kirim(ft, () => api("PUT", "keuangan/saya/target", { nama: ft.nama.value, jumlah: ft.jumlah.value })); };
+  const ht = $("hapus-targetku");
+  if (ht) ht.onclick = () => kirim(ft, () => api("DELETE", "keuangan/saya/target"));
+}
+$("halaman").addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-hapus-uangku]");
+  if (!b || !confirm("Hapus catatan ini?")) return;
+  galat("");
+  try { uang = await api("DELETE", `keuangan/saya/${b.dataset.hapusUangku}`); gambar(); } catch (x) { galat(x.message); }
+});
 // Menandai tugas "Sudah".
 $("halaman").addEventListener("click", async (e) => {
   const b = e.target.closest("button[data-sudah]");
@@ -303,16 +366,18 @@ async function muat() {
   anak = me.anak;
   try { k = await api("GET", "kamarku"); } catch (x) { $("memuat").hidden = false; $("memuat").textContent = x.message; return; }
   tg = await api("GET", "tugas/saya").catch(() => null);
+  uang = await api("GET", "keuangan/saya").catch(() => null);
   ch = await api("GET", "chat/belum?sebagai=anak").catch(() => ch);
   // Bintang bisa bertambah saat orang tua menyetujui tugas: segarkan ringkasan sesekali.
   setInterval(async () => {
     if (document.hidden) return;
-    const [k2, tg2, ch2] = await Promise.all([api("GET", "kamarku").catch(() => null), api("GET", "tugas/saya").catch(() => null), api("GET", "chat/belum?sebagai=anak").catch(() => null)]);
-    const beda = (k2 && k2.bintang !== k.bintang) || (tg2 && JSON.stringify(tg2) !== JSON.stringify(tg)) || (ch2 && JSON.stringify(ch2) !== JSON.stringify(ch));
+    const [k2, tg2, ch2, u2] = await Promise.all([api("GET", "kamarku").catch(() => null), api("GET", "tugas/saya").catch(() => null), api("GET", "chat/belum?sebagai=anak").catch(() => null), api("GET", "keuangan/saya").catch(() => null)]);
+    let beda = (k2 && k2.bintang !== k.bintang) || (tg2 && JSON.stringify(tg2) !== JSON.stringify(tg)) || (ch2 && JSON.stringify(ch2) !== JSON.stringify(ch));
     if (k2) k = k2;
     if (tg2) tg = tg2;
+    if (u2) { if (JSON.stringify(u2) !== JSON.stringify(uang)) beda = true; uang = u2; }
     if (ch2 && hal !== "chat") ch = ch2;
-    if (beda && !["avatar", "toko", "chat"].includes(hal)) gambar(); else tandaChat();
+    if (beda && !["avatar", "toko", "chat", "keuangan"].includes(hal)) gambar(); else tandaChat();
   }, 30000);
   $("dash").hidden = false;
   $("top-nav").hidden = false;

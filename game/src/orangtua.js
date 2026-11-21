@@ -434,7 +434,7 @@ const HAL = {
   setting: ["Setting", "Data anak, batas waktu, PIN, dan akun Anda."],
 };
 // Menu yang isinya per anak (menampilkan pilihan anak di atas).
-const PER_ANAK = new Set(["tugas", "arena", "chat", "report", "setting"]);
+const PER_ANAK = new Set(["tugas", "arena", "keuangan", "chat", "report", "setting"]);
 let hal = HAL[location.hash.slice(1)] ? location.hash.slice(1) : "home";
 let anakDipilih = null;
 try { anakDipilih = Number(sessionStorage.getItem("ortu_anak")) || null; } catch { /* abaikan */ }
@@ -452,6 +452,7 @@ function terapkanHal() {
   $("pilih-anak").hidden = !PER_ANAK.has(hal) || kids.length < 2;
   $("pilih-anak").querySelectorAll("button").forEach((b) => b.classList.toggle("on", Number(b.dataset.anak) === anakDipilih));
   if (hal === "tugas") gambarTugas();
+  if (hal === "keuangan") gambarKeuangan();
   if (hal === "home") gambarHome();
   if (hal === "chat") gambarChat(); else clearInterval(chatTimer);
   tandaChat();
@@ -635,6 +636,72 @@ async function gambarChat() {
   } catch (x) { $("arena-log").innerHTML = `<li class="error">${esc(x.message)}</li>`; }
 }
 
+// ---------------- menu Keuangan ----------------
+// Catatan uang saku dan tabungan anak (dari GET /api/keuangan). Hanya catatan, tidak ada uang yang berpindah.
+// Orang tua hanya memberi uang saku; belanja, tabungan, dan target dicatat anak sendiri (orang tua melihat).
+let dataUang = {};
+const rp = (n) => "Rp" + Number(n || 0).toLocaleString("id-ID");
+const UANG = {
+  masuk: ["➕", "Uang saku masuk", "masuk"], luar: ["🎁", "Pemasukan dari luar", "masuk"], keluar: ["🛒", "Dibelanjakan", "keluar"],
+  tabung: ["🐷", "Ditabung", "tabung"], ambil: ["↩️", "Diambil dari tabungan", "ambil"],
+};
+function gambarKeuangan() {
+  const box = $("keuangan-isi");
+  const d = dataUang[anakDipilih];
+  if (!d) { box.innerHTML = '<section class="panel"><p class="muted">Tambahkan akun anak dulu di menu Setting.</p></section>'; return; }
+  const nama = esc(document.querySelector(`#pilih-anak [data-anak="${anakDipilih}"]`)?.dataset.nama || "anak");
+  const hariIni = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
+  const kotak = (judul, isi, kecil) => `<div class="kotak-ortu"><span class="muted">${judul}</span><b>${isi}</b><span class="muted kecil">${kecil}</span></div>`;
+  const t = d.target;
+  box.innerHTML = `
+    <div class="tiga-ortu">
+      ${kotak("👛 Dompet", rp(d.dompet), "uang saku yang dipegang")}
+      ${kotak("🐷 Tabungan", rp(d.tabungan), t ? `${t.persen}% dari target ${esc(t.nama)}` : "belum ada target")}
+      ${kotak("📅 Bulan ini", rp(d.bulanIni.masuk), `uang saku${d.bulanIni.luar ? ` · ${rp(d.bulanIni.luar)} dari luar` : ""} · ${rp(d.bulanIni.keluar)} dibelanjakan · ${rp(d.bulanIni.tabung)} ditabung`)}
+    </div>
+    <div class="dua-ortu">
+      <form class="panel" id="form-uang">
+        <h2>➕ Beri uang saku ke ${nama}</h2>
+        <div class="grid2">
+          <label>Jumlah (Rp) <input name="jumlah" inputmode="numeric" required placeholder="Contoh: 20000" autocomplete="off" /></label>
+          <label>Tanggal <input name="tanggal" type="date" value="${hariIni}" max="${hariIni}" /></label>
+        </div>
+        <label>Keterangan (boleh kosong) <input name="catatan" maxlength="80" placeholder="Contoh: uang saku minggu ini" /></label>
+        <p class="error" hidden></p>
+        <div><button class="primary" type="submit">Beri uang</button></div>
+        <p class="muted kecil">Uang dari luar (mis. hadiah), belanja, menabung, dan target tabungan dicatat ${nama} sendiri di dashboard anak.</p>
+      </form>
+      <section class="panel">
+        <h2>🎯 Target tabungan ${nama}</h2>
+        ${t ? `<p><b>${esc(t.nama)}</b>: ${rp(d.tabungan)} dari ${rp(t.jumlah)}</p>
+          <span class="bar"><span class="bar-fill" style="width:${t.persen}%"></span></span>
+          <p class="muted">${t.kurang ? `Kurang ${rp(t.kurang)} lagi.` : "Target tercapai! 🎉"}</p>` : `<p class="muted">${nama} belum memasang target. Target dipasang anak sendiri di dashboard anak.</p>`}
+      </section>
+    </div>
+    <section class="panel"><h2>Riwayat</h2><ul class="tugas-list">${d.riwayat.length ? d.riwayat.map((r) => {
+      const [ik, tx, kelas] = UANG[r.jenis];
+      return `<li><span class="tugas-ikon">${ik}</span><span class="tugas-judul"><b>${tx}</b><span class="muted kecil">${tanggalTeks(r.tanggal)} · dicatat ${r.oleh === "anak" ? nama : "Anda"}${r.catatan ? ` · ${esc(r.catatan)}` : ""}</span></span>
+        <span class="uang ${kelas}">${r.jenis === "keluar" ? "−" : r.jenis === "masuk" || r.jenis === "luar" ? "+" : ""}${rp(r.jumlah)}</span>${r.oleh !== "anak" && r.jenis === "masuk" ? `<button class="ghost danger-text" data-hapus-uang="${r.id}">Hapus</button>` : ""}</li>`;
+    }).join("") : '<li class="muted kosong">Belum ada catatan.</li>'}</ul></section>`;
+
+  const fu = $("form-uang");
+  fu.onsubmit = async (e) => {
+    e.preventDefault();
+    setErr(fu, "");
+    busy(fu, true);
+    try {
+      dataUang[anakDipilih] = await api("POST", "keuangan", { childId: anakDipilih, jenis: "masuk", jumlah: fu.jumlah.value, catatan: fu.catatan.value, tanggal: fu.tanggal.value });
+      gambarKeuangan();
+    } catch (x) { setErr(fu, x.message); busy(fu, false); }
+  };
+}
+$("keuangan-isi").addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-hapus-uang]");
+  if (!b || !confirm("Hapus catatan pemberian uang ini?")) return;
+  try { dataUang[anakDipilih] = await api("DELETE", `keuangan/${b.dataset.hapusUang}`); gambarKeuangan(); }
+  catch (x) { alert(x.message); }
+});
+
 // Kartu ringkas per anak di Home.
 function kartuHome(c, soc) {
   const el = document.createElement("article");
@@ -660,6 +727,7 @@ function kartuHome(c, soc) {
     tg && tg.hariIni.total ? `✅ Tugas hari ini ${tg.hariIni.disetujui}/${tg.hariIni.total} disetujui` : "✅ Belum ada tugas hari ini",
     tg?.menunggu.length ? `⏳ ${tg.menunggu.length} tugas menunggu Anda cek` : "",
     belumDibaca[c.id] ? `💬 ${belumDibaca[c.id]} pesan baru dari ${c.name}` : "",
+    dataUang[c.id] ? `💰 Dompet ${rp(dataUang[c.id].dompet)} · Tabungan ${rp(dataUang[c.id].tabungan)}` : "",
     `🎮 ${main} permainan · ${menang} menang`,
     tunggu ? `⚠️ ${tunggu} permintaan teman menunggu persetujuan Anda` : "",
   ].filter(Boolean);
@@ -686,9 +754,10 @@ async function load() {
   $("top-nav").hidden = !masuk;
   if (!masuk) return;
   namaOrtu = me.ortu.name;
-  const [{ children }, social, tugas, belum] = await Promise.all([api("GET", "laporan"), api("GET", "teman"), api("GET", "tugas"), api("GET", "chat/belum?sebagai=ortu")]);
+  const [{ children }, social, tugas, belum, uang] = await Promise.all([api("GET", "laporan"), api("GET", "teman"), api("GET", "tugas"), api("GET", "chat/belum?sebagai=ortu"), api("GET", "keuangan")]);
   dataTugas = tugas.anak;
   belumDibaca = belum.anak;
+  dataUang = uang.anak;
   const byId = Object.fromEntries(social.children.map((s) => [s.childId, s]));
   $("kids").replaceChildren(...children.map((c) => {
     const el = renderKid(c, byId[c.id]);

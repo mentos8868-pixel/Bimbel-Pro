@@ -189,3 +189,11 @@ main:has(#dash:not([hidden])) { max-width: 1200px; }
 .arena-log li { display: flex; justify-content: space-between; gap: 10px; padding: 7px 2px; border-bottom: 1px solid var(--border); }
 .side .badge, #chat-badge { background: var(--error); color: #fff; border-radius: 999px; padding: 0 7px; font-size: 13px; margin-left: 4px; }
 @media (max-width: 720px) { .chat-isi { grid-template-columns: 1fr; } }
+
+/* Menu Keuangan */
+.dua-ortu { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.uang { font-weight: 800; white-space: nowrap; }
+.uang.masuk { color: var(--ok); }
+.uang.keluar { color: var(--error); }
+.uang.tabung, .uang.ambil { color: #b07800; }
+@media (max-width: 720px) { .dua-ortu { grid-template-columns: 1fr; } }
