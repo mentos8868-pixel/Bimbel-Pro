@@ -53,3 +53,17 @@ export function checkText(raw) {
   }
   return { ok: true, text };
 }
+
+// Untuk chat keluarga (orang tua <-> anaknya sendiri): hanya saringan kata kasar, pesan boleh lebih panjang.
+export const MAX_KELUARGA = 300;
+export function cekPesanKeluarga(raw) {
+  const text = String(raw ?? "").replace(/[\u0000-\u0009\u000b-\u001f]/g, "").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  if (!text) return { ok: false, reason: "Pesan kosong." };
+  if (text.length > MAX_KELUARGA) return { ok: false, reason: `Pesan maksimal ${MAX_KELUARGA} huruf.` };
+  const words = normalizeWords(text);
+  const joined = words.join("");
+  if (words.some((w) => BAD_SET.has(w)) || BAD_PARTS.some((p) => joined.includes(p))) {
+    return { ok: false, reason: "Pesan berisi kata yang tidak sopan." };
+  }
+  return { ok: true, text };
+}

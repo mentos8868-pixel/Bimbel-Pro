@@ -12,6 +12,7 @@ import { handleToko } from "./toko.js";
 import { kamarku } from "./kamarku.js";
 import { handleProgres, ringkasBelajar } from "./progres.js";
 import { handleTugas } from "./tugas.js";
+import { handleChat } from "./chat.js";
 import { negaraOr, isNegara, jenjangDariKelas } from "../shared/negara.js";
 import { parentView, parentDecide, unblock, purgeUid, notify, kick } from "./social.js";
 import { sendMail, APP_URL } from "./mailer.js";
@@ -544,6 +545,9 @@ export async function handleApi(req, res) {
 
     // --- tugas dari orang tua (orang tua dan anak) ---
     if (handleTugas({ m, path, body, url, ortuId: ortu?.parent_id ?? null, anak, ownChild, send, ApiError })) return true;
+
+    // --- chat keluarga dan riwayat chat arena ---
+    if (handleChat({ m, path, body, url, ortuId: ortu?.parent_id ?? null, anak, ownChild, send, ApiError })) return true;
 
     // --- kemajuan Ruang Pintar (anak) ---
     if (handleProgres({ m, path, body, anak, send, ApiError })) return true;

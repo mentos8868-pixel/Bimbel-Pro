@@ -1,5 +1,6 @@
 // Chat, profil pemain, pertemanan, undangan, blokir, dan laporan di dalam arena.
 import { PRESETS, checkText } from "../../shared/chat.js";
+import { catatChatArena } from "../chat.js";
 import {
   uidOf, chatSetting, isMuted, block, blockedEitherWay, report, REASONS,
   relation, requestFriend, answerFriend, friendsOf, areFriends,
@@ -45,6 +46,8 @@ export function setupSocial(room) {
     const log = room.lastChats.get(from) || [];
     log.push({ text, at: now });
     room.lastChats.set(from, log.slice(-10));
+    // Pesan anak disimpan 7 hari supaya orang tuanya bisa membaca di dashboard (menu Chat).
+    if (client.auth.role === "anak") catatChatArena(client.auth.childId, text, preset);
 
     const msg = { from: client.sessionId, name: client.auth.name, text, preset };
     for (const c of room.clients) {

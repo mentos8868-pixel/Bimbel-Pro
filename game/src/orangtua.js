@@ -125,6 +125,8 @@ $("form-atur").addEventListener("submit", async (e) => {
     f.reset();
     showAuth("masuk");
     await load();
+// Tanda pesan baru di menu Chat diperbarui tiap 30 detik.
+setInterval(() => { if (!$("dash").hidden && !document.hidden) segarkanBelum().then(() => { if (hal === "home") gambarHome(); }); }, 30000);
   } catch (x) { setErr(f, x.message); } finally { busy(f, false); }
 });
 
@@ -432,7 +434,7 @@ const HAL = {
   setting: ["Setting", "Data anak, batas waktu, PIN, dan akun Anda."],
 };
 // Menu yang isinya per anak (menampilkan pilihan anak di atas).
-const PER_ANAK = new Set(["tugas", "arena", "report", "setting"]);
+const PER_ANAK = new Set(["tugas", "arena", "chat", "report", "setting"]);
 let hal = HAL[location.hash.slice(1)] ? location.hash.slice(1) : "home";
 let anakDipilih = null;
 try { anakDipilih = Number(sessionStorage.getItem("ortu_anak")) || null; } catch { /* abaikan */ }
@@ -451,6 +453,8 @@ function terapkanHal() {
   $("pilih-anak").querySelectorAll("button").forEach((b) => b.classList.toggle("on", Number(b.dataset.anak) === anakDipilih));
   if (hal === "tugas") gambarTugas();
   if (hal === "home") gambarHome();
+  if (hal === "chat") gambarChat(); else clearInterval(chatTimer);
+  tandaChat();
 }
 // Kartu Home digambar ulang setiap kali dibuka, supaya angka tugas yang baru disetujui ikut berubah.
 let dataHome = { children: [], byId: {} };
@@ -557,6 +561,80 @@ $("tugas-isi").addEventListener("click", async (e) => {
   } catch (x) { alert(x.message); b.disabled = false; }
 });
 
+// ---------------- menu Chat ----------------
+// Kiri: chat keluarga dengan anak yang dipilih. Kanan: riwayat chat arena anak (7 hari, hanya dibaca).
+let belumDibaca = {};   // { <id anak>: jumlah pesan anak yang belum dibaca }
+let chatTimer = 0;
+const jam = (at) => new Date(at).toLocaleString("id-ID", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+const CHAT_ARENA = { mati: "Chat arena anak sedang dimatikan, jadi tidak ada pesan baru.", siap: "Anak hanya bisa memakai pesan siap pakai di arena.", bebas: "Anak boleh menulis teks bebas (disaring) di arena." };
+
+function tandaChat() {
+  const n = Object.values(belumDibaca).reduce((a, b) => a + b, 0);
+  $("chat-badge").textContent = n;
+  $("chat-badge").hidden = !n;
+  $("pilih-anak").querySelectorAll("button").forEach((b) => {
+    const k = belumDibaca[b.dataset.anak] || 0;
+    b.textContent = b.dataset.nama + (k && hal === "chat" ? ` (${k})` : "");
+  });
+}
+async function segarkanBelum() {
+  try { belumDibaca = (await api("GET", "chat/belum?sebagai=ortu")).anak; tandaChat(); } catch { /* abaikan */ }
+}
+
+function gelembung(p, saya) {
+  return `<div class="gel ${p.dari === saya ? "saya" : "dia"}"><div>${esc(p.isi).replace(/\n/g, "<br>")}</div><span class="muted kecil">${jam(p.at)}${p.dari === saya && p.dibaca ? " · dibaca" : ""}</span></div>`;
+}
+async function gambarChat() {
+  const box = $("chat-isi");
+  clearInterval(chatTimer);
+  if (!anakDipilih) { box.innerHTML = '<section class="panel"><p class="muted">Tambahkan akun anak dulu di menu Setting.</p></section>'; return; }
+  const id = anakDipilih;
+  const nama = esc(document.querySelector(`#pilih-anak [data-anak="${id}"]`)?.dataset.nama || "anak");
+  box.innerHTML = `<section class="panel chat-keluarga"><h2>Chat dengan ${nama}</h2>
+      <div class="gelembung" id="gelembung"><p class="muted">Memuat…</p></div>
+      <form id="form-chat" class="chat-form"><textarea name="isi" rows="2" maxlength="300" placeholder="Tulis pesan untuk ${nama}…"></textarea><button class="primary" type="submit">Kirim</button></form>
+      <p class="error" hidden></p></section>
+    <section class="panel chat-arena"><h2>Chat ${nama} di arena</h2><p class="muted kecil" id="arena-ket"></p><ul class="arena-log" id="arena-log"><li class="muted">Memuat…</li></ul></section>`;
+  const f = $("form-chat");
+  const muatPesan = async () => {
+    if (hal !== "chat" || anakDipilih !== id) return clearInterval(chatTimer);
+    try {
+      const { pesan } = await api("GET", `chat/keluarga?sebagai=ortu&anak=${id}`);
+      const g = $("gelembung");
+      if (!g) return;
+      const bawah = g.scrollTop + g.clientHeight >= g.scrollHeight - 20;
+      g.innerHTML = pesan.length ? pesan.map((p) => gelembung(p, "ortu")).join("") : `<p class="muted">Belum ada pesan. Sapa ${nama} lebih dulu!</p>`;
+      if (bawah || !g.dataset.sudah) { g.scrollTop = g.scrollHeight; g.dataset.sudah = "1"; }
+      belumDibaca[id] = 0;
+      tandaChat();
+    } catch (x) { setErr(box.querySelector(".chat-keluarga"), x.message); }
+  };
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    const sec = box.querySelector(".chat-keluarga");
+    setErr(sec, "");
+    if (!f.isi.value.trim()) return;
+    busy(f, true);
+    try {
+      await api("POST", "chat/keluarga", { sebagai: "ortu", anak: id, isi: f.isi.value });
+      f.isi.value = "";
+      await muatPesan();
+      $("gelembung").scrollTop = $("gelembung").scrollHeight;
+    } catch (x) { setErr(sec, x.message); } finally { busy(f, false); f.isi.focus(); }
+  };
+  // Enter mengirim, Shift+Enter membuat baris baru (nyaman di laptop).
+  f.isi.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); f.requestSubmit(); } });
+  await muatPesan();
+  chatTimer = setInterval(muatPesan, 5000);
+  try {
+    const r = await api("GET", `chat/arena?sebagai=ortu&anak=${id}`);
+    $("arena-ket").textContent = `${CHAT_ARENA[r.chat] || ""} Hanya pesan yang dikirim ${nama.replace(/&[^;]+;/g, "")} yang disimpan, selama ${r.simpanHari} hari.`;
+    $("arena-log").innerHTML = r.pesan.length
+      ? r.pesan.map((p) => `<li><span>${esc(p.isi)}${p.preset ? ' <span class="muted kecil">(pesan siap pakai)</span>' : ""}</span><span class="muted kecil">${jam(p.at)}</span></li>`).join("")
+      : `<li class="muted">Belum ada chat di arena dalam 7 hari terakhir.</li>`;
+  } catch (x) { $("arena-log").innerHTML = `<li class="error">${esc(x.message)}</li>`; }
+}
+
 // Kartu ringkas per anak di Home.
 function kartuHome(c, soc) {
   const el = document.createElement("article");
@@ -570,7 +648,7 @@ function kartuHome(c, soc) {
     <div><div class="today-label"><strong>Hari ini</strong><span class="t"></span></div>
       <div class="bar"><span class="bar-fill ${persen >= 100 ? "full" : persen >= 75 ? "warn" : ""}" style="width:${persen}%"></span></div></div>
     <ul class="home-poin"></ul>
-    <div class="row"><button data-buka="tugas">✅ Tugas</button><button data-buka="report">📊 Report</button><button data-buka="arena">🎮 Arena</button><button data-buka="setting">⚙️ Setting</button></div>`;
+    <div class="row"><button data-buka="tugas">✅ Tugas</button><button data-buka="chat">💬 Chat</button><button data-buka="report">📊 Report</button><button data-buka="arena">🎮 Arena</button><button data-buka="setting">⚙️ Setting</button></div>`;
   el.querySelector(".dot").innerHTML = avatarSvg(c.avatar, c.color, { aksesori: c.aksesori, aura: c.aura });
   el.querySelector(".nama").textContent = c.name;
   el.querySelector(".jenjang").textContent = kelasText(c);
@@ -581,6 +659,7 @@ function kartuHome(c, soc) {
     b?.ulangi ? `💪 Perlu diulang: ${b.ulangi.nama}` : "",
     tg && tg.hariIni.total ? `✅ Tugas hari ini ${tg.hariIni.disetujui}/${tg.hariIni.total} disetujui` : "✅ Belum ada tugas hari ini",
     tg?.menunggu.length ? `⏳ ${tg.menunggu.length} tugas menunggu Anda cek` : "",
+    belumDibaca[c.id] ? `💬 ${belumDibaca[c.id]} pesan baru dari ${c.name}` : "",
     `🎮 ${main} permainan · ${menang} menang`,
     tunggu ? `⚠️ ${tunggu} permintaan teman menunggu persetujuan Anda` : "",
   ].filter(Boolean);
@@ -607,8 +686,9 @@ async function load() {
   $("top-nav").hidden = !masuk;
   if (!masuk) return;
   namaOrtu = me.ortu.name;
-  const [{ children }, social, tugas] = await Promise.all([api("GET", "laporan"), api("GET", "teman"), api("GET", "tugas")]);
+  const [{ children }, social, tugas, belum] = await Promise.all([api("GET", "laporan"), api("GET", "teman"), api("GET", "tugas"), api("GET", "chat/belum?sebagai=ortu")]);
   dataTugas = tugas.anak;
+  belumDibaca = belum.anak;
   const byId = Object.fromEntries(social.children.map((s) => [s.childId, s]));
   $("kids").replaceChildren(...children.map((c) => {
     const el = renderKid(c, byId[c.id]);
@@ -618,6 +698,7 @@ async function load() {
   $("pilih-anak").replaceChildren(...children.map((c) => {
     const b = document.createElement("button");
     b.dataset.anak = c.id;
+    b.dataset.nama = c.name;
     b.textContent = c.name;
     return b;
   }));

@@ -27,6 +27,8 @@ let anak = null;   // profil dari /api/saya
 let k = null;      // ringkasan dari /api/kamarku
 let toko = null;   // isi toko dari /api/toko (dimuat saat menu Avatar dibuka)
 let tg = null;     // tugas dari orang tua: /api/tugas/saya
+let ch = { n: 0, terakhir: null, namaOrtu: "Orang tua" };   // ringkasan chat keluarga: /api/chat/belum
+let chatTimer = 0;
 let yakinBeli = null;
 
 const galat = (t) => { $("galat").textContent = t || ""; $("galat").hidden = !t; };
@@ -116,7 +118,9 @@ const ISI = {
     <div class="dua">
       <section class="panel"><h3>✅ Tugas hari ini</h3>${daftarTugas()}<h3 class="sub-judul">🎯 Misi belajar</h3>${daftarMisi()}</section>
       <section class="panel"><h3>Mau ke mana?</h3><div class="aksi-besar">${tombolArena()}${tombolBimbel()}</div>
-        <p class="muted kecil">💬 Pesan dari orang tua segera hadir.</p></section>
+        <h3 class="sub-judul">💬 Pesan dari ${esc(ch.namaOrtu)}</h3>${ch.terakhir
+          ? `<p class="pesan-ortu">"${esc(ch.terakhir.isi)}"</p><button data-ke-hal="chat">${ch.n ? `Baca ${ch.n} pesan baru` : "Balas"}</button>`
+          : `<p class="muted kecil">Belum ada pesan. <button class="link" data-ke-hal="chat">Kirim pesan</button></p>`}</section>
     </div>`,
   tugas: () => `<div class="tiga">
       <div class="kotak"><span class="judul">✅ Hari ini</span><span class="besar">${tg ? `${tg.hariIni.disetujui} / ${tg.hariIni.total}` : "–"}</span><span class="kecil">tugas disetujui orang tua</span></div>
@@ -146,7 +150,10 @@ const ISI = {
       <div class="dua"><section class="panel"><h3>📝 Tryout terakhir</h3>${tryout}</section>
         <section class="panel"><h3>🎲 Permainanku</h3>${permainanku()}</section></div>`;
   },
-  chat: () => segera("Chat dengan orang tua", "Segera hadir. Di sini kamu bisa mengirim pesan ke orang tuamu. Chat dengan pemain lain tetap ada di dalam arena."),
+  chat: () => `<section class="panel chat-keluarga"><h3>💬 Chat dengan ${esc(ch.namaOrtu)}</h3>
+      <div class="gelembung" id="gelembung"><p class="muted">Memuat…</p></div>
+      <form id="form-chat" class="chat-form"><textarea name="isi" rows="2" maxlength="300" placeholder="Tulis pesan untuk ${esc(ch.namaOrtu)}…"></textarea><button class="primary" type="submit">Kirim</button></form>
+      <p class="muted kecil">Chat dengan pemain lain tetap ada di dalam arena.</p></section>`,
   avatar: () => `${kepala()}
     <section class="panel"><h3>🐻 Pilih avatar</h3><div id="pilih-avatar"></div><span id="avatar-ok" class="muted" hidden>Avatar tersimpan ✓</span></section>
     <section class="panel"><h3>🛍️ Toko Avatar <span class="saldo">★ ${toko ? toko.bintang : k.bintang} bintang</span></h3>
@@ -174,8 +181,48 @@ function gambar() {
   $("judul").textContent = hal === "home" ? `Halo, ${anak.name}!` : judul;
   $("sub").textContent = sub;
   $("menu").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.ke === hal));
+  clearInterval(chatTimer);
   $("halaman").innerHTML = ISI[hal]();
   if (hal === "avatar") pasangAvatar();
+  if (hal === "chat") pasangChat();
+  tandaChat();
+}
+function tandaChat() { $("chat-badge").textContent = ch.n; $("chat-badge").hidden = !ch.n || hal === "chat"; }
+
+// Chat keluarga: pesan dimuat ulang tiap 5 detik selama menu Chat terbuka. Enter mengirim, Shift+Enter baris baru.
+function pasangChat() {
+  const f = $("form-chat");
+  const muat = async () => {
+    if (hal !== "chat") return clearInterval(chatTimer);
+    try {
+      const { pesan } = await api("GET", "chat/keluarga?sebagai=anak");
+      const g = $("gelembung");
+      if (!g) return;
+      const bawah = g.scrollTop + g.clientHeight >= g.scrollHeight - 20;
+      g.innerHTML = pesan.length
+        ? pesan.map((p) => `<div class="gel ${p.dari === "anak" ? "saya" : "dia"}"><div>${esc(p.isi).replace(/\n/g, "<br>")}</div>
+            <span class="muted kecil">${new Date(p.at).toLocaleString("id-ID", { weekday: "short", hour: "2-digit", minute: "2-digit" })}${p.dari === "anak" && p.dibaca ? " · dibaca" : ""}</span></div>`).join("")
+        : `<p class="muted">Belum ada pesan. Kirim salam ke ${esc(ch.namaOrtu)}!</p>`;
+      if (bawah || !g.dataset.sudah) { g.scrollTop = g.scrollHeight; g.dataset.sudah = "1"; }
+      ch.n = 0;
+      tandaChat();
+    } catch (x) { galat(x.message); }
+  };
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    galat("");
+    if (!f.isi.value.trim()) return;
+    f.querySelector("button").disabled = true;
+    try {
+      await api("POST", "chat/keluarga", { sebagai: "anak", isi: f.isi.value });
+      f.isi.value = "";
+      await muat();
+      $("gelembung").scrollTop = $("gelembung").scrollHeight;
+    } catch (x) { galat(x.message); } finally { f.querySelector("button").disabled = false; f.isi.focus(); }
+  };
+  f.isi.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); f.requestSubmit(); } });
+  muat();
+  chatTimer = setInterval(muat, 5000);
 }
 function keHal(h) {
   hal = h;
@@ -185,6 +232,7 @@ function keHal(h) {
   window.scrollTo(0, 0);
 }
 $("menu").addEventListener("click", (e) => { const b = e.target.closest("[data-ke]"); if (b) keHal(b.dataset.ke); });
+$("halaman").addEventListener("click", (e) => { const b = e.target.closest("[data-ke-hal]"); if (b) keHal(b.dataset.keHal); });
 
 function pasangAvatar() {
   let okTimer = 0;
@@ -253,14 +301,16 @@ async function muat() {
   anak = me.anak;
   try { k = await api("GET", "kamarku"); } catch (x) { $("memuat").hidden = false; $("memuat").textContent = x.message; return; }
   tg = await api("GET", "tugas/saya").catch(() => null);
+  ch = await api("GET", "chat/belum?sebagai=anak").catch(() => ch);
   // Bintang bisa bertambah saat orang tua menyetujui tugas: segarkan ringkasan sesekali.
   setInterval(async () => {
     if (document.hidden) return;
-    const [k2, tg2] = await Promise.all([api("GET", "kamarku").catch(() => null), api("GET", "tugas/saya").catch(() => null)]);
-    const beda = (k2 && k2.bintang !== k.bintang) || (tg2 && JSON.stringify(tg2) !== JSON.stringify(tg));
+    const [k2, tg2, ch2] = await Promise.all([api("GET", "kamarku").catch(() => null), api("GET", "tugas/saya").catch(() => null), api("GET", "chat/belum?sebagai=anak").catch(() => null)]);
+    const beda = (k2 && k2.bintang !== k.bintang) || (tg2 && JSON.stringify(tg2) !== JSON.stringify(tg)) || (ch2 && JSON.stringify(ch2) !== JSON.stringify(ch));
     if (k2) k = k2;
     if (tg2) tg = tg2;
-    if (beda && hal !== "avatar") gambar();
+    if (ch2 && hal !== "chat") ch = ch2;
+    if (beda && hal !== "avatar" && hal !== "chat") gambar(); else tandaChat();
   }, 30000);
   $("dash").hidden = false;
   $("top-nav").hidden = false;
