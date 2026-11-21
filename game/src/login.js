@@ -62,6 +62,10 @@ export function setupLogin(onStart) {
       me = { ortu: null, anak: null, children: [], offline: true };
     }
     if (me.anak) {
+      // Anak selalu mulai dari dashboard anak. Tombol "Masuk arena" di sana membuka /?arena=1.
+      const keArena = new URLSearchParams(location.search).has("arena");
+      if (!keArena) { location.replace("/anak.html"); return; }
+      history.replaceState(null, "", location.pathname);
       $("siap-judul").textContent = `Halo, ${me.anak.name}!`;
       const sisa = me.anak.limitMin ? Math.max(0, me.anak.limitMin - me.anak.usedMin) : null;
       $("siap-avatar").innerHTML = avatarSvg(me.anak.avatar, me.anak.color, { aksesori: me.anak.aksesori, aura: me.anak.aura });
@@ -69,7 +73,16 @@ export function setupLogin(onStart) {
       anakPicker.set(me.anak.avatar);
       $("anak-avatar-ok").hidden = true;
       $("siap-info").textContent = `${me.anak.jenjang}` + (sisa !== null ? ` · sisa waktu bermain hari ini ${sisa} menit` : "");
-      return go("siap");
+      // Langsung masuk arena. Bila gagal (mis. waktu bermain habis), tampilkan layar siap beserta pesannya.
+      try {
+        await api("GET", "tiket?sebagai=anak");
+        box().hidden = true;
+        onStart(childProfile(me.anak), "anak");
+      } catch (x) {
+        go("siap");
+        err("siap", x.message);
+      }
+      return;
     }
     if (me.ortu) {
       ortuPicker.set(me.ortu.avatar || DEFAULT_ORTU_AVATAR);

@@ -264,41 +264,5 @@ a.btn {
   .toko-atas img { width: 64px; height: 64px; }
 }
 
-/* ---------- Kamarku (dashboard anak, dirancang untuk laptop) ---------- */
-#kamarku-panel { z-index: 20; }   /* di atas tombol Chat/Teman */
-.kamar-card { width: min(960px, 100%); gap: 14px; }
-.kamar-kepala { display: flex; align-items: center; gap: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
-.kamar-kepala img { width: 84px; height: 84px; flex: none; }
-.kamar-nama { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.kamar-level { display: flex; align-items: center; gap: 10px; font-size: 14px; }
-.kamar-level .lv { background: var(--text); color: #fff; font-weight: 800; border-radius: 10px; padding: 3px 10px; white-space: nowrap; }
-.kamar-bar { flex: 1; height: 10px; background: #e8eef4; border-radius: 6px; overflow: hidden; min-width: 80px; }
-.kamar-bar i { display: block; height: 100%; background: var(--primary); border-radius: 6px; }
-.kamar-bar.hijau i { background: #2e9e5b; }
-.kamar-bar.oranye i { background: #f28c28; }
-.kamar-angka { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.kamar-kotak { background: #f4f8fc; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
-.kamar-kotak .judul { font-size: 14px; color: var(--muted); font-weight: 700; }
-.kamar-kotak .besar { font-size: 26px; font-weight: 800; }
-.kamar-kotak .kecil { font-size: 13px; color: var(--muted); }
-.kamar-dua { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
-.kamar-dua h3 { margin: 0 0 6px; font-size: 16px; }
-.kamar-baris { display: flex; align-items: center; gap: 8px; padding: 8px 2px; border-bottom: 1px solid var(--border); font-size: 15px; }
-.kamar-baris > :first-child:not(.cek) { flex: 1; }
-.kamar-baris .on { color: #2e9e5b; font-weight: 700; }
-.kamar-catatan { background: #eef6ff; color: #1d4f91; border-radius: 10px; padding: 8px 10px; font-size: 14px; margin-top: 8px; }
-.kamar-aksi { display: flex; gap: 10px; padding-top: 12px; border-top: 1px solid var(--border); }
-.kamar-aksi button { flex: 1; font-weight: 700; }
-/* Layar sempit (HP) belum jadi fokus: cukup ditumpuk satu kolom. */
-@media (max-width: 720px) {
-  .kamar-angka, .kamar-dua { grid-template-columns: 1fr; }
-  .kamar-aksi { flex-direction: column; }
-}
-.kamar-sub { margin-top: 14px !important; }
-.kamar-baris .cek { flex: none; width: 20px; color: var(--muted); }
-.kamar-baris .cek.on { color: #2e9e5b; }
-.kamar-baris .cek + span { flex: 1; }
-.kamar-mapel { display: flex; flex-direction: column; gap: 4px; padding: 6px 2px; font-size: 15px; }
-.kamar-mapel > div { display: flex; justify-content: space-between; gap: 8px; }
-#kamar-isi button.primary { margin-top: 6px; }
-.kamar-mapel .kamar-bar { flex: none; }
+/* Tautan ke dashboard anak di layar siap */
+.btn-link { display: block; text-align: center; padding: 8px; color: var(--primary); font-weight: 700; text-decoration: none; }

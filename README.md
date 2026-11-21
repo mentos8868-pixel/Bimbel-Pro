@@ -19,6 +19,7 @@ npm run dev
 Lalu buka:
 - Arena: http://localhost:5173
 - Dashboard orang tua: http://localhost:5173/orangtua.html
+- Dashboard anak: http://localhost:5173/anak.html (anak diarahkan ke sini setelah masuk)
 - Di HP/tablet yang tersambung ke Wi-Fi yang sama: http://ALAMAT-IP-LAPTOP:5173 (alamatnya muncul di terminal pada baris "Network")
 
 ## Cara memakai akun

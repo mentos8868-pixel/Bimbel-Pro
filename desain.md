@@ -104,6 +104,8 @@ Permainan kartu dengan nama, aturan, dan tampilan sendiri, bukan Uno.
 
 ## 7. Dashboard anak "Kamarku" (rancangan, belum dibangun)
 
+> **Diganti** pada 22 November 2026 oleh dashboard anak di `anak.html` (lihat bagian 8). Panel Kamarku di arena sudah dihapus; isinya pindah ke dashboard anak.
+
 Dirancang 21 November 2026, **fokus laptop**.
 
 **Status:** Tahap 1 sudah dibangun (21 November 2026): kepala dengan Level/XP, waktu main, bintang dan aksesori, permainan, teman, dan tombol cepat. Kode: `game/src/kamarku-ui.js` dan `server/kamarku.js` (`GET /api/kamarku`, khusus sesi anak). 
@@ -138,3 +140,55 @@ Dirancang 21 November 2026, **fokus laptop**.
 - Daftar teman hanya nama panggilan dan status di arena.
 - Pengaturan (batas waktu, chat, pertemanan) tetap hanya bisa diubah orang tua; anak hanya melihat hasilnya.
 - Bahasa positif: "Coba ulangi" bukan "Gagal", jumlah menang ditonjolkan, bukan kalah.
+
+---
+
+## 8. Penataan ulang dashboard orang tua dan anak
+
+Dirancang 21 November 2026 dari susunan menu pengguna, **fokus laptop**. Kedua dashboard memakai menu di sisi kiri.
+
+**Status (22 November 2026):** tahap 1 sudah dibangun. Dashboard orang tua memakai menu samping; setiap bagian kartu anak ditandai `data-hal` sesuai menunya, jadi isi lama tetap dipakai. Dashboard anak ada di `anak.html` (`game/src/anak.js`): setelah masuk dengan PIN atau kode, anak diarahkan ke sana; "Masuk arena" membuka `/?arena=1`, dan di arena ada tombol "Dashboard". Ruang Pintar punya tautan kembali ke dashboard. Panel Kamarku di arena dihapus (isinya pindah ke dashboard anak; data tetap dari `/api/kamarku`, kini ditambah menit bermain 7 hari). Menu Tugas, Keuangan, dan Chat masih bertuliskan "Segera hadir".
+
+### Dashboard orang tua (`orangtua.html`)
+Di bagian atas ada pilihan anak (Budi / Liliya), kecuali di menu Home yang menampilkan semua anak.
+
+| Menu | Isi |
+|------|-----|
+| **Home** | Satu kartu per anak: sisa waktu main hari ini, tugas hari ini (selesai/menunggu dicek), ringkasan belajar, pesan baru, dan hal yang perlu tindakan (permintaan teman, tugas menunggu persetujuan) |
+| **Tugas** | Orang tua membuat tugas: judul, jenis (Ibadah, Rumah, Belajar, Lainnya), jadwal (sekali, setiap hari, atau hari tertentu), dan bintang hadiah (boleh 0). Anak menandai "Sudah", lalu orang tua menekan **Setujui** atau **Belum**. Tugas belajar (mis. "2 latihan Matematika") bisa tercentang otomatis dari Ruang Pintar |
+| **Arena** | Hasil Catur, Scramble, dan Kartu Kilat, permainan terakhir, daftar teman dan persetujuan pertemanan, pemain yang diblokir, dan izin arena (Cari lawan, jenis chat) |
+| **Keuangan** | Catatan keuangan anak: uang saku masuk, pengeluaran, tabungan, dan target tabungan. Hadiah tugas bisa dicatat sebagai uang saku. *(Isi menu ini perlu dipastikan lagi dengan pengguna.)* |
+| **Chat** | (1) Chat keluarga: pesan antara orang tua dan anaknya. (2) Riwayat chat arena anak, hanya bisa dibaca |
+| **Report** | Waktu main 7 hari, kemajuan Ruang Pintar per pelajaran, riwayat tryout, medali, dan tugas yang selesai minggu ini |
+| **Setting** | Per anak: kurikulum, kelas, negara, batas waktu, ganti PIN, buat kode masuk, avatar, dan hapus akun anak. Untuk orang tua: nama, avatar, ganti kata sandi, hapus akun |
+
+### Dashboard anak (halaman baru, sebelum arena)
+Setelah anak masuk (PIN atau kode), ia melihat dashboard ini dulu, bukan langsung arena. Dari arena ada tombol kembali ke dashboard. Panel Kamarku di arena diganti tombol "Dashboard".
+
+| Menu | Isi |
+|------|-----|
+| **Home** | Level dan aura, sisa waktu main, bintang, medali, tugas hari ini, pesan baru dari orang tua, tombol cepat Masuk arena dan Belajar |
+| **Tugas** | Daftar tugas dari orang tua dengan tombol **Sudah**, status (menunggu dicek / disetujui), dan bintang hadiah. Misi belajar harian juga di sini |
+| **Arena** | Tombol masuk dunia 3D, teman yang sedang di arena, dan hasil permainanku |
+| **Bimbel** | Tombol membuka Ruang Pintar, kemajuan per pelajaran, misi tryout hari ini, dan saran "coba ulangi" |
+| **Report** | Waktu main 7 hari, medali, riwayat tryout, dan hasil permainan |
+| **Chat** | Chat dengan orang tua. Chat dengan pemain lain tetap di dalam arena |
+| **Avatar** | Pilih avatar, Toko Avatar (aksesori dengan bintang), dan kemajuan aura |
+
+### Data baru di server
+- `tugas` (orang tua, anak, judul, jenis, jadwal, bintang, aktif) dan `tugas_catatan` (tugas, tanggal, status: menunggu / disetujui / belum). Bintang hadiah ditambahkan saat orang tua menyetujui.
+- `pesan_keluarga` (keluarga, pengirim, penerima, isi, waktu, dibaca). Hanya antar anggota keluarga yang sama.
+- `chat_arena_log` (anak, isi, waktu, ruang): **disimpan 7 hari** lalu dihapus otomatis, hanya bisa dibaca orang tua anak itu.
+- `keuangan` (anak, jenis: masuk/keluar/tabung, jumlah, catatan, tanggal), bila isi menu Keuangan disetujui.
+
+### Keamanan anak
+- Chat keluarga hanya antara orang tua dan anaknya sendiri. Tidak bisa dipakai untuk menghubungi keluarga lain.
+- Riwayat chat arena disimpan sesingkat mungkin (7 hari) dan disebutkan di "Data apa yang disimpan?" saat mendaftar (UU PDP).
+- Teks chat keluarga tetap melewati saringan kata yang sama dengan arena.
+- Anak tidak bisa mengubah tugas, keuangan, atau pengaturan. Anak hanya bisa menandai tugas "Sudah".
+
+### Tahapan pembangunan
+1. **Kerangka menu**: menu samping di kedua dashboard, halaman dashboard anak sebelum arena, dan isi yang sudah ada dipindah ke menu yang cocok (Home, Arena, Bimbel, Report, Setting, Avatar).
+2. **Tugas**: membuat, menandai, dan menyetujui tugas, serta bintang hadiah.
+3. **Chat**: chat keluarga, lalu riwayat chat arena untuk orang tua.
+4. **Keuangan**: setelah isinya dipastikan.

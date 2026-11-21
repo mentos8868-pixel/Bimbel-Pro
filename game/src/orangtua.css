@@ -130,3 +130,28 @@ label.check input { width: 20px; height: 20px; margin-top: 2px; flex: none; }
 .belajar-baris { display: grid; grid-template-columns: 140px 1fr 90px; align-items: center; gap: 10px; font-size: 15px; padding: 3px 0; }
 .belajar-baris .bar { margin-top: 0; }
 .belajar-baris .muted { text-align: right; }
+
+/* ---------- Dashboard dengan menu samping (laptop) ---------- */
+main:has(#dash:not([hidden])) { max-width: 1200px; }
+.dash { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 20px; align-items: start; }
+.side { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 4px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 10px; }
+.side button { text-align: left; border: none; background: transparent; padding: 10px 12px; font-size: 16px; }
+.side button:hover { background: #f1f5fa; }
+.side button.on { background: #e3efff; color: #1d4f91; }
+.isi { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.judul-hal { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.judul-hal p { margin: 0; }
+.pilih-anak { display: flex; gap: 6px; }
+.pilih-anak button { padding: 6px 14px; font-size: 15px; }
+.pilih-anak button.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+.luar { display: none !important; }
+.home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+.home-poin { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 15px; }
+.home-kartu .row button { padding: 6px 12px; font-size: 14px; }
+.segera { border-style: dashed; }
+/* Di dalam satu menu, bagian kartu anak tidak perlu garis pemisah bawaan. */
+.dash .settings, .dash .social, .dash .belajar { border-top: none; padding-top: 0; margin-top: 0; }
+@media (max-width: 720px) {
+  .dash { grid-template-columns: 1fr; }
+  .side { position: static; flex-direction: row; flex-wrap: wrap; }
+}

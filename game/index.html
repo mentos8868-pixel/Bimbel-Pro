@@ -85,6 +85,7 @@
           </details>
           <span class="error" hidden></span>
           <button class="primary" data-act="main-anak">Masuk ke arena</button>
+          <a class="btn-link" href="/anak.html">🏠 Ke dashboard</a>
           <button class="ghost" data-act="ganti">Bukan kamu? Ganti pemain</button>
         </section>
 
@@ -106,7 +107,7 @@
       <div id="hud-hint" class="pill muted">WASD / panah untuk berjalan</div>
     </div>
     <div id="social-btns" hidden>
-      <button id="btn-kamarku" hidden>🏠 Kamarku <span class="muted small">[K]</span></button>
+      <button id="btn-dashboard" hidden>🏠 Dashboard</button>
       <button id="btn-chat">Chat</button>
       <button id="btn-teman">Teman <span id="teman-badge" class="badge" hidden></span></button>
     </div>
@@ -284,28 +285,6 @@
         </div>
         <span id="ktr-menu-error" class="error" hidden></span>
         <button class="ghost" data-mode="tutup">Tutup</button>
-      </div>
-    </div>
-
-    <!-- Kamarku: dashboard anak (tombol "Kamarku" atau K). Isinya dari /api/kamarku -->
-    <div id="kamarku-panel" class="overlay" hidden>
-      <div class="card kamar-card" role="dialog" aria-labelledby="kamar-judul">
-        <div class="kamar-kepala">
-          <img id="kamar-avatar" alt="Avatarmu" />
-          <div class="kamar-nama">
-            <h2 id="kamar-judul">Kamarku</h2>
-            <div id="kamar-info" class="muted small"></div>
-            <div id="kamar-level" class="kamar-level"></div>
-          </div>
-          <button class="ghost" id="kamar-tutup">Tutup <span class="muted small">[Esc]</span></button>
-        </div>
-        <div id="kamar-isi"><p class="muted">Memuat kamarmu…</p></div>
-        <span id="kamar-error" class="error" hidden></span>
-        <div class="kamar-aksi">
-          <button data-ke="bimbel">📚 Ke Ruang Bimbel</button>
-          <button data-ke="game">🎲 Ke Ruang Game</button>
-          <button data-ke="toko">🛍️ Buka Toko</button>
-        </div>
       </div>
     </div>
 

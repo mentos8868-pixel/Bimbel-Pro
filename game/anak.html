@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard Anak</title>
+    <link rel="stylesheet" href="/src/orangtua.css" />
+    <link rel="stylesheet" href="/src/avatar.css" />
+    <link rel="stylesheet" href="/src/anak.css" />
+  </head>
+  <body class="hal-anak">
+    <header class="top">
+      <strong>Bimbel Pro</strong>
+      <nav id="top-nav" hidden>
+        <button id="btn-keluar" class="ghost">Bukan kamu? Ganti pemain</button>
+      </nav>
+    </header>
+
+    <main>
+      <p id="memuat" class="muted">Memuat…</p>
+
+      <!-- Belum masuk sebagai anak -->
+      <section id="belum" class="panel" hidden>
+        <h2>Masuk dulu, ya</h2>
+        <p class="muted">Dashboard ini untuk akun anak. Masuk dengan PIN di perangkat keluarga, atau dengan kode masuk dari orang tua.</p>
+        <div><a class="btn btn-utama" href="/">Ke halaman masuk</a></div>
+      </section>
+
+      <!-- Dashboard anak: menu samping, isi tiap menu digambar oleh anak.js -->
+      <section id="dash" class="dash" hidden>
+        <nav class="side" id="menu" aria-label="Menu dashboard">
+          <button data-ke="home" class="on">🏠 Home</button>
+          <button data-ke="tugas">✅ Tugas</button>
+          <button data-ke="arena">🌍 Arena</button>
+          <button data-ke="bimbel">📚 Bimbel</button>
+          <button data-ke="report">📊 Report</button>
+          <button data-ke="chat">💬 Chat</button>
+          <button data-ke="avatar">🐻 Avatar</button>
+        </nav>
+        <div class="isi">
+          <div class="judul-hal">
+            <div>
+              <h1 id="judul"></h1>
+              <p id="sub" class="muted"></p>
+            </div>
+          </div>
+          <div id="halaman" class="halaman"></div>
+          <p id="galat" class="error" hidden></p>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/anak.js"></script>
+  </body>
+</html>

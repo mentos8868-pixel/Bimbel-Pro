@@ -12,7 +12,6 @@ import { KartuUI } from "./kartu-ui.js";
 import { ChessUI } from "./chess-ui.js";
 import { ScrambleUI } from "./scramble-ui.js";
 import { TokoUI } from "./toko-ui.js";
-import { KamarkuUI } from "./kamarku-ui.js";
 
 const $ = (id) => document.getElementById(id);
 const SPEED = 5.5; // meter per detik
@@ -93,14 +92,9 @@ async function start(profile, playingAs) {
   // Keyboard
   const keys = new Set();
   let uiOpen = false;
-  let kamar = null;   // panel Kamarku (hanya akun anak), dibuat di bawah
   window.addEventListener("keydown", (e) => {
     if (e.target.tagName === "INPUT") return;
-    const kunci = e.key.toLowerCase();
-    // Kamarku: K membuka/menutup, Esc menutup.
-    if (kamar && kamar.terbuka && (kunci === "k" || kunci === "escape")) return kamar.close();
-    if (kamar && kunci === "k" && !uiOpen) return bukaKamar();
-    keys.add(kunci);
+    keys.add(e.key.toLowerCase());
     if (e.key.toLowerCase() === "e" && !uiOpen && nearTable) useTable(nearTable);
   });
   window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
@@ -376,38 +370,12 @@ async function start(profile, playingAs) {
     },
   });
 
-  // ---------- Kamarku (dashboard anak) ----------
-  // Tombol cepat memindahkan avatar ke depan ruangan, atau langsung membuka Toko.
-  const TUJUAN = { bimbel: { x: 0, z: 25.5, ry: 0 }, game: { x: 21, z: 0, ry: Math.PI / 2 } };
-  kamar = playingAs === "anak" ? new KamarkuUI({
-    onClose: () => (uiOpen = false),
-    onKe: (ke) => {
-      if (ke === "toko") return useTable({ id: "toko" });
-      const t = TUJUAN[ke];
-      me.root.position.set(t.x, 0, t.z);
-      me.root.rotation.y = t.ry;
-    },
-  }) : null;
-  function bukaKamar() {
-    if (!kamar || uiOpen) return;
-    uiOpen = true;
-    keys.clear();
-    kamar.open(profile);
-  }
-  if (kamar) {
+  // ---------- Kembali ke dashboard anak ----------
+  if (playingAs === "anak") {
     $("social-btns").hidden = false;
-    $("btn-kamarku").hidden = false;
-    $("btn-kamarku").onclick = () => (kamar.terbuka ? kamar.close() : bukaKamar());
+    $("btn-dashboard").hidden = false;
+    $("btn-dashboard").onclick = () => (location.href = "/anak.html");
     if (!social) { $("btn-chat").hidden = true; $("btn-teman").hidden = true; }
-    // Terbuka sendiri sekali sehari saat anak pertama kali masuk arena.
-    const kunciHari = `kamarku_hari_a${profile.childId}`;
-    const hari = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" });
-    let sudah = null;
-    try { sudah = localStorage.getItem(kunciHari); } catch { /* penyimpanan diblokir */ }
-    if (sudah !== hari) {
-      try { localStorage.setItem(kunciHari, hari); } catch { /* abaikan */ }
-      bukaKamar();
-    }
   }
 
   let nearTable = null;

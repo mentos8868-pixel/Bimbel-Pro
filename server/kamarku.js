@@ -1,7 +1,7 @@
 // Kamarku: ringkasan untuk anak yang sedang masuk (dashboard anak di arena).
 // Hanya data milik anak itu sendiri; tidak ada perbandingan dengan pemain lain.
 // Kemajuan Ruang Pintar (medali, misi, topik) dibaca dari server/progres.js.
-import { db, today } from "./db.js";
+import { db, today, lastDays } from "./db.js";
 import { AKSESORI, rapikanAksesori } from "../shared/aksesori.js";
 import { XP_PER_LEVEL, levelDariXp, auraUntukLevel, auraBerikutnya } from "../shared/aura.js";
 import { friendsOf, isOnline } from "./social.js";
@@ -16,6 +16,11 @@ export function kamarku(childId) {
 
   const detik = db.prepare("SELECT seconds FROM play_time WHERE child_id = ? AND day = ?").get(c.id, today())?.seconds || 0;
   const usedMin = Math.floor(detik / 60);
+
+  // Menit bermain 7 hari terakhir (untuk menu Report di dashboard anak).
+  const hari = lastDays(7);
+  const perHari = Object.fromEntries(db.prepare("SELECT day, seconds FROM play_time WHERE child_id = ? AND day >= ?").all(c.id, hari[0]).map((r) => [r.day, r.seconds]));
+  const minggu = hari.map((d) => ({ day: d, minutes: Math.floor((perHari[d] || 0) / 60) }));
 
   const level = levelDariXp(c.xp);
   const aura = auraUntukLevel(level), next = auraBerikutnya(level);
@@ -40,6 +45,7 @@ export function kamarku(childId) {
     .sort((a, b) => b.online - a.online || a.name.localeCompare(b.name));
 
   return {
+    minggu,
     waktu: { usedMin, limitMin: c.limit_min, sisaMin: c.limit_min > 0 ? Math.max(0, c.limit_min - usedMin) : null },
     level, xp: c.xp, xpLevel: c.xp % XP_PER_LEVEL, xpPerLevel: XP_PER_LEVEL,
     aura: aura ? aura.nama : "", auraBerikut: next ? { nama: next.nama, level: next.dari } : null,

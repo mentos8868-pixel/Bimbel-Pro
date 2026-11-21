@@ -1,0 +1,53 @@
+/* Dashboard anak. Dasar tampilan (menu samping, panel, tombol, grafik) dari orangtua.css. */
+body.hal-anak { background: #eef6ff; }
+.halaman { display: flex; flex-direction: column; gap: 16px; }
+.halaman h3 { display: flex; align-items: center; gap: 10px; }
+.halaman h4 { margin: 8px 0 4px; }
+a.btn-utama, .btn-utama { background: var(--primary); color: #fff; border-color: var(--primary); }
+.btn-besar { font-size: 18px; padding: 14px 18px; text-align: center; flex: 1; }
+.aksi-besar { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.kepala-anak { flex-direction: row; align-items: center; gap: 18px; }
+.ava-besar { width: 96px; height: 96px; flex: none; display: block; }
+.ava-besar svg { width: 100%; height: 100%; }
+.kepala-isi { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.level-baris { display: flex; align-items: center; gap: 10px; font-size: 14px; margin-top: 4px; }
+.level-baris .bar { flex: 1; margin-top: 0; min-width: 80px; }
+.lv { background: var(--text); color: #fff; font-weight: 800; border-radius: 10px; padding: 3px 10px; white-space: nowrap; }
+
+.tiga { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.dua { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.kotak { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.kotak .judul { font-size: 14px; color: var(--muted); font-weight: 700; }
+.kotak .besar { font-size: 26px; font-weight: 800; }
+.kotak .kecil, .kecil { font-size: 13px; color: var(--muted); }
+.panel .kotak { border: none; background: #f4f8fc; }
+
+.daftar { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.daftar li { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--border); }
+.daftar li:last-child { border-bottom: none; }
+.daftar li > span:nth-child(2) { flex: 1; }
+.daftar .cek { width: 20px; flex: none; color: var(--muted); text-align: center; }
+.daftar .beres .cek, .daftar .cek.on, .on { color: #2e9e5b; font-weight: 700; }
+.catatan { margin: 6px 0 0; background: #eef6ff; color: #1d4f91; border-radius: 10px; padding: 8px 10px; font-size: 14px; }
+.segera { border-style: dashed; }
+
+.mapel { display: flex; flex-direction: column; gap: 6px; }
+.mapel-baris { display: grid; grid-template-columns: 160px 1fr 90px; align-items: center; gap: 10px; }
+.mapel-baris .bar { margin-top: 0; }
+.mapel-baris .muted { text-align: right; }
+
+.saldo { margin-left: auto; background: #fff4d6; color: #7a5200; border-radius: 999px; padding: 3px 12px; font-size: 15px; }
+.toko-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.toko-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px; border: 2px solid #eee3d0; border-radius: 14px; text-align: center; background: #fff; }
+.toko-item .av-face { width: 76px; height: 76px; display: block; }
+.toko-item .av-face svg { width: 100%; height: 100%; }
+.toko-item.pakai { border-color: var(--primary); background: #eef6ff; }
+.toko-item button { padding: 6px 12px; font-size: 14px; width: 100%; }
+.toko-item button.yakin { background: #f2b134; border-color: #f2b134; }
+
+/* Layar sempit (HP) belum jadi fokus: cukup ditumpuk satu kolom. */
+@media (max-width: 720px) {
+  .tiga, .dua { grid-template-columns: 1fr; }
+  .kepala-anak { flex-direction: column; text-align: center; }
+}

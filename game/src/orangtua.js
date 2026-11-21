@@ -419,6 +419,77 @@ function renderKid(c, soc) {
   return el;
 }
 
+// ---------------- menu samping ----------------
+// Setiap bagian ditandai data-hal="<menu> [menu lain]". Menu yang tidak aktif disembunyikan dengan kelas
+// "luar" (bukan atribut hidden, karena beberapa bagian memakai hidden untuk keperluan lain).
+const HAL = {
+  home: ["Home", "Ringkasan semua anak hari ini."],
+  tugas: ["Tugas", "Tugas rumah, ibadah, dan belajar untuk anak."],
+  arena: ["Arena", "Hasil permainan, teman, dan izin di arena."],
+  keuangan: ["Keuangan", "Uang saku dan tabungan anak."],
+  chat: ["Chat", "Pesan keluarga dan riwayat chat arena."],
+  report: ["Report", "Waktu bermain dan kemajuan belajar."],
+  setting: ["Setting", "Data anak, batas waktu, PIN, dan akun Anda."],
+};
+// Menu yang isinya per anak (menampilkan pilihan anak di atas).
+const PER_ANAK = new Set(["arena", "report", "setting"]);
+let hal = HAL[location.hash.slice(1)] ? location.hash.slice(1) : "home";
+let anakDipilih = null;
+try { anakDipilih = Number(sessionStorage.getItem("ortu_anak")) || null; } catch { /* abaikan */ }
+let namaOrtu = "";
+
+function terapkanHal() {
+  const [judul, sub] = HAL[hal];
+  $("halo").textContent = hal === "home" ? `Halo, ${namaOrtu}!` : judul;
+  $("sub-hal").textContent = sub;
+  $("menu").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.ke === hal));
+  $("dash").querySelectorAll("[data-hal]").forEach((el) => el.classList.toggle("luar", !el.dataset.hal.split(" ").includes(hal)));
+  const kids = [...$("kids").children];
+  if (kids.length && !kids.some((k) => Number(k.dataset.anak) === anakDipilih)) anakDipilih = Number(kids[0].dataset.anak);
+  for (const k of kids) k.hidden = !PER_ANAK.has(hal) || Number(k.dataset.anak) !== anakDipilih;
+  $("pilih-anak").hidden = !PER_ANAK.has(hal) || kids.length < 2;
+  $("pilih-anak").querySelectorAll("button").forEach((b) => b.classList.toggle("on", Number(b.dataset.anak) === anakDipilih));
+}
+function keHal(h, idAnak) {
+  hal = h;
+  if (idAnak) anakDipilih = idAnak;
+  try { sessionStorage.setItem("ortu_anak", String(anakDipilih || "")); } catch { /* abaikan */ }
+  history.replaceState(null, "", h === "home" ? location.pathname : `#${h}`);
+  terapkanHal();
+  window.scrollTo(0, 0);
+}
+$("menu").addEventListener("click", (e) => { const b = e.target.closest("[data-ke]"); if (b) keHal(b.dataset.ke); });
+$("pilih-anak").addEventListener("click", (e) => { const b = e.target.closest("[data-anak]"); if (b) keHal(hal, Number(b.dataset.anak)); });
+
+// Kartu ringkas per anak di Home.
+function kartuHome(c, soc) {
+  const el = document.createElement("article");
+  el.className = "panel home-kartu";
+  const used = c.week.at(-1)?.minutes ?? c.usedMin;
+  const persen = c.limitMin ? Math.min(100, Math.round((used / c.limitMin) * 100)) : 0;
+  const tunggu = (soc?.approvals || []).length;
+  const b = c.belajar;
+  el.innerHTML = `<header class="kid-head"><span class="dot av-face"></span><div><h2 class="nama"></h2><span class="muted jenjang"></span></div></header>
+    <div><div class="today-label"><strong>Hari ini</strong><span class="t"></span></div>
+      <div class="bar"><span class="bar-fill ${persen >= 100 ? "full" : persen >= 75 ? "warn" : ""}" style="width:${persen}%"></span></div></div>
+    <ul class="home-poin"></ul>
+    <div class="row"><button data-buka="report">📊 Report</button><button data-buka="arena">🎮 Arena</button><button data-buka="setting">⚙️ Setting</button></div>`;
+  el.querySelector(".dot").innerHTML = avatarSvg(c.avatar, c.color, { aksesori: c.aksesori, aura: c.aura });
+  el.querySelector(".nama").textContent = c.name;
+  el.querySelector(".jenjang").textContent = kelasText(c);
+  el.querySelector(".t").textContent = c.limitMin ? `${used} dari ${c.limitMin} menit` : `${used} menit (tanpa batas)`;
+  const menang = Object.values(c.stats).reduce((n, s) => n + s.menang, 0), main = Object.values(c.stats).reduce((n, s) => n + s.main, 0);
+  const poin = [
+    b ? `📚 ${b.latihan7Hari} latihan minggu ini · ${b.medali.punya}/${b.medali.total} medali` : "📚 Belum berlatih di Ruang Pintar",
+    b?.ulangi ? `💪 Perlu diulang: ${b.ulangi.nama}` : "",
+    `🎮 ${main} permainan · ${menang} menang`,
+    tunggu ? `⚠️ ${tunggu} permintaan teman menunggu persetujuan Anda` : "",
+  ].filter(Boolean);
+  el.querySelector(".home-poin").replaceChildren(...poin.map((t) => Object.assign(document.createElement("li"), { textContent: t })));
+  el.addEventListener("click", (e) => { const x = e.target.closest("[data-buka]"); if (x) keHal(x.dataset.buka, c.id); });
+  return el;
+}
+
 // ---------------- muat ----------------
 async function load() {
   $("memuat").hidden = false;
@@ -436,11 +507,26 @@ async function load() {
   $("dash").hidden = !masuk;
   $("top-nav").hidden = !masuk;
   if (!masuk) return;
-  $("halo").textContent = `Halo, ${me.ortu.name}!`;
+  namaOrtu = me.ortu.name;
   const [{ children }, social] = await Promise.all([api("GET", "laporan"), api("GET", "teman")]);
   const byId = Object.fromEntries(social.children.map((s) => [s.childId, s]));
-  $("kids").replaceChildren(...children.map((c) => renderKid(c, byId[c.id])));
+  $("kids").replaceChildren(...children.map((c) => {
+    const el = renderKid(c, byId[c.id]);
+    el.dataset.anak = c.id;
+    return el;
+  }));
+  $("pilih-anak").replaceChildren(...children.map((c) => {
+    const b = document.createElement("button");
+    b.dataset.anak = c.id;
+    b.textContent = c.name;
+    return b;
+  }));
+  const kosong = Object.assign(document.createElement("section"), { className: "panel" });
+  kosong.innerHTML = '<h2>Belum ada akun anak</h2><p class="muted">Tambahkan akun anak di menu Setting.</p><div><button class="primary" data-buka="setting">⚙️ Ke Setting</button></div>';
+  kosong.querySelector("button").onclick = () => keHal("setting");
+  $("home").replaceChildren(...(children.length ? children.map((c) => kartuHome(c, byId[c.id])) : [kosong]));
   $("form-anak").querySelector("h2").textContent = children.length ? "Tambah akun anak" : "Mulai dengan menambah akun anak";
+  terapkanHal();
 }
 
 load();

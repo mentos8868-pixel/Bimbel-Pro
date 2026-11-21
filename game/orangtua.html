@@ -100,12 +100,45 @@
       </section>
 
       <!-- Sudah masuk -->
-      <section id="dash" hidden>
-        <h1 id="halo">Halo!</h1>
-        <p class="muted">Pantau waktu bermain dan hasil permainan anak, lalu atur batas dan izinnya.</p>
-        <div id="kids"></div>
+      <section id="dash" class="dash" hidden>
+        <!-- Menu samping. Setiap bagian halaman ditandai data-hal (menu tempat ia tampil). -->
+        <nav class="side" id="menu" aria-label="Menu dashboard">
+          <button data-ke="home" class="on">🏠 Home</button>
+          <button data-ke="tugas">✅ Tugas</button>
+          <button data-ke="arena">🎮 Arena</button>
+          <button data-ke="keuangan">💰 Keuangan</button>
+          <button data-ke="chat">💬 Chat</button>
+          <button data-ke="report">📊 Report</button>
+          <button data-ke="setting">⚙️ Setting</button>
+        </nav>
 
-        <form id="form-anak" class="panel">
+        <div class="isi">
+          <div class="judul-hal">
+            <div>
+              <h1 id="halo">Halo!</h1>
+              <p id="sub-hal" class="muted"></p>
+            </div>
+            <div id="pilih-anak" class="pilih-anak" role="tablist" aria-label="Pilih anak"></div>
+          </div>
+
+          <div id="home" class="home-grid" data-hal="home"></div>
+
+          <div id="kids"></div>
+
+          <section class="panel segera" data-hal="tugas">
+            <h2>Tugas untuk anak</h2>
+            <p class="muted">Segera hadir. Anda bisa membuat tugas seperti salat, mencuci piring, atau 2 latihan Matematika. Anak menandai "Sudah", lalu Anda setujui dan beri bintang hadiah.</p>
+          </section>
+          <section class="panel segera" data-hal="keuangan">
+            <h2>Keuangan anak</h2>
+            <p class="muted">Segera hadir: catatan uang saku, pengeluaran, dan tabungan anak.</p>
+          </section>
+          <section class="panel segera" data-hal="chat">
+            <h2>Chat</h2>
+            <p class="muted">Segera hadir: chat keluarga dengan anak, dan riwayat chat arena anak (disimpan 7 hari).</p>
+          </section>
+
+        <form id="form-anak" class="panel" data-hal="setting">
           <h2>Tambah akun anak</h2>
           <div class="grid2">
             <label>Nama panggilan <input name="name" maxlength="16" required placeholder="Contoh: Budi" /></label>
@@ -132,7 +165,7 @@
           <button class="primary" type="submit">Tambah anak</button>
         </form>
 
-        <details class="panel danger">
+        <details class="panel danger" data-hal="setting">
           <summary>Hapus akun saya</summary>
           <p>Semua akun anak, laporan, dan riwayat permainan akan terhapus permanen dan tidak bisa dikembalikan.</p>
           <form id="form-hapus-akun" class="row">
@@ -141,6 +174,7 @@
           </form>
           <p class="error" hidden></p>
         </details>
+        </div>
       </section>
     </main>
 
@@ -151,30 +185,31 @@
           <div><h2 class="nama"></h2><span class="muted jenjang"></span></div>
         </header>
 
-        <details class="av-edit">
+        <details class="av-edit" data-hal="setting">
           <summary>Ganti avatar</summary>
           <div class="av-edit-picker"></div>
           <span class="av-saved muted" hidden>Avatar tersimpan ✓</span>
         </details>
 
-        <div class="today">
+        <div class="today" data-hal="report">
           <div class="today-label"><strong>Hari ini</strong> <span class="today-text"></span></div>
           <div class="bar"><span class="bar-fill"></span></div>
         </div>
 
-        <div class="week" aria-label="Menit bermain 7 hari terakhir"></div>
+        <div class="week" data-hal="report" aria-label="Menit bermain 7 hari terakhir"></div>
 
-        <table class="stats">
+        <h3 data-hal="arena">Hasil permainan</h3>
+        <table class="stats" data-hal="arena">
           <thead><tr><th>Game</th><th>Main</th><th>Menang</th><th>Kalah</th><th>Seri</th></tr></thead>
           <tbody></tbody>
         </table>
 
-        <details class="recent-box">
+        <details class="recent-box" data-hal="arena">
           <summary>10 permainan terakhir</summary>
           <ul class="recent"></ul>
         </details>
 
-        <div class="belajar">
+        <div class="belajar" data-hal="report">
           <h3>Ruang Pintar</h3>
           <p class="belajar-ringkas muted"></p>
           <div class="belajar-mapel"></div>
@@ -186,17 +221,18 @@
         </div>
 
         <form class="settings">
-          <h3>Pengaturan</h3>
-          <label>Kurikulum sekolah (dipakai di Ruang Pintar)
+          <h3 data-hal="setting">Pengaturan anak</h3>
+          <h3 data-hal="arena">Izin di arena</h3>
+          <label data-hal="setting">Kurikulum sekolah (dipakai di Ruang Pintar)
             <select name="kurikulum" class="pilih-kurikulum"></select>
           </label>
-          <label>Kelas (tampil di papan nama avatar dan dipakai di Ruang Pintar)
+          <label data-hal="setting">Kelas (tampil di papan nama avatar dan dipakai di Ruang Pintar)
             <select name="kelas" class="pilih-kelas"></select>
           </label>
-          <label>Negara (benderanya tampil di papan nama avatar)
+          <label data-hal="setting">Negara (benderanya tampil di papan nama avatar)
             <select name="negara" class="pilih-negara"></select>
           </label>
-          <label>Batas waktu bermain per hari
+          <label data-hal="setting">Batas waktu bermain per hari
             <select name="limitMin">
               <option value="15">15 menit</option>
               <option value="30">30 menit</option>
@@ -207,29 +243,29 @@
               <option value="0">Tanpa batas</option>
             </select>
           </label>
-          <label class="check">
+          <label class="check" data-hal="arena">
             <input type="checkbox" name="allowStrangers" />
             <span>Boleh bermain dengan pemain lain lewat "Cari lawan" (hanya yang sejenjang). Bila mati, anak hanya bisa
               lawan bot atau main dengan kode meja.</span>
           </label>
-          <label>Chat di arena
+          <label data-hal="arena">Chat di arena
             <select name="chat">
               <option value="mati">Mati (tidak bisa mengirim maupun melihat chat)</option>
               <option value="siap">Pesan siap pakai saja ("Halo!", "Ayo main!", …)</option>
               <option value="bebas">Teks bebas dengan saringan (SMP/SMA)</option>
             </select>
           </label>
-          <label class="check">
+          <label class="check" data-hal="arena">
             <input type="checkbox" name="approveFriends" />
             <span>Pertemanan baru perlu persetujuan saya</span>
           </label>
-          <div class="row">
+          <div class="row" data-hal="arena setting">
             <button class="primary" type="submit">Simpan</button>
             <span class="saved muted" hidden>Tersimpan ✓</span>
           </div>
         </form>
 
-        <div class="social">
+        <div class="social" data-hal="arena">
           <h3>Teman</h3>
           <div class="approvals"></div>
           <ul class="friends"></ul>
@@ -239,12 +275,12 @@
           </div>
         </div>
 
-        <div class="actions">
+        <div class="actions" data-hal="setting">
           <button class="btn-kode">Buat kode masuk</button>
           <button class="btn-pin">Ganti PIN</button>
           <button class="btn-hapus ghost danger-text">Hapus akun anak</button>
         </div>
-        <p class="kode-box" hidden></p>
+        <p class="kode-box" data-hal="setting" hidden></p>
         <p class="error" hidden></p>
       </article>
     </template>

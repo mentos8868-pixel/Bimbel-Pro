@@ -19,6 +19,7 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, "index.html"),
         orangtua: resolve(import.meta.dirname, "orangtua.html"),
+        anak: resolve(import.meta.dirname, "anak.html"),
       },
     },
   },
