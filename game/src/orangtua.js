@@ -432,7 +432,7 @@ const HAL = {
   setting: ["Setting", "Data anak, batas waktu, PIN, dan akun Anda."],
 };
 // Menu yang isinya per anak (menampilkan pilihan anak di atas).
-const PER_ANAK = new Set(["arena", "report", "setting"]);
+const PER_ANAK = new Set(["tugas", "arena", "report", "setting"]);
 let hal = HAL[location.hash.slice(1)] ? location.hash.slice(1) : "home";
 let anakDipilih = null;
 try { anakDipilih = Number(sessionStorage.getItem("ortu_anak")) || null; } catch { /* abaikan */ }
@@ -449,6 +449,17 @@ function terapkanHal() {
   for (const k of kids) k.hidden = !PER_ANAK.has(hal) || Number(k.dataset.anak) !== anakDipilih;
   $("pilih-anak").hidden = !PER_ANAK.has(hal) || kids.length < 2;
   $("pilih-anak").querySelectorAll("button").forEach((b) => b.classList.toggle("on", Number(b.dataset.anak) === anakDipilih));
+  if (hal === "tugas") gambarTugas();
+  if (hal === "home") gambarHome();
+}
+// Kartu Home digambar ulang setiap kali dibuka, supaya angka tugas yang baru disetujui ikut berubah.
+let dataHome = { children: [], byId: {} };
+function gambarHome() {
+  const { children, byId } = dataHome;
+  const kosong = Object.assign(document.createElement("section"), { className: "panel" });
+  kosong.innerHTML = '<h2>Belum ada akun anak</h2><p class="muted">Tambahkan akun anak di menu Setting.</p><div><button class="primary">⚙️ Ke Setting</button></div>';
+  kosong.querySelector("button").onclick = () => keHal("setting");
+  $("home").replaceChildren(...(children.length ? children.map((c) => kartuHome(c, byId[c.id])) : [kosong]));
 }
 function keHal(h, idAnak) {
   hal = h;
@@ -461,6 +472,91 @@ function keHal(h, idAnak) {
 $("menu").addEventListener("click", (e) => { const b = e.target.closest("[data-ke]"); if (b) keHal(b.dataset.ke); });
 $("pilih-anak").addEventListener("click", (e) => { const b = e.target.closest("[data-anak]"); if (b) keHal(hal, Number(b.dataset.anak)); });
 
+// ---------------- menu Tugas ----------------
+// Data dari GET /api/tugas: { anak: { <id>: { tugas, menunggu, hariIni, minggu } } }.
+let dataTugas = {};
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const IKON_JENIS = { ibadah: "🕌", rumah: "🏠", belajar: "📚", lainnya: "⭐" };
+const NAMA_JENIS = { ibadah: "Ibadah", rumah: "Rumah", belajar: "Belajar", lainnya: "Lainnya" };
+const NAMA_HARI = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+const jadwalTeks = (t) => (t.jadwal === "harian" ? "Setiap hari" : t.jadwal === "sekali" ? "Sekali" : t.hari.map((h) => NAMA_HARI[h]).join(", "));
+const STATUS = { "": ["○", "belum dikerjakan", ""], menunggu: ["⏳", "menunggu dicek", "tunggu"], disetujui: ["✔", "disetujui", "ok"], belum: ["↺", "diminta mengulang", "ulang"] };
+function tanggalTeks(tgl) {
+  const hariIni = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
+  const kemarin = new Date(Date.now() + 7 * 3600e3 - 86400e3).toISOString().slice(0, 10);
+  return tgl === hariIni ? "hari ini" : tgl === kemarin ? "kemarin" : new Date(tgl + "T12:00:00+07:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "short" });
+}
+
+function gambarTugas() {
+  const box = $("tugas-isi");
+  const d = dataTugas[anakDipilih];
+  if (!d) { box.innerHTML = '<section class="panel"><p class="muted">Tambahkan akun anak dulu di menu Setting.</p></section>'; return; }
+  const nama = esc(document.querySelector(`#pilih-anak [data-anak="${anakDipilih}"]`)?.textContent || "anak");
+  const kotak = (judul, isi, kecil) => `<div class="kotak-ortu"><span class="muted">${judul}</span><b>${isi}</b><span class="muted kecil">${kecil}</span></div>`;
+  const tunggu = d.menunggu.length
+    ? d.menunggu.map((t) => `<li class="approval"><span>${IKON_JENIS[t.jenis] || ""} <b>${esc(t.judul)}</b> · ${tanggalTeks(t.tanggal)}${t.bintang ? ` · ★${t.bintang}` : ""}</span>
+        <span class="row"><button class="primary" data-setujui="${t.id}" data-tgl="${t.tanggal}">Setujui</button><button data-belum="${t.id}" data-tgl="${t.tanggal}">Belum</button></span></li>`).join("")
+    : `<li class="muted kosong">Tidak ada tugas yang menunggu dicek.</li>`;
+  const daftar = d.tugas.length
+    ? d.tugas.map((t) => {
+        const [ikon, teks, kelas] = STATUS[t.status] || STATUS[""];
+        return `<li><span class="tugas-ikon">${IKON_JENIS[t.jenis] || ""}</span><span class="tugas-judul"><b>${esc(t.judul)}</b><span class="muted kecil">${NAMA_JENIS[t.jenis]} · ${jadwalTeks(t)}${t.bintang ? ` · ★${t.bintang}` : ""}</span></span>
+          <span class="tugas-status ${kelas}">${t.hariIni ? `${ikon} ${teks}` : '<span class="muted">bukan hari ini</span>'}</span>
+          <button class="ghost danger-text" data-hapus="${t.id}">Hapus</button></li>`;
+      }).join("")
+    : `<li class="muted kosong">Belum ada tugas. Buat tugas pertama di bawah.</li>`;
+  box.innerHTML = `
+    <div class="tiga-ortu">
+      ${kotak("Tugas hari ini", `${d.hariIni.disetujui} / ${d.hariIni.total}`, "sudah disetujui")}
+      ${kotak("Menunggu dicek", d.menunggu.length, d.menunggu.length ? "perlu tindakan Anda" : "semua sudah dicek")}
+      ${kotak("7 hari terakhir", d.minggu.persen === null ? "–" : `${d.minggu.persen}%`, `${d.minggu.beres} dari ${d.minggu.wajib} tugas selesai`)}
+    </div>
+    <section class="panel"><h2>Menunggu dicek</h2><ul class="tugas-list">${tunggu}</ul></section>
+    <section class="panel"><h2>Tugas ${nama}</h2><ul class="tugas-list">${daftar}</ul></section>
+    <form class="panel" id="form-tugas">
+      <h2>Tugas baru untuk ${nama}</h2>
+      <div class="grid2">
+        <label>Nama tugas <input name="judul" maxlength="60" required placeholder="Contoh: Salat Subuh, Mencuci piring" /></label>
+        <label>Jenis <select name="jenis">${Object.entries(NAMA_JENIS).map(([k, v]) => `<option value="${k}">${IKON_JENIS[k]} ${v}</option>`).join("")}</select></label>
+        <label>Jadwal <select name="jadwal"><option value="harian">Setiap hari</option><option value="hari">Hari tertentu</option><option value="sekali">Sekali saja</option></select></label>
+        <label>Bintang hadiah (masuk saat Anda setujui) <select name="bintang">${[0, 1, 2, 3, 4, 5].map((n) => `<option value="${n}" ${n === 1 ? "selected" : ""}>${n ? "★".repeat(n) + ` (${n})` : "Tanpa bintang"}</option>`).join("")}</select></label>
+      </div>
+      <div class="pilih-hari" hidden>${NAMA_HARI.map((h, i) => `<label class="check"><input type="checkbox" name="hari" value="${i}" /><span>${h}</span></label>`).join("")}</div>
+      <p class="error" hidden></p>
+      <div><button class="primary" type="submit">Tambah tugas</button></div>
+    </form>`;
+  const f = $("form-tugas");
+  f.jadwal.onchange = () => (f.querySelector(".pilih-hari").hidden = f.jadwal.value !== "hari");
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    setErr(f, "");
+    const hari = [...f.querySelectorAll('[name="hari"]:checked')].map((x) => Number(x.value));
+    if (f.jadwal.value === "hari" && !hari.length) return setErr(f, "Pilih minimal satu hari.");
+    busy(f, true);
+    try {
+      dataTugas[anakDipilih] = await api("POST", "tugas", { childId: anakDipilih, judul: f.judul.value, jenis: f.jenis.value, jadwal: f.jadwal.value, hari, bintang: Number(f.bintang.value) });
+      gambarTugas();
+    } catch (x) { setErr(f, x.message); busy(f, false); }
+  };
+}
+// Tombol Setujui / Belum / Hapus di menu Tugas.
+$("tugas-isi").addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-setujui], button[data-belum], button[data-hapus]");
+  if (!b) return;
+  try {
+    if (b.dataset.hapus) {
+      const judul = b.closest("li").querySelector(".tugas-judul b").textContent;
+      if (!confirm(`Hapus tugas "${judul}"? Riwayatnya tetap tersimpan.`)) return;
+      dataTugas[anakDipilih] = await api("DELETE", `tugas/${b.dataset.hapus}`);
+    } else {
+      b.disabled = true;
+      const aksi = b.dataset.setujui ? "setujui" : "belum";
+      dataTugas[anakDipilih] = await api("POST", `tugas/${b.dataset.setujui || b.dataset.belum}/${aksi}`, { tanggal: b.dataset.tgl });
+    }
+    gambarTugas();
+  } catch (x) { alert(x.message); b.disabled = false; }
+});
+
 // Kartu ringkas per anak di Home.
 function kartuHome(c, soc) {
   const el = document.createElement("article");
@@ -468,12 +564,13 @@ function kartuHome(c, soc) {
   const used = c.week.at(-1)?.minutes ?? c.usedMin;
   const persen = c.limitMin ? Math.min(100, Math.round((used / c.limitMin) * 100)) : 0;
   const tunggu = (soc?.approvals || []).length;
+  const tg = dataTugas[c.id];
   const b = c.belajar;
   el.innerHTML = `<header class="kid-head"><span class="dot av-face"></span><div><h2 class="nama"></h2><span class="muted jenjang"></span></div></header>
     <div><div class="today-label"><strong>Hari ini</strong><span class="t"></span></div>
       <div class="bar"><span class="bar-fill ${persen >= 100 ? "full" : persen >= 75 ? "warn" : ""}" style="width:${persen}%"></span></div></div>
     <ul class="home-poin"></ul>
-    <div class="row"><button data-buka="report">📊 Report</button><button data-buka="arena">🎮 Arena</button><button data-buka="setting">⚙️ Setting</button></div>`;
+    <div class="row"><button data-buka="tugas">✅ Tugas</button><button data-buka="report">📊 Report</button><button data-buka="arena">🎮 Arena</button><button data-buka="setting">⚙️ Setting</button></div>`;
   el.querySelector(".dot").innerHTML = avatarSvg(c.avatar, c.color, { aksesori: c.aksesori, aura: c.aura });
   el.querySelector(".nama").textContent = c.name;
   el.querySelector(".jenjang").textContent = kelasText(c);
@@ -482,6 +579,8 @@ function kartuHome(c, soc) {
   const poin = [
     b ? `📚 ${b.latihan7Hari} latihan minggu ini · ${b.medali.punya}/${b.medali.total} medali` : "📚 Belum berlatih di Ruang Pintar",
     b?.ulangi ? `💪 Perlu diulang: ${b.ulangi.nama}` : "",
+    tg && tg.hariIni.total ? `✅ Tugas hari ini ${tg.hariIni.disetujui}/${tg.hariIni.total} disetujui` : "✅ Belum ada tugas hari ini",
+    tg?.menunggu.length ? `⏳ ${tg.menunggu.length} tugas menunggu Anda cek` : "",
     `🎮 ${main} permainan · ${menang} menang`,
     tunggu ? `⚠️ ${tunggu} permintaan teman menunggu persetujuan Anda` : "",
   ].filter(Boolean);
@@ -508,7 +607,8 @@ async function load() {
   $("top-nav").hidden = !masuk;
   if (!masuk) return;
   namaOrtu = me.ortu.name;
-  const [{ children }, social] = await Promise.all([api("GET", "laporan"), api("GET", "teman")]);
+  const [{ children }, social, tugas] = await Promise.all([api("GET", "laporan"), api("GET", "teman"), api("GET", "tugas")]);
+  dataTugas = tugas.anak;
   const byId = Object.fromEntries(social.children.map((s) => [s.childId, s]));
   $("kids").replaceChildren(...children.map((c) => {
     const el = renderKid(c, byId[c.id]);
@@ -521,10 +621,7 @@ async function load() {
     b.textContent = c.name;
     return b;
   }));
-  const kosong = Object.assign(document.createElement("section"), { className: "panel" });
-  kosong.innerHTML = '<h2>Belum ada akun anak</h2><p class="muted">Tambahkan akun anak di menu Setting.</p><div><button class="primary" data-buka="setting">⚙️ Ke Setting</button></div>';
-  kosong.querySelector("button").onclick = () => keHal("setting");
-  $("home").replaceChildren(...(children.length ? children.map((c) => kartuHome(c, byId[c.id])) : [kosong]));
+  dataHome = { children, byId };
   $("form-anak").querySelector("h2").textContent = children.length ? "Tambah akun anak" : "Mulai dengan menambah akun anak";
   terapkanHal();
 }

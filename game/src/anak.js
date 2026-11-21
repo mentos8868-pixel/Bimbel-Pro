@@ -26,6 +26,7 @@ let hal = HAL[location.hash.slice(1)] ? location.hash.slice(1) : "home";
 let anak = null;   // profil dari /api/saya
 let k = null;      // ringkasan dari /api/kamarku
 let toko = null;   // isi toko dari /api/toko (dimuat saat menu Avatar dibuka)
+let tg = null;     // tugas dari orang tua: /api/tugas/saya
 let yakinBeli = null;
 
 const galat = (t) => { $("galat").textContent = t || ""; $("galat").hidden = !t; };
@@ -67,6 +68,21 @@ function daftarMisi() {
   return `<ul class="daftar">${b.misi.tryout.map((t) => baris(t.selesai, `Tryout ${esc(t.nama)}`, t.selesai ? (t.bintang !== null ? "★".repeat(t.bintang) : "selesai") : "belum")).join("")}
     ${baris(b.misi.latihanHariIni > 0, "Latihan 1 topik", b.misi.latihanHariIni ? `${b.misi.latihanHariIni} sesi hari ini` : "belum")}</ul>`;
 }
+// Tugas dari orang tua untuk hari ini, dengan tombol "Sudah".
+const IKON_JENIS = { ibadah: "🕌", rumah: "🏠", belajar: "📚", lainnya: "⭐" };
+function daftarTugas(semua = false) {
+  if (!tg) return `<p class="muted">Tugas tidak bisa dimuat.</p>`;
+  const list = tg.tugas.filter((t) => semua || t.hariIni);
+  if (!list.length) return `<p class="muted">${semua ? "Belum ada tugas dari orang tua." : "Tidak ada tugas dari orang tua hari ini."}</p>`;
+  return `<ul class="daftar tugas">${list.map((t) => {
+    const kanan = !t.hariIni ? `<span class="muted">bukan hari ini</span>`
+      : t.status === "disetujui" ? `<span class="on">✔ disetujui${t.bintang ? ` +${t.bintang}★` : ""}</span>`
+      : t.status === "menunggu" ? `<span class="tunggu">⏳ menunggu dicek</span>`
+      : `<button class="primary" data-sudah="${t.id}">${t.status === "belum" ? "Sudah (lagi)" : "Sudah"}</button>`;
+    return `<li class="${t.status === "disetujui" ? "beres" : ""}"><span class="cek">${IKON_JENIS[t.jenis] || "⭐"}</span>
+      <span>${esc(t.judul)}${t.bintang ? ` <span class="muted">★${t.bintang}</span>` : ""}${t.status === "belum" ? ` <span class="ulang">· diminta mengulang</span>` : ""}</span>${kanan}</li>`;
+  }).join("")}</ul>`;
+}
 const segera = (judul, teks) => `<section class="panel segera"><h3>${judul}</h3><p class="muted">${teks}</p></section>`;
 const tombolArena = () => `<a class="btn btn-utama btn-besar" href="/?arena=1">🌍 Masuk arena</a>`;
 const tombolBimbel = () => `<a class="btn btn-besar" href="/bimbel/index.html">📚 Buka Ruang Pintar</a>`;
@@ -98,12 +114,16 @@ function grafikMinggu() {
 const ISI = {
   home: () => `${kepala()}${kotakAngka()}
     <div class="dua">
-      <section class="panel"><h3>🎯 Hari ini</h3>${daftarMisi()}<p class="muted kecil">Tugas dari orang tua segera hadir di sini.</p></section>
+      <section class="panel"><h3>✅ Tugas hari ini</h3>${daftarTugas()}<h3 class="sub-judul">🎯 Misi belajar</h3>${daftarMisi()}</section>
       <section class="panel"><h3>Mau ke mana?</h3><div class="aksi-besar">${tombolArena()}${tombolBimbel()}</div>
         <p class="muted kecil">💬 Pesan dari orang tua segera hadir.</p></section>
     </div>`,
-  tugas: () => `<section class="panel"><h3>🎯 Misi belajar hari ini</h3>${daftarMisi()}</section>
-    ${segera("Tugas dari orang tua", "Segera hadir. Orang tuamu akan bisa memberi tugas seperti salat, mencuci piring, atau belajar. Kamu tinggal menekan \"Sudah\", lalu orang tua memberi bintang.")}`,
+  tugas: () => `<div class="tiga">
+      <div class="kotak"><span class="judul">✅ Hari ini</span><span class="besar">${tg ? `${tg.hariIni.disetujui} / ${tg.hariIni.total}` : "–"}</span><span class="kecil">tugas disetujui orang tua</span></div>
+      <div class="kotak"><span class="judul">⏳ Menunggu dicek</span><span class="besar">${tg ? tg.hariIni.menunggu : "–"}</span><span class="kecil">orang tua akan mengecek</span></div>
+      <div class="kotak"><span class="judul">📅 7 hari terakhir</span><span class="besar">${tg?.minggu.persen ?? "–"}${tg?.minggu.persen != null ? "%" : ""}</span><span class="kecil">tugas selesai</span></div></div>
+    <section class="panel"><h3>✅ Tugas dari orang tua</h3><p class="muted kecil">Tekan "Sudah" setelah selesai. Bintang masuk setelah orang tua menyetujui.</p>${daftarTugas(true)}</section>
+    <section class="panel"><h3>🎯 Misi belajar hari ini</h3>${daftarMisi()}</section>`,
   arena: () => `<div class="dua">
       <section class="panel"><h3>🌍 Dunia arena</h3><p class="muted">Jalan-jalan, main Catur, Scramble, dan Kartu Kilat, lalu belanja di Toko Avatar.</p>
         ${kotakWaktu()}<div class="aksi-besar">${tombolArena()}</div></section>
@@ -187,6 +207,15 @@ function pasangAvatar() {
     api("GET", "toko").then((j) => { toko = j; if (hal === "avatar") gambar(); }).catch((x) => galat(x.message));
   }
 }
+// Menandai tugas "Sudah".
+$("halaman").addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-sudah]");
+  if (!b) return;
+  galat("");
+  b.disabled = true;
+  try { tg = await api("POST", `tugas/${b.dataset.sudah}/sudah`); gambar(); }
+  catch (x) { galat(x.message); b.disabled = false; }
+});
 // Beli (klik kedua untuk yakin) dan pakai/lepas aksesori di menu Avatar.
 $("halaman").addEventListener("click", async (e) => {
   const b = e.target.closest("button[data-beli], button[data-pakai]");
@@ -223,6 +252,16 @@ async function muat() {
   if (!me.anak) { $("belum").hidden = false; return; }
   anak = me.anak;
   try { k = await api("GET", "kamarku"); } catch (x) { $("memuat").hidden = false; $("memuat").textContent = x.message; return; }
+  tg = await api("GET", "tugas/saya").catch(() => null);
+  // Bintang bisa bertambah saat orang tua menyetujui tugas: segarkan ringkasan sesekali.
+  setInterval(async () => {
+    if (document.hidden) return;
+    const [k2, tg2] = await Promise.all([api("GET", "kamarku").catch(() => null), api("GET", "tugas/saya").catch(() => null)]);
+    const beda = (k2 && k2.bintang !== k.bintang) || (tg2 && JSON.stringify(tg2) !== JSON.stringify(tg));
+    if (k2) k = k2;
+    if (tg2) tg = tg2;
+    if (beda && hal !== "avatar") gambar();
+  }, 30000);
   $("dash").hidden = false;
   $("top-nav").hidden = false;
   document.title = `Dashboard ${anak.name}`;

@@ -51,3 +51,10 @@ a.btn-utama, .btn-utama { background: var(--primary); color: #fff; border-color:
   .tiga, .dua { grid-template-columns: 1fr; }
   .kepala-anak { flex-direction: column; text-align: center; }
 }
+
+/* Tugas dari orang tua */
+.daftar.tugas .cek { font-size: 18px; }
+.daftar.tugas button { padding: 6px 14px; font-size: 15px; }
+.tunggu { color: #b07800; font-weight: 700; white-space: nowrap; }
+.ulang { color: var(--error); font-size: 13px; }
+.sub-judul { margin-top: 10px; }

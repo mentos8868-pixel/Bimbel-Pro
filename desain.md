@@ -149,6 +149,8 @@ Dirancang 21 November 2026 dari susunan menu pengguna, **fokus laptop**. Kedua d
 
 **Status (22 November 2026):** tahap 1 sudah dibangun. Dashboard orang tua memakai menu samping; setiap bagian kartu anak ditandai `data-hal` sesuai menunya, jadi isi lama tetap dipakai. Dashboard anak ada di `anak.html` (`game/src/anak.js`): setelah masuk dengan PIN atau kode, anak diarahkan ke sana; "Masuk arena" membuka `/?arena=1`, dan di arena ada tombol "Dashboard". Ruang Pintar punya tautan kembali ke dashboard. Panel Kamarku di arena dihapus (isinya pindah ke dashboard anak; data tetap dari `/api/kamarku`, kini ditambah menit bermain 7 hari). Menu Tugas, Keuangan, dan Chat masih bertuliskan "Segera hadir".
 
+**Tahap 2 (Tugas) sudah dibangun (22 November 2026):** `server/tugas.js` dengan tabel `tugas` dan `tugas_catatan`. API orang tua: `GET/POST /api/tugas`, `DELETE /api/tugas/:id` (tugas dinonaktifkan, riwayat tetap), `POST /api/tugas/:id/setujui` dan `/belum` dengan `{ tanggal }`. API anak: `GET /api/tugas/saya` dan `POST /api/tugas/:id/sudah`. Bintang hadiah 0–5 masuk ke saldo anak saat disetujui; maksimal 30 tugas aktif per anak. Anak yang sedang di arena mendapat pemberitahuan saat ada tugas baru atau tugasnya dicek. Tugas "sekali" tampil sampai disetujui. Tugas belajar yang tercentang otomatis dari Ruang Pintar **belum** dibuat; jenis Belajar sekarang ditandai manual seperti tugas lain.
+
 ### Dashboard orang tua (`orangtua.html`)
 Di bagian atas ada pilihan anak (Budi / Liliya), kecuali di menu Home yang menampilkan semua anak.
 
