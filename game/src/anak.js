@@ -1,4 +1,4 @@
-// Dashboard anak: halaman pertama setelah anak masuk. Menu: Home, Tugas, Arena, Bimbel, Report, Chat, Avatar.
+// Dashboard anak: halaman pertama setelah anak masuk. Menu: Home, Tugas, Arena, Bimbel, Report, Chat, Avatar, Toko Avatar.
 // Hanya data milik anak itu sendiri (dari /api/saya, /api/kamarku, /api/toko). Pengaturan tetap di tangan orang tua.
 import { api } from "./api.js";
 import { avatarPicker } from "./avatar-picker.js";
@@ -20,12 +20,13 @@ const HAL = {
   bimbel: ["Bimbel", "Belajar dan tryout di Ruang Pintar."],
   report: ["Report", "Catatan bermain dan belajarmu."],
   chat: ["Chat", "Pesan dengan orang tua."],
-  avatar: ["Avatar", "Pilih avatar dan hias dengan aksesori."],
+  avatar: ["Avatar", "Pilih avatar kesukaanmu."],
+  toko: ["Toko Avatar", "Tukar bintang dengan aksesori untuk avatarmu."],
 };
 let hal = HAL[location.hash.slice(1)] ? location.hash.slice(1) : "home";
 let anak = null;   // profil dari /api/saya
 let k = null;      // ringkasan dari /api/kamarku
-let toko = null;   // isi toko dari /api/toko (dimuat saat menu Avatar dibuka)
+let toko = null;   // isi toko dari /api/toko (dimuat saat menu Toko Avatar dibuka)
 let tg = null;     // tugas dari orang tua: /api/tugas/saya
 let ch = { n: 0, terakhir: null, namaOrtu: "Orang tua" };   // ringkasan chat keluarga: /api/chat/belum
 let chatTimer = 0;
@@ -155,7 +156,9 @@ const ISI = {
       <form id="form-chat" class="chat-form"><textarea name="isi" rows="2" maxlength="300" placeholder="Tulis pesan untuk ${esc(ch.namaOrtu)}…"></textarea><button class="primary" type="submit">Kirim</button></form>
       <p class="muted kecil">Chat dengan pemain lain tetap ada di dalam arena.</p></section>`,
   avatar: () => `${kepala()}
-    <section class="panel"><h3>🐻 Pilih avatar</h3><div id="pilih-avatar"></div><span id="avatar-ok" class="muted" hidden>Avatar tersimpan ✓</span></section>
+    <section class="panel"><h3>🐻 Pilih avatar</h3><div id="pilih-avatar"></div><span id="avatar-ok" class="muted" hidden>Avatar tersimpan ✓</span>
+      <p class="muted kecil">Mau hiasan baru? <button class="link" data-ke-hal="toko">Buka Toko Avatar</button></p></section>`,
+  toko: () => `${kepala()}
     <section class="panel"><h3>🛍️ Toko Avatar <span class="saldo">★ ${toko ? toko.bintang : k.bintang} bintang</span></h3>
       <p class="muted">Tukar bintang dari Ruang Pintar dengan aksesori. Aksesori yang dipakai juga terlihat di arena.</p><div id="toko-isi">${toko ? isiToko() : "<p class=\"muted\">Memuat toko…</p>"}</div></section>`,
 };
@@ -184,6 +187,9 @@ function gambar() {
   clearInterval(chatTimer);
   $("halaman").innerHTML = ISI[hal]();
   if (hal === "avatar") pasangAvatar();
+  if (hal === "toko" && !toko) {
+    api("GET", "toko").then((j) => { toko = j; if (hal === "toko") gambar(); }).catch((x) => galat(x.message));
+  }
   if (hal === "chat") pasangChat();
   tandaChat();
 }
@@ -244,16 +250,12 @@ function pasangAvatar() {
         await api("POST", "avatar", { avatar, sebagai: "anak" });
         anak.avatar = avatar;
         document.querySelectorAll(".kepala-anak .ava-besar").forEach((el) => (el.innerHTML = gambarAvatar()));
-        if (toko) $("toko-isi").innerHTML = isiToko();
         $("avatar-ok").hidden = false;
         clearTimeout(okTimer);
         okTimer = setTimeout(() => ($("avatar-ok").hidden = true), 2000);
       } catch (x) { galat(x.message); }
     },
   });
-  if (!toko) {
-    api("GET", "toko").then((j) => { toko = j; if (hal === "avatar") gambar(); }).catch((x) => galat(x.message));
-  }
 }
 // Menandai tugas "Sudah".
 $("halaman").addEventListener("click", async (e) => {
@@ -264,7 +266,7 @@ $("halaman").addEventListener("click", async (e) => {
   try { tg = await api("POST", `tugas/${b.dataset.sudah}/sudah`); gambar(); }
   catch (x) { galat(x.message); b.disabled = false; }
 });
-// Beli (klik kedua untuk yakin) dan pakai/lepas aksesori di menu Avatar.
+// Beli (klik kedua untuk yakin) dan pakai/lepas aksesori di menu Toko Avatar.
 $("halaman").addEventListener("click", async (e) => {
   const b = e.target.closest("button[data-beli], button[data-pakai]");
   if (!b || b.disabled || !toko) return;
@@ -310,7 +312,7 @@ async function muat() {
     if (k2) k = k2;
     if (tg2) tg = tg2;
     if (ch2 && hal !== "chat") ch = ch2;
-    if (beda && hal !== "avatar" && hal !== "chat") gambar(); else tandaChat();
+    if (beda && !["avatar", "toko", "chat"].includes(hal)) gambar(); else tandaChat();
   }, 30000);
   $("dash").hidden = false;
   $("top-nav").hidden = false;

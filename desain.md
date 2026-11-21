@@ -180,7 +180,8 @@ Setelah anak masuk (PIN atau kode), ia melihat dashboard ini dulu, bukan langsun
 | **Bimbel** | Tombol membuka Ruang Pintar, kemajuan per pelajaran, misi tryout hari ini, dan saran "coba ulangi" |
 | **Report** | Waktu main 7 hari, medali, riwayat tryout, dan hasil permainan |
 | **Chat** | Chat dengan orang tua. Chat dengan pemain lain tetap di dalam arena |
-| **Avatar** | Pilih avatar, Toko Avatar (aksesori dengan bintang), dan kemajuan aura |
+| **Avatar** | Pilih avatar dan kemajuan aura |
+| **Toko Avatar** | Menu sendiri (dipisah dari Avatar): tukar bintang dengan aksesori, lalu pakai atau lepas |
 
 ### Data baru di server
 - `tugas` (orang tua, anak, judul, jenis, jadwal, bintang, aktif) dan `tugas_catatan` (tugas, tanggal, status: menunggu / disetujui / belum). Bintang hadiah ditambahkan saat orang tua menyetujui.
