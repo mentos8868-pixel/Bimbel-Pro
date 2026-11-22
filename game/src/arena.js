@@ -7,6 +7,7 @@ import {
 import { buildAvatar3d, buildManekin } from "./avatar3d.js";
 import { drawFlag, namaKelas } from "../../shared/negara.js";
 import { BARIS_BIMBEL, KOLOM_BIMBEL, TITIK_BIMBEL } from "../../shared/kursi-bimbel.js";
+import { MEJA_GAME } from "../../shared/meja-game.js";
 
 export const ARENA_RADIUS = 38;
 
@@ -348,31 +349,35 @@ export function createArena(canvas) {
   const gameSign = makeSign(scene, ["Ruang Game"], { width: 4.5, height: 1.2, bg: "#4f9cf0", fg: "#ffffff" });
   gameSign.position.set(17.6, 3.2, 0);
 
-  const jenisGame = [
-    { id: "catur", label: "Catur", warna: "#c99563", pemain: 2, baris: [-12.5, -7.5] },
-    { id: "scramble", label: "Scramble Words", warna: "#9b7bd8", pemain: 4, baris: [-2.5, 2.5] },
-    { id: "kartu", label: "Kartu Kilat", warna: "#ef6f5e", pemain: 4, baris: [7.5] },
-    { id: "otello", label: "Otello", warna: "#31877f", pemain: 2, baris: [12.5] },
-  ];
-  const tables = jenisGame.flatMap(({ baris, ...game }) =>
-    baris.flatMap((z) => [21.8, 28.2].map((x) => ({ ...game, x, z, ready: true }))));
+  const gayaMeja = {
+    catur: ["Catur", "#c99563"], scramble: ["Scramble Words", "#9b7bd8"],
+    kartu: ["Kartu Kilat", "#ef6f5e"], otello: ["Otello", "#31877f"],
+    "beda-gambar": ["Spot the Differences", "#3d8b70"],
+  };
+  const tables = MEJA_GAME.map((meja) => {
+    const [label, warna] = gayaMeja[meja.id];
+    return { ...meja, label, warna, ready: true };
+  });
   for (const t of tables) {
     mejaPertandingan(scene, t, walls);
-    const s = makeSign(scene, t.ready ? [t.label] : [t.label, "Segera hadir"], { width: t.id === "scramble" ? 3.2 : 2.6, height: t.ready ? 0.7 : 1 });
+    const s = makeSign(scene, t.ready ? [t.label] : [t.label, "Segera hadir"], { width: t.label.length > 13 ? 3.5 : 2.6, height: t.ready ? 0.7 : 1 });
     s.position.set(t.x, 2.3, t.z);
   }
 
   // Kantor di lahan barat. Pintu timur menghadap jalan dari alun-alun.
-  room(scene, walls, { cx: -24.5, cz: 0, w: 16, d: 16, door: "e", floor: "#e8f4ed", wall: "#387b70" });
+  room(scene, walls, { cx: -24.5, cz: 0, w: 16, d: 20, door: "e", floor: "#e8f4ed", wall: "#387b70" });
   const kantorSign = makeSign(scene, ["Kantor", "Ayah dan Ibu"], { width: 4.5, height: 1.35, bg: "#245d56", fg: "#ffffff" });
   kantorSign.position.set(-16.5, 3.1, 0);
   // Partisi menyisakan pintu selebar 2,4 meter di tengah lorong.
-  for (const z of [-4.6, 4.6]) {
-    box(scene, "partisiManajer", { w: 0.24, h: 1.45, d: 6.8, x: -27.4, z, color: "#538980", walls });
+  for (const z of [-5.6, 5.6]) {
+    box(scene, "partisiManajer", { w: 0.24, h: 1.45, d: 8.8, x: -27.4, z, color: "#538980", walls });
   }
   const papanManajer = makeSign(scene, ["Ruang Manajer"], { width: 2.8, height: 0.7, bg: "#245d56", fg: "#ffffff" });
   papanManajer.position.set(-27.4, 2.3, 0);
-  const mejaKantor = [-4.6, 2, 5.6].flatMap(z => [-25.3, -22.2, -19.1].map(x => ({ x, z })));
+  // Sisakan petak di depan pintu timur sebagai akses masuk.
+  const mejaKantor = [-7.2, -3.5, 0.5, 4.3, 8].flatMap((z) =>
+    (z === 0.5 ? [-25.8, -23.2, -20.6] : [-25.8, -23.2, -20.6, -18]).map((x) => ({ x, z })),
+  );
   mejaKantor.push({ x: -30, z: 1.5, manajer: true });
   for (const meja of mejaKantor) {
     const { x, z, manajer } = meja;

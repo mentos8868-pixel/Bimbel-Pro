@@ -5,3 +5,6 @@
 .chat-audio, .chat-rekaman audio { width: 250px; max-width: 100%; display: block; }
 .gel:has(.chat-audio) { width: min(100%, 290px); }
 .gel.saya:has(.chat-audio) > div { max-width: 100%; }
+.chat-lokasi { padding: 8px 16px; background: #f7f9fc; border-bottom: 1px solid var(--border); }
+.chat-lokasi p { margin: 4px 0; }
+.chat-lokasi .row { flex-wrap: wrap; }

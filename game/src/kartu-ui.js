@@ -79,7 +79,8 @@ export class KartuUI {
     this.setView({ ...e.publicState(Date.now()), hostId: "me", startIn: 0 });
   }
 
-  startOnline(profile, room) {
+  startOnline(profile, room, privat = true) {
+    this.privat = privat;
     this.cleanup();
     Object.assign(this, { kind: "online", profile, room, myId: room.sessionId });
     this.mode = room.state.mode;
@@ -236,7 +237,7 @@ export class KartuUI {
 
     if (waiting) {
       const n = v.players.length;
-      let t = this.room ? `Kode meja: ${this.room.roomId}. ` : "";
+      let t = this.room && this.privat ? `Kode meja privat: ${this.room.roomId}. ` : "";
       t += n < 2 ? "Menunggu pemain lain…" : `Mulai otomatis dalam ${v.startIn} detik.`;
       $("ktr-wait-text").textContent = t;
       $("ktr-start").hidden = !(v.hostId === this.myId && n >= 2);

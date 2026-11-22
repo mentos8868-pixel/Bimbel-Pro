@@ -3,6 +3,7 @@ import http from "node:http";
 import colyseus from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { handleApi } from "./accounts.js";
+import { serveStatic, staticAktif } from "./static.js";
 import { ArenaRoom } from "./rooms/ArenaRoom.js";
 import { ChessRoom } from "./rooms/ChessRoom.js";
 import { ScrambleRoom } from "./rooms/ScrambleRoom.js";
@@ -14,7 +15,7 @@ const PORT = Number(process.env.GAME_SERVER_PORT || 2567);
 
 const httpServer = http.createServer((req, res) => {
   handleApi(req, res).then((handled) => {
-    if (!handled && !res.headersSent && !req.url.includes("/matchmake/")) {
+    if (!handled && !res.headersSent && !req.url.includes("/matchmake/") && !serveStatic(req, res)) {
       res.writeHead(404);
       res.end();
     }
@@ -24,10 +25,11 @@ const httpServer = http.createServer((req, res) => {
 const gameServer = new Server({ transport: new WebSocketTransport({ server: httpServer }) });
 gameServer.define("arena", ArenaRoom);
 // Cari lawan hanya dengan pemain sejenjang (dan sebahasa / sejenis kartu).
-gameServer.define("chess", ChessRoom).filterBy(["jenjang"]);
-gameServer.define("scramble", ScrambleRoom).filterBy(["jenjang", "lang"]);
-gameServer.define("kartu", KartuRoom).filterBy(["jenjang", "mode"]);
+gameServer.define("chess", ChessRoom).filterBy(["jenjang", "meja"]);
+gameServer.define("scramble", ScrambleRoom).filterBy(["jenjang", "lang", "meja"]);
+gameServer.define("kartu", KartuRoom).filterBy(["jenjang", "mode", "meja"]);
 
 gameServer.listen(PORT).then(() => {
   console.log(`Server Bimbel Pro berjalan di http://localhost:${PORT} (API) dan ws://localhost:${PORT} (game)`);
+  if (staticAktif) console.log(`Halaman web (game/dist) juga dilayani di http://localhost:${PORT}`);
 });

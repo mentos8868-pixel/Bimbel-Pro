@@ -6,6 +6,8 @@ import { uidOf } from "../social.js";
 import { avatarOr } from "../../shared/avatars.js";
 import { db } from "../db.js";
 import { sedangBekerja } from "../kantor.js";
+import { siapkanBedaGambar } from "./arena-beda-gambar.js";
+import { siapkanKursiGame } from "./kursi-game.js";
 import { rapikanAksesori } from "../../shared/aksesori.js";
 import { levelDariXp, auraUntukLevel } from "../../shared/aura.js";
 import { JARAK_INTERAKSI_BIMBEL, POSISI_KURSI_BIMBEL, TITIK_BIMBEL } from "../../shared/kursi-bimbel.js";
@@ -34,6 +36,8 @@ defineTypes(Player, {
   z: "number",
   ry: "number",
   kursiBimbel: "number", // 0 = berdiri, 1 dst. = nomor kursi
+  mejaGame: "number",
+  kursiGame: "number",
   pekerjaan: "string",
 });
 
@@ -60,12 +64,14 @@ export class ArenaRoom extends Room {
     this.clock.setInterval(() => this.segarkanStatusKerja(), 1000);
 
     setupSocial(this);
+    this.keluarBedaGambar = siapkanBedaGambar(this);
+    this.lepasKursiGame = siapkanKursiGame(this);
     this.posisiSebelumBelajar = new Map();
 
     this.onMessage("belajar-bimbel", (client, mulai) => {
       const id = client.sessionId;
       const p = this.state.players.get(id);
-      if (!p || client.auth?.role !== "anak") return;
+      if (!p || p.mejaGame || client.auth?.role !== "anak") return;
       if (mulai === false && p.kursiBimbel) {
         Object.assign(p, this.posisiSebelumBelajar.get(id));
         this.posisiSebelumBelajar.delete(id);
@@ -87,7 +93,7 @@ export class ArenaRoom extends Room {
 
     this.onMessage("move", (client, data = {}) => {
       const p = this.state.players.get(client.sessionId);
-      if (!p || p.kursiBimbel) return;
+      if (!p || p.kursiBimbel || p.mejaGame) return;
       let x = num(data.x, p.x);
       let z = num(data.z, p.z);
       // Jaga pemain tetap di dalam arena.
@@ -149,6 +155,7 @@ export class ArenaRoom extends Room {
     p.z = Math.sin(ang) * 3;
     p.ry = 0;
     p.kursiBimbel = 0;
+    p.mejaGame = p.kursiGame = 0;
     p.pekerjaan = a.role === "ortu" ? sedangBekerja(a.parentId) : "";
     this.state.players.set(client.sessionId, p);
     socialJoin(client);
@@ -161,6 +168,8 @@ export class ArenaRoom extends Room {
   }
 
   onLeave(client) {
+    this.keluarBedaGambar(client);
+    if (client.auth) this.lepasKursiGame(client);
     this.posisiSebelumBelajar.delete(client.sessionId);
     this.state.players.delete(client.sessionId);
     if (client.auth) socialLeave(this, client);

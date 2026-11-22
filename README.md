@@ -26,23 +26,16 @@ Lalu buka:
 
 Dekati Elon Musk (bot simulasi) di alun-alun dan tekan **E** atau tombol **Bicara**. Ketik pertanyaan dan tekan **Kirim**. Mentor mengingat tiga pertukaran terakhir selama panel terbuka.
 
-Server Bimbel Pro memakai Ollama pada `127.0.0.1:11434`. Pada komputer server baru, jalankan Ollama dan unduh model dengan `ollama pull qwen2.5:1.5b`. Untuk memakai model Ollama lain yang sudah terpasang, isi variabel `BIMBEL_MODEL` dengan nama model sebelum menjalankan server.
-
-Untuk menjalankan kembali Ollama portabel di komputer proyek ini, gunakan PowerShell dari folder proyek dan biarkan proses berjalan selama mentor digunakan.
-
-```powershell
-$env:OLLAMA_MODELS = (Resolve-Path 'server/data/mentor-runtime/models').Path
-& ./server/data/mentor-runtime/ollama.exe serve
-```
+Server mengirim pertanyaan ke API OpenAI. Atur `OPENAI_API_KEY` di lingkungan server, lalu jalankan ulang server. Model bawaan adalah `gpt-4.1-mini` dan bisa diganti melalui `OPENAI_MODEL`.
 
 ## Cara memakai akun
 
 1. **Orang tua** membuka dashboard, lalu mendaftar: memilih **Ayah** atau **Ibu**, mengisi nama, email, kata sandi, dan mencentang persetujuan data anak. Yang mendaftar pertama menjadi **kepala keluarga**.
-2. Pasangan bisa bergabung: kepala keluarga menekan **Undang Ibu/Ayah** di menu Setting dan mendapat kode 6 huruf (berlaku 24 jam). Pasangan mendaftar seperti biasa, memilih perannya, lalu mengisi kode itu. Bisa juga dari layar depan arena: pilih "Saya diundang pasangan: punya kode keluarga", ketik kodenya, lalu "Lanjut daftar" (kode dan peran langsung terisi). Kedua orang tua punya hak yang sama atas anak-anak; hanya kepala keluarga yang bisa mengeluarkan pasangan atau menghapus seluruh keluarga.
+2. Kepala keluarga bisa menambah pasangan lewat **Setting → Keluarga** dengan membuat akun berisi nama, email, dan kata sandi. Kedua orang tua punya hak yang sama atas anak-anak. Hanya kepala keluarga yang bisa mengeluarkan pasangan atau menghapus seluruh keluarga.
 3. Di dashboard, orang tua **menambah akun anak**: nama panggilan, kelas, pilihan **Anak laki-laki** atau **Anak perempuan**, warna, dan PIN 4 angka.
 4. Anak masuk dengan salah satu cara berikut:
    - **Perangkat keluarga** (orang tua sudah masuk di browser itu): buka arena, pilih nama anak, lalu masukkan PIN.
-   - **Perangkat anak sendiri**: orang tua menekan "Buat kode masuk" di dashboard. Di perangkat anak, pilih "Saya anak: pakai kode masuk" lalu ketik kodenya. Kode berlaku 15 menit dan hanya sekali pakai.
+   - **Perangkat anak sendiri**: orang tua membuat nama pengguna dan kata sandi di Setting. Di perangkat anak, pilih "Masuk sebagai anak" dan isi keduanya.
 5. Orang tua juga bisa **main sebagai orang tua**: pilih tingkat soal, lalu ajak anak bermain lewat kode meja.
 6. **Tanpa akun** (mode tamu), pemain hanya bisa berjalan di arena dan melawan bot.
 
@@ -96,7 +89,7 @@ Tujuh agen khusus Bimbel Pro, berbahasa Indonesia. Panggil dengan menyebut naman
   - Statistik per game (main, menang, kalah, seri) dan 10 permainan terakhir
   - Pengaturan batas waktu, izin bermain dengan pemain lain, chat, dan persetujuan pertemanan
   - Setujui atau tolak permintaan teman, hapus pertemanan, dan buka blokir
-  - Buat kode masuk, ganti PIN, hapus akun anak, hapus seluruh akun (semua data ikut terhapus)
+  - Atur login anak, ganti PIN, hapus akun anak, hapus seluruh akun (semua data ikut terhapus)
 - **Arena**
   - Berjalan dengan WASD/panah di laptop, atau joystick layar di HP/tablet. Kamera bisa diputar dengan geser dan di-zoom
   - Pemain lain terlihat secara online. Nama dan warna avatar diambil dari akun

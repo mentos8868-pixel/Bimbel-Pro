@@ -54,6 +54,17 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 .panel-float.right { left: auto; right: 12px; }
 
+/* Ruang tunggu catur: dua pemain menekan Siap sebelum mulai */
+.ruang-tunggu { width: min(380px, calc(100% - 24px)); display: flex; flex-direction: column; gap: 10px; }
+.ruang-tunggu h2 { margin: 0; }
+.ruang-tunggu p { margin: 0; }
+.tunggu-pemain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.tunggu-pemain li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: #f1f5fa; border: 2px solid transparent; }
+.tunggu-pemain li.siap { background: #e6f7ec; border-color: #7fd19b; }
+.tunggu-pemain li.kosong { background: none; border: 2px dashed #c9d4e0; color: #64748b; justify-content: center; text-align: center; }
+.ruang-tunggu #tunggu-siap { font-size: 18px; padding: 12px; }
+.ruang-tunggu .row { justify-content: space-between; }
+
 /* Chat keluarga di arena (Family dan orang tua ↔ anak) */
 .panel-float.keluarga { width: min(380px, calc(100% - 24px)); max-height: 70vh; overflow: hidden; }
 .keluarga-tab { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -175,6 +186,20 @@ button:disabled { opacity: 0.5; cursor: default; }
 #scr-lang button.on { background: var(--primary); color: var(--primary-text); border-color: var(--primary); }
 .scr-card { width: min(480px, 100%); }
 .card.kartu-papan-kata, .card.kartu-otello { width: min(540px, 100%); }
+.card.kartu-beda-gambar { width: min(800px, 100%); }
+.beda-gambar-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.beda-gambar-grid h4 { margin: 0 0 5px; }
+.beda-gambar { position: relative; aspect-ratio: 4 / 3; border: 1px solid #557880; border-radius: 14px; overflow: hidden; box-shadow: inset 0 0 22px #20304022; }
+.beda-gambar { background: #dce8eb url("/beda-gambar/adegan-realistis.png") no-repeat; background-size: 300% 200%; }
+.beda-foto-varian { position: absolute; transform: translate(-50%, -50%); aspect-ratio: 1; pointer-events: none; background: url('/beda-gambar/benda-realistis.png') no-repeat; background-size: 600% 400%; }
+.beda-gambar button {
+  position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center;
+  z-index: 1; width: clamp(24px, 13%, 56px); aspect-ratio: 1; padding: 0; border: 2px solid transparent;
+  border-radius: 50%; background: transparent; font-size: clamp(16px, 3.5vw, 34px); line-height: 1;
+  filter: drop-shadow(0 2px 1px #1a34454d);
+}
+.beda-gambar button:hover, .beda-gambar button:focus-visible { border-color: #244155; }
+.beda-gambar button[aria-pressed="true"] { border-color: #08723d; background: #edfff0b5; }
 .papan-kata, .papan-otello { display: grid; width: 100%; gap: 2px; padding: 6px; border-radius: 8px; background: #43606d; }
 .papan-kata { grid-template-columns: repeat(11, minmax(0, 1fr)); }
 .papan-otello { grid-template-columns: repeat(8, minmax(0, 1fr)); background: #253e4b; }

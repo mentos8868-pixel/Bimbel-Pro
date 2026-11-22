@@ -1,4 +1,4 @@
-// Akun orang tua dan anak: pendaftaran, masuk, sesi, PIN anak, kode masuk, tiket game,
+// Akun orang tua dan anak: pendaftaran, masuk, sesi, sandi anak, tiket game,
 // batas waktu bermain, hasil permainan, dan laporan untuk orang tua.
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from "node:crypto";
 import { db, today, lastDays } from "./db.js";
@@ -47,6 +47,20 @@ export function checkSecret(secret, stored) {
 
 const sha = (s) => createHash("sha256").update(s).digest("hex");
 const newToken = () => randomBytes(32).toString("base64url");
+const sandiAnakCadangan = hashSecret(randomBytes(32).toString("hex"));
+const loginAnak = (value) => typeof value === "string" ? value.trim().toLowerCase() : "";
+const POLA_LOGIN_ANAK = /^[a-z0-9_.-]{3,24}$/;
+
+function kredensialAnak(body, childId = null) {
+  const login = loginAnak(body.loginAnak);
+  if (!POLA_LOGIN_ANAK.test(login)) throw new ApiError(400, "Nama pengguna harus 3–24 huruf Latin, angka, titik, garis bawah, atau tanda hubung.");
+  if (typeof body.sandiAnak !== "string" || body.sandiAnak.length < 8 || body.sandiAnak.length > 128) {
+    throw new ApiError(400, "Kata sandi anak harus 8–128 karakter.");
+  }
+  const ada = db.prepare("SELECT id FROM children WHERE login_anak = ?").get(login);
+  if (ada && ada.id !== childId) throw new ApiError(409, "Nama pengguna sudah dipakai. Pilih nama lain.");
+  return [login, hashSecret(body.sandiAnak)];
+}
 
 export class ApiError extends Error {
   constructor(status, message) {
@@ -114,7 +128,7 @@ export function addPlaySeconds(childId, seconds, now = Date.now()) {
 function publicChild(c) {
   return {
     id: c.id, name: c.name, jenjang: c.jenjang, color: c.color, avatar: avatarOr(c.avatar),
-    avatarPunya: avatarDimiliki(c),
+    avatarPunya: avatarDimiliki(c), loginAnak: c.login_anak,
     negara: negaraOr(c.negara), kelas: c.kelas || 0, kurikulum: KURIKULUM.includes(c.kurikulum) ? c.kurikulum : "merdeka",
     aksesori: rapikanAksesori(c.aksesori_pakai).join(","), level: levelDariXp(c.xp), aura: auraAnak(c),
     limitMin: c.limit_min, allowStrangers: !!c.allow_strangers, chat: c.chat, approveFriends: !!c.approve_friends,
@@ -212,10 +226,6 @@ function validChildFields(b, partial) {
   }
   if (!partial || b.color !== undefined) out.color = WARNA.test(b.color || "") ? b.color : "#4f9cf0";
   if (!partial || b.avatar !== undefined) out.avatar = avatarOr(b.avatar);
-  if (!partial || b.pin !== undefined) {
-    if (!/^\d{4}$/.test(String(b.pin ?? ""))) throw new ApiError(400, "PIN harus 4 angka.");
-    out.pin_hash = hashSecret(b.pin);
-  }
   if (b.limitMin !== undefined) {
     const m = Number(b.limitMin);
     if (!Number.isInteger(m) || m < 0 || m > 600) throw new ApiError(400, "Batas waktu harus 0–600 menit.");
@@ -262,8 +272,24 @@ function parseCookies(req) {
   return out;
 }
 
+// COOKIE_SECURE=1 saat di-hosting lewat HTTPS, supaya cookie sesi hanya dikirim lewat koneksi aman.
+const COOKIE_SECURE = process.env.COOKIE_SECURE === "1" ? "; Secure" : "";
+
 function cookie(name, value, maxAgeSec) {
-  return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSec}`;
+  return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSec}${COOKIE_SECURE}`;
+}
+
+// Lewat Cloudflare Tunnel semua permintaan datang dari 127.0.0.1, jadi batas percobaan per-IP
+// akan dipakai bersama semua tester. Kalau TRUST_PROXY=1, pakai IP asli dari header Cloudflare,
+// tapi hanya untuk koneksi dari mesin ini sendiri (tunnel), supaya header tidak bisa dipalsukan dari luar.
+function clientIp(req) {
+  const raw = req.socket.remoteAddress || "?";
+  const lokal = raw === "127.0.0.1" || raw === "::1" || raw === "::ffff:127.0.0.1";
+  if (process.env.TRUST_PROXY === "1" && lokal) {
+    const cf = String(req.headers["cf-connecting-ip"] || "").trim();
+    if (cf) return cf;
+  }
+  return raw;
 }
 
 async function readJson(req, maks = 20000) {
@@ -320,7 +346,7 @@ export async function handleApi(req, res) {
     const sesiAnak = sessionFromToken(cookies[COOKIE.anak]);
     const ortu = sesiOrtu?.role === "ortu" ? sesiOrtu : null;
     const anak = sesiAnak?.role === "anak" ? sesiAnak : null;
-    const ip = req.socket.remoteAddress || "?";
+    const ip = clientIp(req);
     const path = url.pathname.slice(5).split("/").filter(Boolean); // tanpa "/api/"
     const m = req.method;
     // Kemajuan Ruang Pintar boleh lebih besar (daftar topik dan riwayat).
@@ -349,23 +375,9 @@ export async function handleApi(req, res) {
       // Pendaftar memilih perannya (Ayah atau Ibu); avatar awalnya mengikuti peran.
       const peran = PERAN[body.peran] ? body.peran : null;
       if (!peran) throw new ApiError(400, "Pilih dulu: Ayah atau Ibu.");
-      // Tanpa kode: menjadi kepala keluarga baru. Dengan kode undangan: bergabung ke keluarga pengundang.
-      let kepalaId = null;
-      const kode = str(body.kode, 12).toUpperCase().replace(/[^A-Z0-9]/g, "");
-      if (kode) {
-        const lim = limited(`undangan:${ip}`, 10);
-        const u = db.prepare("SELECT * FROM undangan_ortu WHERE kode = ?").get(kode);
-        if (!u || u.expires_at < Date.now()) { lim.fail(); throw new ApiError(400, "Kode undangan salah atau sudah kedaluwarsa."); }
-        lim.ok();
-        const anggota = anggotaKeluarga(u.kepala_id);
-        if (anggota.length >= 2) throw new ApiError(400, "Keluarga ini sudah punya dua orang tua.");
-        if (anggota.some((a) => a.peran === peran)) throw new ApiError(400, `Keluarga ini sudah punya ${PERAN[peran]}. Pilih peran yang lain.`);
-        kepalaId = u.kepala_id;
-      }
       const now = Date.now();
       const r = db.prepare("INSERT INTO parents (email, pass_hash, name, consent_at, created_at, avatar, peran, kepala_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(email, hashSecret(body.password), name, now, now, AVATAR_PERAN[peran], peran, kepalaId);
-      if (kode) db.prepare("DELETE FROM undangan_ortu WHERE kode = ?").run(kode);   // sekali pakai
+        .run(email, hashSecret(body.password), name, now, now, AVATAR_PERAN[peran], peran, null);
       const token = createSession("ortu", Number(r.lastInsertRowid));
       return send(200, { ok: true }, { "Set-Cookie": cookie(COOKIE.ortu, token, SESSION_MS / 1000) }), true;
     }
@@ -474,27 +486,34 @@ export async function handleApi(req, res) {
       res.end(avatarSvg(c.avatar, c.color, { aksesori: pakai, aura: auraAnak(c) }));
       return true;
     }
-    // --- keluarga: anggota, kode undangan untuk orang tua kedua, peran ---
+    // --- keluarga: anggota dan peran orang tua ---
     if (path[0] === "keluarga") {
       const kepala = needOrtu(), saya = ortuSaya;
       const ringkas = () => {
         const anggota = anggotaKeluarga(kepala).map((a) => ({ id: a.id, name: a.name, email: a.email, peran: a.peran, kepala: !a.kepala_id, saya: a.id === saya }));
-        const u = db.prepare("SELECT kode, expires_at FROM undangan_ortu WHERE kepala_id = ? AND expires_at > ? ORDER BY expires_at DESC LIMIT 1").get(kepala, Date.now());
-        return { anggota, undangan: anggota.length < 2 && u ? { kode: u.kode, sampai: u.expires_at } : null, sayaKepala: saya === kepala };
+        return { anggota, sayaKepala: saya === kepala };
       };
       if (m === "GET" && path.length === 1) return send(200, ringkas()), true;
-      if (m === "POST" && path[1] === "undang") {
-        if (anggotaKeluarga(kepala).length >= 2) throw new ApiError(400, "Keluarga sudah punya dua orang tua.");
-        const ALPHA = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        let kode;
-        do { kode = Array.from(randomBytes(6), (b) => ALPHA[b % ALPHA.length]).join(""); }
-        while (db.prepare("SELECT 1 FROM undangan_ortu WHERE kode = ?").get(kode));
-        db.prepare("DELETE FROM undangan_ortu WHERE kepala_id = ?").run(kepala);
-        db.prepare("INSERT INTO undangan_ortu (kode, kepala_id, expires_at) VALUES (?, ?, ?)").run(kode, kepala, Date.now() + DAY);
-        return send(200, ringkas()), true;
-      }
-      if (m === "DELETE" && path[1] === "undang") {
-        db.prepare("DELETE FROM undangan_ortu WHERE kepala_id = ?").run(kepala);
+      if (m === "POST" && path.length === 2 && path[1] === "pasangan") {
+        if (saya !== kepala) throw new ApiError(403, "Hanya kepala keluarga yang bisa menambah akun pasangan.");
+        const name = str(body.name, 40);
+        const email = str(body.email, 120).toLowerCase();
+        if (!name) throw new ApiError(400, "Isi nama pasangan.");
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ApiError(400, "Alamat email tidak valid.");
+        if (typeof body.password !== "string" || body.password.length < 8 || body.password.length > 128) {
+          throw new ApiError(400, "Kata sandi harus 8–128 karakter.");
+        }
+        db.exec("BEGIN IMMEDIATE");
+        try {
+          const anggota = anggotaKeluarga(kepala);
+          if (anggota.length >= 2) throw new ApiError(409, "Keluarga ini sudah punya dua orang tua.");
+          if (db.prepare("SELECT 1 FROM parents WHERE email = ?").get(email)) throw new ApiError(409, "Email ini sudah terdaftar. Gunakan email lain.");
+          const peran = anggota[0].peran === "ayah" ? "ibu" : "ayah";
+          const now = Date.now();
+          db.prepare("INSERT INTO parents (email, pass_hash, name, consent_at, created_at, avatar, peran, kepala_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+            .run(email, hashSecret(body.password), name, now, now, AVATAR_PERAN[peran], peran, kepala);
+          db.exec("COMMIT");
+        } catch (e) { db.exec("ROLLBACK"); throw e; }
         return send(200, ringkas()), true;
       }
       if (m === "PATCH" && path[1] === "peran") {
@@ -579,18 +598,46 @@ export async function handleApi(req, res) {
       if (n >= 6) throw new ApiError(400, "Maksimal 6 akun anak.");
       const f = validChildFields(body, false);
       if (!AVATAR_AWAL_ANAK.includes(f.avatar)) throw new ApiError(400, "Pilih avatar manusia untuk akun anak baru.");
-      const r = db.prepare(`INSERT INTO children (parent_id, name, jenjang, kelas, kurikulum, negara, color, avatar, pin_hash, limit_min, allow_strangers, chat, created_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(pid, f.name, f.jenjang, f.kelas ?? 0, f.kurikulum, f.negara, f.color, f.avatar, f.pin_hash, f.limit_min ?? 60, f.allow_strangers ?? 0, f.chat ?? "mati", Date.now());
+      const login = kredensialAnak(body);
+      const r = db.prepare(`INSERT INTO children (parent_id, name, jenjang, kelas, kurikulum, negara, color, avatar, pin_hash, limit_min, allow_strangers, chat, created_at, login_anak, sandi_anak_hash)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(pid, f.name, f.jenjang, f.kelas ?? 0, f.kurikulum, f.negara, f.color, f.avatar, "", f.limit_min ?? 60, f.allow_strangers ?? 0, f.chat ?? "mati", Date.now(), ...login);
       return send(200, { child: publicChild(childRow(Number(r.lastInsertRowid))) }), true;
     }
     if (path[0] === "anak" && path.length === 2 && path[1] === "keluar" && m === "POST") {
       endSession(cookies[COOKIE.anak]);
       return send(200, { ok: true }, { "Set-Cookie": cookie(COOKIE.anak, "", 0) }), true;
     }
+    if (path[0] === "anak" && path.length === 2 && path[1] === "masuk" && m === "POST") {
+      const login = loginAnak(body.loginAnak);
+      const lim = limited(`sandi-anak:${ip}`, 10);
+      const c = POLA_LOGIN_ANAK.test(login) ? db.prepare("SELECT * FROM children WHERE login_anak = ?").get(login) : null;
+      const valid = typeof body.sandiAnak === "string" && body.sandiAnak.length <= 128
+        && checkSecret(body.sandiAnak, c?.sandi_anak_hash || sandiAnakCadangan);
+      if (!c?.sandi_anak_hash || !valid) {
+        lim.fail();
+        throw new ApiError(401, "Nama pengguna atau kata sandi salah.");
+      }
+      lim.ok();
+      endSession(cookies[COOKIE.anak]);
+      const token = createSession("anak", c.parent_id, c.id);
+      return send(200, { child: publicChild(c) }, { "Set-Cookie": cookie(COOKIE.anak, token, SESSION_MS / 1000) }), true;
+    }
     if (path[0] === "anak" && path.length >= 2) {
       const pid = needOrtu();
       const c = ownChild(pid, path[1]);
+      if (path.length === 3 && path[2] === "login" && m === "PATCH") {
+        const login = kredensialAnak(body, c.id);
+        db.exec("BEGIN IMMEDIATE");
+        try {
+          db.prepare("UPDATE children SET login_anak = ?, sandi_anak_hash = ? WHERE id = ?").run(...login, c.id);
+          db.prepare("DELETE FROM sessions WHERE child_id = ? AND role = 'anak'").run(c.id);
+          db.prepare("DELETE FROM login_codes WHERE child_id = ?").run(c.id);
+          db.exec("COMMIT");
+        } catch (e) { db.exec("ROLLBACK"); throw e; }
+        kick(`a${c.id}`);
+        return send(200, { loginAnak: login[0] }), true;
+      }
       if (path.length === 2 && m === "PATCH") {
         const f = validChildFields(body, true);
         if (f.avatar) {
@@ -599,7 +646,6 @@ export async function handleApi(req, res) {
         }
         const keys = Object.keys(f);
         if (keys.length) {
-          if (f.pin_hash) { f.pin_fail = 0; f.pin_lock_until = 0; keys.push("pin_fail", "pin_lock_until"); }
           db.prepare(`UPDATE children SET ${keys.map((k) => `${k} = ?`).join(", ")} WHERE id = ?`).run(...keys.map((k) => f[k]), c.id);
         }
         return send(200, { child: publicChild(childRow(c.id)) }), true;
@@ -610,66 +656,6 @@ export async function handleApi(req, res) {
         kick(`a${c.id}`);
         return send(200, { ok: true }), true;
       }
-      if (path[2] === "kode" && m === "POST") {
-        const ALPHA = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        let code;
-        do { code = Array.from(randomBytes(6), (b) => ALPHA[b % ALPHA.length]).join(""); }
-        while (db.prepare("SELECT 1 FROM login_codes WHERE code = ?").get(code));
-        const expiresAt = Date.now() + 15 * 60000;
-        db.prepare("DELETE FROM login_codes WHERE child_id = ?").run(c.id);
-        db.prepare("INSERT INTO login_codes (code, child_id, expires_at) VALUES (?, ?, ?)").run(code, c.id, expiresAt);
-        return send(200, { code, expiresAt }), true;
-      }
-      if (path[2] === "masuk" && m === "POST") {
-        // Anak masuk di perangkat keluarga (orang tua sudah masuk) dengan PIN.
-        const now = Date.now();
-        if (c.pin_lock_until > now) throw new ApiError(429, "PIN dikunci sementara. Coba lagi 15 menit lagi.");
-        if (!checkSecret(String(body.pin ?? ""), c.pin_hash)) {
-          const fails = c.pin_fail + 1;
-          db.prepare("UPDATE children SET pin_fail = ?, pin_lock_until = ? WHERE id = ?")
-            .run(fails >= 5 ? 0 : fails, fails >= 5 ? now + 15 * 60000 : 0, c.id);
-          throw new ApiError(401, fails >= 5 ? "PIN salah 5 kali. Dikunci 15 menit." : "PIN salah.");
-        }
-        db.prepare("UPDATE children SET pin_fail = 0 WHERE id = ?").run(c.id);
-        endSession(cookies[COOKIE.anak]);
-        const token = createSession("anak", pid, c.id);
-        return send(200, { child: publicChild(c) }, { "Set-Cookie": cookie(COOKIE.anak, token, SESSION_MS / 1000) }), true;
-      }
-    }
-
-    // --- cek kode undangan keluarga sebelum mendaftar (tanpa masuk): nama kepala keluarga dan peran yang masih kosong ---
-    if (m === "GET" && path[0] === "undangan") {
-      const lim = limited(`undangan-cek:${ip}`, 15);
-      const kode = str(url.searchParams.get("kode"), 12).toUpperCase().replace(/[^A-Z0-9]/g, "");
-      const u = db.prepare("SELECT * FROM undangan_ortu WHERE kode = ?").get(kode);
-      if (!u || u.expires_at < Date.now()) { lim.fail(); throw new ApiError(404, "Kode undangan salah atau sudah kedaluwarsa. Minta kode baru ke pasangan Anda."); }
-      lim.ok();
-      const anggota = anggotaKeluarga(u.kepala_id);
-      if (anggota.length >= 2) throw new ApiError(400, "Keluarga ini sudah punya dua orang tua.");
-      const kepala = anggota.find((a) => !a.kepala_id) || anggota[0];
-      const kosong = Object.keys(PERAN).find((p) => !anggota.some((a) => a.peran === p));
-      return send(200, { kode, namaKepala: kepala.name, peran: kosong }), true;
-    }
-
-    // --- anak masuk di perangkatnya sendiri dengan kode dari orang tua ---
-    if (m === "POST" && path[0] === "kode") {
-      const lim = limited(`kode:${ip}`, 10);
-      const code = str(body.code, 12).toUpperCase().replace(/[^A-Z0-9]/g, "");
-      const row = db.prepare("SELECT * FROM login_codes WHERE code = ?").get(code);
-      if (!row || row.expires_at < Date.now()) {
-        lim.fail();
-        // Kode undangan keluarga diketik di kolom kode anak: arahkan ke jalur pendaftaran orang tua.
-        if (db.prepare("SELECT 1 FROM undangan_ortu WHERE kode = ? AND expires_at > ?").get(code, Date.now())) {
-          throw new ApiError(400, "Ini kode undangan keluarga untuk orang tua. Kembali, lalu pilih \"Saya diundang pasangan\".");
-        }
-        throw new ApiError(401, "Kode masuk salah atau sudah kedaluwarsa.");
-      }
-      lim.ok();
-      db.prepare("DELETE FROM login_codes WHERE code = ?").run(code); // sekali pakai
-      const c = childRow(row.child_id);
-      endSession(cookies[COOKIE.anak]);
-      const token = createSession("anak", c.parent_id, c.id);
-      return send(200, { child: publicChild(c) }, { "Set-Cookie": cookie(COOKIE.anak, token, SESSION_MS / 1000) }), true;
     }
 
     // --- tiket game ---

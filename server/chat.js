@@ -45,9 +45,14 @@ db.exec(`
     created_at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS chat_arena_anak ON chat_arena_log(child_id, created_at);
+  CREATE TABLE IF NOT EXISTS lokasi_chat_anak (
+    child_id INTEGER PRIMARY KEY REFERENCES children(id) ON DELETE CASCADE,
+    lat REAL NOT NULL, lng REAL NOT NULL, dibagikan_at INTEGER NOT NULL
+  );
 `);
 
 const SIMPAN_ARENA_MS = 7 * 86400000;
+const SIMPAN_LOKASI_MS = 3600000;
 const MAKS_PESAN = 500;
 const MAKS_AUDIO = 512 * 1024;
 export const MAKS_BODY_SUARA = Math.ceil(MAKS_AUDIO / 3) * 4 + 1024;
@@ -68,6 +73,7 @@ export function catatChatArena(childId, isi, preset) {
 }
 setInterval(() => {
   db.prepare("DELETE FROM chat_arena_log WHERE created_at < ?").run(Date.now() - SIMPAN_ARENA_MS);
+  db.prepare("DELETE FROM lokasi_chat_anak WHERE dibagikan_at <= ?").run(Date.now() - SIMPAN_LOKASI_MS);
 }, 3600000).unref();
 
 // Pembatas: paling banyak 10 pesan per 30 detik per pengirim.
@@ -131,6 +137,29 @@ export function handleChat({ m, path, body, url, ortuId, ortuSaya, anak, ownChil
   const pengirim = { ortu: sebagai === "ortu" ? (ortuSaya ?? parentId) : null, anak: sebagai === "anak" ? childId : null };
   const penerima = pengirim.ortu ? `o${pengirim.ortu}` : `a${pengirim.anak}`;
 
+  if (path[1] === "lokasi" && path.length === 2) {
+    if (m === "POST" && sebagai === "anak") {
+      if (body.hapus === true) {
+        db.prepare("DELETE FROM lokasi_chat_anak WHERE child_id = ?").run(childId);
+        return send(200, { aktif: false }), true;
+      }
+      const { lat, lng } = body;
+      if (!Number.isFinite(lat) || Math.abs(lat) > 90 || !Number.isFinite(lng) || Math.abs(lng) > 180) {
+        throw new ApiError(400, "Koordinat lokasi tidak valid.");
+      }
+      db.prepare(`INSERT INTO lokasi_chat_anak (child_id, lat, lng, dibagikan_at) VALUES (?, ?, ?, ?)
+        ON CONFLICT(child_id) DO UPDATE SET lat = excluded.lat, lng = excluded.lng, dibagikan_at = excluded.dibagikan_at`)
+        .run(childId, lat, lng, Date.now());
+      return send(200, { aktif: true }), true;
+    }
+    if (m === "GET" && sebagai === "anak") {
+      const aktif = !!db.prepare("SELECT 1 FROM lokasi_chat_anak WHERE child_id = ? AND dibagikan_at > ?")
+        .get(childId, Date.now() - SIMPAN_LOKASI_MS);
+      return send(200, { aktif }), true;
+    }
+    throw new ApiError(403, "Lokasi hanya bisa dibagikan dari akun anak.");
+  }
+
   // Jumlah pesan belum dibaca (untuk tanda di menu).
   if (path[1] === "belum" && m === "GET") {
     const family = db.prepare(`
@@ -172,6 +201,12 @@ export function handleChat({ m, path, body, url, ortuId, ortuSaya, anak, ownChil
     }
     if (path.length !== 2) throw new ApiError(404, "Alamat tidak ditemukan.");
     if (m === "GET") {
+      const lokasi = sebagai === "ortu" ? db.prepare(`
+        SELECT c.name AS nama, l.lat, l.lng, l.dibagikan_at AS at
+        FROM lokasi_chat_anak l JOIN children c ON c.id = l.child_id
+        WHERE c.parent_id = ? AND l.dibagikan_at > ? AND (? IS NULL OR c.id = ?)
+        ORDER BY c.id
+      `).all(parentId, Date.now() - SIMPAN_LOKASI_MS, childId ?? null, childId ?? null) : undefined;
       if (grup) {
         const pesan = daftarFamily(parentId, pengirim);
         if (pesan.length) {
@@ -179,11 +214,11 @@ export function handleChat({ m, path, body, url, ortuId, ortuSaya, anak, ownChil
             ON CONFLICT(keluarga_id, penerima) DO UPDATE SET terakhir = MAX(terakhir, excluded.terakhir)`)
             .run(parentId, penerima, pengirim.ortu, pengirim.anak, pesan.at(-1).id);
         }
-        return send(200, { pesan }), true;
+        return send(200, { pesan, lokasi }), true;
       }
       // Membuka percakapan berarti pesan dari pihak lain sudah dibaca.
       db.prepare("UPDATE pesan_keluarga SET dibaca = 1 WHERE child_id = ? AND dari = ? AND dibaca = 0").run(childId, sebagai === "ortu" ? "anak" : "ortu");
-      return send(200, { pesan: daftarPesan(childId, sebagai) }), true;
+      return send(200, { pesan: daftarPesan(childId, sebagai), lokasi }), true;
     }
     if (m === "POST") {
       const kunci = grup ? `family:${sebagai}:${pengirim.ortu ?? pengirim.anak}` : `${sebagai}:${childId}`;

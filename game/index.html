@@ -20,32 +20,19 @@
         <section data-step="pilih" hidden>
           <h1>Selamat datang!</h1>
           <p class="muted">Siapa yang mau bermain?</p>
-          <button class="primary" data-go="kode">Saya anak: pakai kode masuk</button>
+          <button class="primary" data-go="login-anak">Masuk sebagai anak</button>
           <a class="btn" href="/orangtua.html">Saya orang tua: masuk / daftar</a>
-          <button data-go="undangan">Saya diundang pasangan: punya kode keluarga</button>
           <p class="muted">Belum punya akun? Orang tua mendaftar dulu, lalu membuat akun anak di dashboard orang tua.</p>
         </section>
 
-        <!-- Anak masuk dengan kode dari orang tua -->
-        <form data-step="kode" id="form-kode" hidden>
-          <h2>Kode masuk</h2>
-          <p class="muted">Minta kode 6 huruf dari orang tua (dibuat di dashboard orang tua).</p>
-          <input id="kode-input" maxlength="6" autocomplete="off" class="code big-code" placeholder="KODE" />
+        <form data-step="login-anak" id="form-login-anak" hidden>
+          <h2>Masuk sebagai anak</h2>
+          <p class="muted">Gunakan nama pengguna dan kata sandi dari orang tua.</p>
+          <label>Nama pengguna <input name="loginAnak" maxlength="24" autocomplete="username" required /></label>
+          <label>Kata sandi <input name="sandiAnak" type="password" maxlength="128" autocomplete="current-password" required /></label>
           <span class="error" hidden></span>
           <button type="submit" class="primary">Masuk</button>
-          <button type="button" class="ghost" data-go="pilih">Kembali</button>
-        </form>
-
-        <!-- Orang tua kedua (mis. Ibu) bergabung ke keluarga dengan kode undangan dari pasangannya -->
-        <form data-step="undangan" id="form-undangan" hidden>
-          <h2>Gabung ke keluarga</h2>
-          <p class="muted">Masukkan kode undangan 6 huruf dari pasangan Anda (dibuat di dashboard orang tua, menu Setting → Keluarga).</p>
-          <input id="undangan-input" maxlength="6" autocomplete="off" class="code big-code" placeholder="KODE" />
-          <p id="undangan-info" class="notice-kecil" hidden></p>
-          <span class="error" hidden></span>
-          <button type="submit" class="primary" id="undangan-cek">Periksa kode</button>
-          <a class="btn utama" id="undangan-lanjut" hidden>Lanjut daftar</a>
-          <button type="button" class="ghost" data-go="pilih">Kembali</button>
+          <button type="button" class="ghost" data-act="kembali-login-anak">Kembali</button>
         </form>
 
         <!-- Perangkat keluarga: orang tua sudah masuk -->
@@ -54,21 +41,12 @@
           <div id="anak-list" class="kids"></div>
           <p id="anak-kosong" class="muted" hidden>Belum ada akun anak. Buat dulu di dashboard orang tua.</p>
           <div class="row">
+            <button data-go="login-anak">Masuk dengan kata sandi</button>
             <button data-go="ortu">Main sebagai orang tua</button>
             <a class="btn" href="/orangtua.html">Dashboard orang tua</a>
           </div>
           <button class="ghost" data-act="keluar">Keluar dari akun</button>
-          <button class="ghost" data-go="undangan">Pasangan belum punya akun? Daftar dengan kode keluarga</button>
         </section>
-
-        <!-- PIN anak -->
-        <form data-step="pin" id="form-pin" hidden>
-          <h2 id="pin-judul">Masukkan PIN</h2>
-          <input id="pin-input" inputmode="numeric" maxlength="4" autocomplete="off" class="code big-code" placeholder="••••" type="password" />
-          <span class="error" hidden></span>
-          <button type="submit" class="primary">Masuk</button>
-          <button type="button" class="ghost" data-go="keluarga">Kembali</button>
-        </form>
 
         <!-- Orang tua memilih tingkat soal sebelum bermain -->
         <section data-step="ortu" hidden>
@@ -192,14 +170,28 @@
           <button data-level="2">Menengah</button>
           <button data-level="3">Mahir</button>
         </div>
-        <button data-mode="cari">Cari lawan (online)</button>
-        <button data-mode="buat">Main dengan teman: buat kode meja</button>
+        <button data-mode="cari">Main online di meja ini</button>
+        <button data-mode="buat">Buat meja privat</button>
         <div class="row">
           <input id="join-code" maxlength="4" placeholder="KODE" autocomplete="off" />
-          <button data-mode="gabung">Gabung</button>
+          <button data-mode="gabung">Gabung privat</button>
         </div>
         <span id="chess-menu-error" class="error" hidden></span>
         <button class="ghost" data-mode="tutup">Tutup</button>
+      </div>
+    </div>
+
+    <!-- Ruang tunggu catur: kedua pemain menekan Siap, lalu permainan dimulai -->
+    <div id="chess-tunggu" class="overlay" hidden>
+      <div class="card ruang-tunggu" role="dialog" aria-labelledby="tunggu-judul">
+        <h2 id="tunggu-judul">♟️ Ruang tunggu catur</h2>
+        <p id="tunggu-info" class="muted"></p>
+        <ul id="tunggu-pemain" class="tunggu-pemain"></ul>
+        <button id="tunggu-siap" class="primary">✅ Siap</button>
+        <div class="row">
+          <button id="tunggu-bot" class="ghost">Lawan bot saja</button>
+          <button id="tunggu-keluar" class="ghost">Berdiri</button>
+        </div>
       </div>
     </div>
 
@@ -235,11 +227,11 @@
           <button data-level="2">Menengah</button>
           <button data-level="3">Mahir</button>
         </div>
-        <button data-mode="cari">Cari lawan (online)</button>
-        <button data-mode="buat">Main dengan teman: buat kode meja</button>
+        <button data-mode="cari">Main online di meja ini</button>
+        <button data-mode="buat">Buat meja privat</button>
         <div class="row">
           <input id="scr-join-code" maxlength="4" placeholder="KODE" autocomplete="off" class="code" />
-          <button data-mode="gabung">Gabung</button>
+          <button data-mode="gabung">Gabung privat</button>
         </div>
         <span id="scr-menu-error" class="error" hidden></span>
         <button class="ghost" data-mode="tutup">Tutup</button>
@@ -290,6 +282,26 @@
       </div>
     </div>
 
+    <div id="beda-gambar-panel" class="overlay" hidden>
+      <div class="card kartu-beda-gambar">
+        <h2>Spot the Differences</h2>
+        <h3 data-judul-beda tabindex="-1"></h3>
+        <p data-skor-beda></p>
+        <ul data-lobi-beda hidden></ul>
+        <div class="beda-gambar-grid" data-isi-beda hidden>
+          <section><h4>Gambar A</h4><div class="beda-gambar" data-gambar-beda></div></section>
+          <section><h4>Gambar B</h4><div class="beda-gambar" data-gambar-beda></div></section>
+        </div>
+        <p data-pesan-beda role="status"></p>
+        <div class="row">
+          <button type="button" class="primary" data-lanjut-beda hidden>Adegan berikutnya</button>
+            <button type="button" class="primary" data-berdua-beda hidden>Ready</button>
+          <button type="button" data-ulang-beda>Main ulang</button>
+          <button type="button" data-tutup-beda>Keluar</button>
+        </div>
+      </div>
+    </div>
+
     <div id="otello-panel" class="overlay" hidden>
       <div class="card kartu-otello">
         <h2>Otello</h2>
@@ -329,11 +341,11 @@
             <button data-level="3">Mahir</button>
           </div>
         </div>
-        <button data-mode="cari">Cari lawan (online)</button>
-        <button data-mode="buat">Main dengan teman: buat kode meja</button>
+        <button data-mode="cari">Main online di meja ini</button>
+        <button data-mode="buat">Buat meja privat</button>
         <div class="row">
           <input id="ktr-join-code" maxlength="4" placeholder="KODE" autocomplete="off" class="code" />
-          <button data-mode="gabung">Gabung</button>
+          <button data-mode="gabung">Gabung privat</button>
         </div>
         <span id="ktr-menu-error" class="error" hidden></span>
         <button class="ghost" data-mode="tutup">Tutup</button>
@@ -360,6 +372,7 @@
     <div id="mentor-panel" class="overlay" hidden>
       <section class="card" role="dialog" aria-modal="true" aria-labelledby="mentor-judul">
         <h2 id="mentor-judul">Elon Musk · Bot simulasi</h2>
+        <p>Pertanyaan dan percakapan terakhir di panel ini dikirim ke OpenAI. Hindari menulis data pribadi.</p>
         <p id="mentor-jawaban" aria-live="polite"></p>
         <div class="row" id="mentor-pilihan"></div>
         <form id="mentor-form">
@@ -375,6 +388,7 @@
         <h2 id="kantor-judul">Kantor Ayah dan Ibu</h2>
         <p id="kantor-saldo" class="muted"></p>
         <p id="kantor-status"></p>
+        <p id="kantor-slot" class="muted"></p>
         <p id="kantor-pesan" role="status" hidden></p>
         <button class="primary" id="kantor-aksi">Mulai bekerja</button>
         <button class="ghost" id="kantor-tutup">Tutup</button>

@@ -6,6 +6,7 @@ import { rapikanAksesori } from "../shared/aksesori.js";
 const DURASI_MS = 3_600_000;
 const HADIAH = 2;
 const BATAS_HARIAN = 10;
+const KAPASITAS = 20;
 
 db.exec(`CREATE TABLE IF NOT EXISTS kerja_ortu (
   parent_id INTEGER PRIMARY KEY REFERENCES parents(id) ON DELETE CASCADE,
@@ -30,6 +31,7 @@ if (!db.prepare("PRAGMA table_info(kerja_ortu)").all().some((c) => c.name === "p
 
 const diterima = (id, hari) => db.prepare("SELECT bintang FROM hadiah_kerja_ortu WHERE parent_id = ? AND hari = ?").get(id, hari)?.bintang ?? 0;
 const sesiKerja = db.prepare("SELECT selesai_at, pekerjaan FROM kerja_ortu WHERE parent_id = ?");
+const hitungAktif = db.prepare("SELECT COUNT(*) AS n FROM kerja_ortu WHERE pekerjaan = ? AND selesai_at > ?");
 
 export function sedangBekerja(id, sekarang = Date.now()) {
   const sesi = sesiKerja.get(id);
@@ -37,13 +39,17 @@ export function sedangBekerja(id, sekarang = Date.now()) {
 }
 
 function status(id) {
+  const sekarang = Date.now();
   const kerja = sesiKerja.get(id);
   const { bintang } = db.prepare("SELECT bintang FROM parents WHERE id = ?").get(id);
   return {
     bintang, hadiah: HADIAH, durasi: DURASI_MS / 1000,
-    batasHarian: BATAS_HARIAN, hariIni: diterima(id, today()),
+    batasHarian: BATAS_HARIAN, hariIni: diterima(id, today(sekarang)),
+    slot: Object.fromEntries(["kantor", "sawah"].map((jenis) => [
+      jenis, { kapasitas: KAPASITAS, tersedia: Math.max(0, KAPASITAS - hitungAktif.get(jenis, sekarang).n) },
+    ])),
     pekerjaan: kerja?.pekerjaan ?? null,
-    sisaMs: kerja ? Math.max(0, kerja.selesai_at - Date.now()) : null,
+    sisaMs: kerja ? Math.max(0, kerja.selesai_at - sekarang) : null,
   };
 }
 
@@ -72,10 +78,18 @@ export function handleKantor({ m, path, body, ortuSaya, keluargaId, anak, url, s
   if (m === "POST" && path.length === 2 && path[1] === "mulai") {
     const pekerjaan = body?.pekerjaan ?? "kantor";
     if (!["kantor", "sawah"].includes(pekerjaan)) throw new ApiError(400, "Pilih pekerjaan yang tersedia.");
-    db.prepare(`INSERT OR IGNORE INTO kerja_ortu (parent_id, selesai_at, durasi_ms, pekerjaan)
-      SELECT ?, ?, ?, ? WHERE COALESCE(
-        (SELECT bintang FROM hadiah_kerja_ortu WHERE parent_id = ? AND hari = ?), 0) + ? <= ?`)
-      .run(ortuSaya, Date.now() + DURASI_MS, DURASI_MS, pekerjaan, ortuSaya, today(), HADIAH, BATAS_HARIAN);
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const sekarang = Date.now();
+      if (!sesiKerja.get(ortuSaya) && diterima(ortuSaya, today(sekarang)) + HADIAH <= BATAS_HARIAN) {
+        if (hitungAktif.get(pekerjaan, sekarang).n >= KAPASITAS) {
+          throw new ApiError(409, `Slot ${pekerjaan === "kantor" ? "Kantor" : "Sawah"} penuh. Coba lagi saat ada sesi yang selesai.`);
+        }
+        db.prepare("INSERT INTO kerja_ortu (parent_id, selesai_at, durasi_ms, pekerjaan) VALUES (?, ?, ?, ?)")
+          .run(ortuSaya, sekarang + DURASI_MS, DURASI_MS, pekerjaan);
+      }
+      db.exec("COMMIT");
+    } catch (e) { db.exec("ROLLBACK"); throw e; }
     send(200, status(ortuSaya));
     return true;
   }

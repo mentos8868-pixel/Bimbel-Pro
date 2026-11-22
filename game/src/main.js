@@ -1,6 +1,7 @@
 import { Vector3, Scalar, PointerEventTypes } from "@babylonjs/core";
 import { aturPoseBelajar, aturStatusKerja, createArena, createAvatar, disposeAvatar, moveWithCollision, showBubble } from "./arena.js";
 import { JARAK_INTERAKSI_BIMBEL } from "../../shared/kursi-bimbel.js";
+import { kursiMeja } from "../../shared/meja-game.js";
 import { SocialUI } from "./social-ui.js";
 import {
   joinArena, findChessMatch, createChessTable, joinChessTable,
@@ -14,6 +15,7 @@ import { ChessUI } from "./chess-ui.js";
 import { ScrambleUI } from "./scramble-ui.js";
 import { pasangPapanKata } from "./papan-kata.js";
 import { pasangOtello } from "./otello-ui.js";
+import { pasangBedaGambar } from "./beda-gambar.js";
 import { TokoUI } from "./toko-ui.js";
 import { pasangChatKeluarga } from "./chat-keluarga-arena.js";
 import { siapkanMentor } from "./mentor-arena.js";
@@ -104,6 +106,24 @@ async function start(profile, playingAs) {
   let pantauTabBelajar;
   let menungguKursi = false;
   let batasWaktuKursi;
+  let mejaGame = null, mejaMenunggu = null, posisiSebelumGame = null;
+  const kunciMeja = () => mejaGame && room ? `${room.roomId}:${mejaGame.nomor}` : "";
+  function posisiAvatar({ x, z, ry }) {
+    me.root.position.set(x, 0, z);
+    me.root.rotation.y = ry;
+  }
+  function tutupGame() {
+    uiOpen = false;
+    keys.clear();
+    if (!mejaGame) return;
+    mejaGame = null;
+    if (room) room.send("meja-game-berdiri");
+    else if (posisiSebelumGame) {
+      posisiAvatar(posisiSebelumGame);
+      aturPoseBelajar(me, false);
+    }
+    posisiSebelumGame = null;
+  }
 
   function selesaiMenungguKursi() {
     clearTimeout(batasWaktuKursi);
@@ -113,7 +133,10 @@ async function start(profile, playingAs) {
   function berdiriDariKursi() {
     selesaiMenungguKursi();
     keys.clear();
-    room?.send("belajar-bimbel", false);
+    if (mejaMenunggu) {
+      mejaMenunggu = null;
+      room?.send("meja-game-berdiri");
+    } else room?.send("belajar-bimbel", false);
   }
 
   window.addEventListener("keydown", (e) => {
@@ -121,6 +144,7 @@ async function start(profile, playingAs) {
     const key = e.key.toLowerCase();
     keys.add(key);
     if (e.repeat || uiOpen) return;
+    if ((key === "e" || key === "escape") && mejaGame) { tutupGame(); return; }
     if ((key === "e" || key === "escape") && (me.duduk || menungguKursi)) {
       e.preventDefault();
       berdiriDariKursi();
@@ -154,7 +178,10 @@ async function start(profile, playingAs) {
       const av = createAvatar(scene, { ...p, role: "ortu", jenjang: "Orang tua", color: "#5b6b7c" });
       const ibu = p.peran === "ibu";
       if (p.pekerjaan === "sawah") av.root.position.set(ibu ? -22 : -25, 0, -12.7);
-      else av.root.position.set(ibu ? -22.2 : -25.3, 0, 4.65);
+      else {
+        const meja = tables.filter((t) => t.id === "kantor" && !t.manajer).slice(-4)[ibu ? 1 : 0];
+        av.root.position.set(meja.x, 0, meja.z - 0.7);
+      }
       aturStatusKerja(av, p.pekerjaan);
       pekerjaKeluarga.set(p.uid, av);
     }
@@ -239,6 +266,7 @@ async function start(profile, playingAs) {
     }
     room.onLeave((code) => {
       room = null;
+      mejaMenunggu = null;
       for (const { av } of others.values()) disposeAvatar(av);
       others.clear();
       gambarPekerjaKeluarga();
@@ -263,7 +291,8 @@ async function start(profile, playingAs) {
   }
 
   // ---------- Catur ----------
-  const chessUI = new ChessUI({ onClose: () => (uiOpen = false) });
+  // "Lawan bot saja" dari ruang tunggu: tetap duduk, langsung tampilkan pilihan bot.
+  const chessUI = new ChessUI({ onClose: tutupGame, onBot: () => { menuError(""); $("bot-levels").hidden = false; menu.hidden = false; } });
   const menu = $("chess-menu");
   const menuError = (t) => {
     $("chess-menu-error").textContent = t;
@@ -279,27 +308,27 @@ async function start(profile, playingAs) {
       return;
     }
     const mode = btn.dataset.mode;
-    if (mode === "tutup") { menu.hidden = true; uiOpen = false; return; }
+    if (mode === "tutup") { menu.hidden = true; tutupGame(); return; }
     if (mode === "bot") { $("bot-levels").hidden = false; return; }
     menuError("");
     try {
       let r;
-      if (mode === "cari") r = await findChessMatch(profile);
+      if (mode === "cari") r = await findChessMatch(profile, kunciMeja());
       else if (mode === "buat") r = await createChessTable(profile);
       else if (mode === "gabung") {
         const code = $("join-code").value.trim();
         if (code.length !== 4) return menuError("Masukkan 4 huruf kode meja.");
         r = await joinChessTable(code, profile);
       }
-      if (r) { menu.hidden = true; chessUI.startOnline(profile, r); }
+      if (r) { if (!mejaGame) { r.leave(); return; } menu.hidden = true; chessUI.startOnline(profile, r, mode !== "cari"); }
     } catch (err) {
       menuError(onlineError(err, mode));
     }
   });
 
   // ---------- Scramble ----------
-  const scrambleUI = new ScrambleUI({ onClose: () => (uiOpen = false) });
-  const mulaiPapanKata = pasangPapanKata($("papan-kata-panel"), () => (uiOpen = false), (p, hasil, poin) => {
+  const scrambleUI = new ScrambleUI({ onClose: tutupGame });
+  const mulaiPapanKata = pasangPapanKata($("papan-kata-panel"), tutupGame, (p, hasil, poin) => {
     if (p.role === "anak") reportResult("scramble", "bot", { win: "menang", loss: "kalah", draw: "seri" }[hasil], poin);
   });
   const sMenu = $("scramble-menu");
@@ -323,27 +352,27 @@ async function start(profile, playingAs) {
       return;
     }
     const mode = btn.dataset.mode;
-    if (mode === "tutup") { sMenu.hidden = true; uiOpen = false; return; }
+    if (mode === "tutup") { sMenu.hidden = true; tutupGame(); return; }
     if (mode === "papan-kata") { sMenu.hidden = true; mulaiPapanKata(profile, scrLang); return; }
     if (mode === "bot") { $("scr-bot-levels").hidden = false; return; }
     sError("");
     try {
       let r;
-      if (mode === "cari") r = await findScrambleMatch(profile, scrLang);
+      if (mode === "cari") r = await findScrambleMatch(profile, scrLang, kunciMeja());
       else if (mode === "buat") r = await createScrambleTable(profile, scrLang);
       else if (mode === "gabung") {
         const code = $("scr-join-code").value.trim();
         if (code.length !== 4) return sError("Masukkan 4 huruf kode meja.");
         r = await joinScrambleTable(code, profile);
       }
-      if (r) { sMenu.hidden = true; scrambleUI.startOnline(profile, r); }
+      if (r) { if (!mejaGame) { r.leave(); return; } sMenu.hidden = true; scrambleUI.startOnline(profile, r, mode !== "cari"); }
     } catch (err) {
       sError(onlineError(err, mode));
     }
   });
 
   // ---------- Kartu Kilat ----------
-  const kartuUI = new KartuUI({ onClose: () => (uiOpen = false) });
+  const kartuUI = new KartuUI({ onClose: tutupGame });
   const kMenu = $("kartu-menu");
   let kMode = "hitung";
   let kBots = 2;
@@ -364,19 +393,19 @@ async function start(profile, playingAs) {
       return;
     }
     const mode = btn.dataset.mode;
-    if (mode === "tutup") { kMenu.hidden = true; uiOpen = false; return; }
+    if (mode === "tutup") { kMenu.hidden = true; tutupGame(); return; }
     if (mode === "bot") { $("ktr-bot-opts").hidden = false; return; }
     kError("");
     try {
       let r;
-      if (mode === "cari") r = await findKartuMatch(profile, kMode);
+      if (mode === "cari") r = await findKartuMatch(profile, kMode, kunciMeja());
       else if (mode === "buat") r = await createKartuTable(profile, kMode);
       else if (mode === "gabung") {
         const code = $("ktr-join-code").value.trim();
         if (code.length !== 4) return kError("Masukkan 4 huruf kode meja.");
         r = await joinKartuTable(code, profile);
       }
-      if (r) { kMenu.hidden = true; kartuUI.startOnline(profile, r); }
+      if (r) { if (!mejaGame) { r.leave(); return; } kMenu.hidden = true; kartuUI.startOnline(profile, r, mode !== "cari"); }
     } catch (err) {
       kError(onlineError(err, mode));
     }
@@ -385,13 +414,14 @@ async function start(profile, playingAs) {
   // ---------- Chat & teman ----------
   // Meja online yang sedang menunggu pemain (untuk mengundang teman).
   const currentTable = () => {
-    if (chessUI.mode === "online" && chessUI.room && chessUI.serverStatus === "menunggu") return { game: "catur", code: chessUI.room.roomId };
-    if (scrambleUI.mode === "online" && scrambleUI.room && scrambleUI.view?.status === "menunggu") return { game: "scramble", code: scrambleUI.room.roomId };
-    if (kartuUI.kind === "online" && kartuUI.room && kartuUI.view?.status === "menunggu") return { game: "kartu", code: kartuUI.room.roomId };
+    if (chessUI.mode === "online" && chessUI.privat && chessUI.room && chessUI.serverStatus === "menunggu") return { game: "catur", code: chessUI.room.roomId };
+    if (scrambleUI.mode === "online" && scrambleUI.privat && scrambleUI.room && scrambleUI.view?.status === "menunggu") return { game: "scramble", code: scrambleUI.room.roomId };
+    if (kartuUI.kind === "online" && kartuUI.privat && kartuUI.room && kartuUI.view?.status === "menunggu") return { game: "kartu", code: kartuUI.room.roomId };
     return null;
   };
   // Menerima undangan teman: tutup meja/menu yang terbuka, lalu gabung ke meja dengan kodenya.
   async function joinInvite(game, code) {
+    if (playingAs === "anak") return toast(`Duduk di meja ${game} dan masukkan kode privat ${code}.`);
     for (const ui of [chessUI, scrambleUI, kartuUI]) if (!ui.el.hidden) ui.close();
     for (const id of ["chess-menu", "scramble-menu", "kartu-menu", "toko-panel", "teman-panel", "profil"]) $(id).hidden = true;
     uiOpen = true;
@@ -428,8 +458,38 @@ async function start(profile, playingAs) {
   }
 
   const bukaMentor = siapkanMentor(() => { uiOpen = false; keys.clear(); });
-  const bukaOtello = pasangOtello($("otello-panel"), () => { uiOpen = false; keys.clear(); });
+  const bukaOtello = pasangOtello($("otello-panel"), tutupGame);
+  const bukaBedaGambar = pasangBedaGambar($("beda-gambar-panel"), tutupGame, room);
   function useTable(t) {
+    if (t.nomor && mejaGame !== t) {
+      if (mejaGame || menungguKursi) return;
+      keys.clear();
+      if (!room) {
+        posisiSebelumGame = posisiPemain();
+        mejaGame = t;
+        posisiAvatar(kursiMeja(t)[0]);
+        aturPoseBelajar(me, true);
+        useTable(t);
+        return;
+      }
+      mejaMenunggu = t;
+      menungguKursi = true;
+      room.send("move", posisiPemain());
+      room.send("meja-game-duduk", t.nomor);
+      batasWaktuKursi = setTimeout(() => {
+        mejaMenunggu = null;
+        selesaiMenungguKursi();
+        room?.send("meja-game-berdiri");
+        toast("Meja belum merespons. Coba duduk lagi.");
+      }, 4000);
+      return;
+    }
+    if (t.id === "beda-gambar") {
+      uiOpen = true;
+      keys.clear();
+      bukaBedaGambar(t);
+      return;
+    }
     if (t.id === "otello") {
       uiOpen = true;
       keys.clear();
@@ -490,6 +550,19 @@ async function start(profile, playingAs) {
       keys.clear();
       $("bot-levels").hidden = true;
       menuError("");
+      // Anak yang duduk di meja catur langsung masuk ruang tunggu meja ini (bersama yang duduk di seberang).
+      // Bila tidak bisa (mis. belum diizinkan bermain dengan pemain lain), tampilkan menu dengan alasannya.
+      if (room && playingAs === "anak") {
+        findChessMatch(profile, kunciMeja()).then((r) => {
+          if (!mejaGame) { r.leave(); return; }
+          chessUI.startOnline(profile, r, false);
+        }).catch((err) => {
+          if (!mejaGame) return;
+          menuError(onlineError(err, "cari"));
+          menu.hidden = false;
+        });
+        return;
+      }
       menu.hidden = false;
     } else if (t.id === "scramble") {
       uiOpen = true;
@@ -502,25 +575,51 @@ async function start(profile, playingAs) {
     }
   }
 
+  room?.onMessage("meja-game-siap", ({ nomor, posisi }) => {
+    if (mejaMenunggu?.nomor !== nomor) { room?.send("meja-game-berdiri"); return; }
+    mejaGame = mejaMenunggu;
+    mejaMenunggu = null;
+    selesaiMenungguKursi();
+    posisiAvatar(posisi);
+    aturPoseBelajar(me, true);
+    useTable(mejaGame);
+  });
+  room?.onMessage("meja-game-gagal", (pesan) => {
+    mejaMenunggu = null;
+    selesaiMenungguKursi();
+    toast(pesan);
+  });
+  room?.onMessage("meja-game-berdiri", (posisi) => {
+    posisiAvatar(posisi);
+    aturPoseBelajar(me, false);
+  });
+
   const kantorPanel = $("kantor-panel");
   const kantorAksi = $("kantor-aksi");
   const kantorPesan = $("kantor-pesan");
   let kantorStatus = null;
   let kantorSelesai = 0;
   let kantorTimer;
+  let kantorSlotTimer;
   let kantorMemuat = false;
   let tempatKerja = "kantor";
 
   function tampilKantor() {
     const sisa = Math.max(0, Math.ceil((kantorSelesai - performance.now()) / 1000));
     const batas = kantorStatus && kantorStatus.hariIni + kantorStatus.hadiah > kantorStatus.batasHarian;
-    kantorAksi.disabled = kantorMemuat || sisa > 0 || Boolean(batas);
+    const slot = kantorStatus?.slot?.[tempatKerja];
+    const penuh = kantorStatus?.sisaMs === null && slot?.tersedia === 0;
+    $("kantor-slot").textContent = slot ? `Slot tersedia ${slot.tersedia}/${slot.kapasitas}` : "";
+    kantorAksi.disabled = kantorMemuat || sisa > 0 || Boolean(batas) || penuh;
     $("kantor-saldo").textContent = kantorStatus ? `★ ${kantorStatus.bintang} bintang` : "";
     if (!kantorStatus) {
       $("kantor-status").textContent = kantorMemuat ? "Memuat sesi kerja…" : "";
       kantorAksi.textContent = "Coba lagi";
     } else if (batas) {
       $("kantor-status").textContent = `Batas ${kantorStatus.batasHarian} bintang kerja hari ini sudah tercapai.`;
+    } else if (penuh) {
+      $("kantor-status").textContent = "Slot sedang penuh. Kamu bisa mulai saat ada sesi yang selesai.";
+      kantorAksi.textContent = "Mulai bekerja";
     } else if (kantorStatus.sisaMs === null) {
       $("kantor-status").textContent = `Bekerja selama ${kantorStatus.durasi / 3600} jam untuk mendapat ${kantorStatus.hadiah} bintang.`;
       kantorAksi.textContent = tempatKerja === "sawah" ? "Mulai bertani" : "Mulai bekerja";
@@ -534,7 +633,7 @@ async function start(profile, playingAs) {
   async function muatKantor(aksi) {
     if (kantorMemuat) return;
     kantorMemuat = true;
-    kantorPesan.hidden = true;
+    if (aksi || !kantorStatus) kantorPesan.hidden = true;
     tampilKantor();
     try {
       kantorStatus = await (aksi ? api("POST", `kantor/${aksi}`, aksi === "mulai" ? { pekerjaan: tempatKerja } : {}) : api("GET", "kantor"));
@@ -562,11 +661,13 @@ async function start(profile, playingAs) {
     kantorPanel.hidden = false;
     $("kantor-tutup").focus();
     kantorTimer = setInterval(tampilKantor, 250);
+    kantorSlotTimer = setInterval(() => muatKantor(), 10000);
     muatKantor();
   }
   kantorAksi.onclick = () => muatKantor(kantorStatus && (kantorStatus.sisaMs === null ? "mulai" : "ambil"));
   $("kantor-tutup").onclick = () => {
     clearInterval(kantorTimer);
+    clearInterval(kantorSlotTimer);
     kantorPanel.hidden = true;
     uiOpen = false;
   };
@@ -596,7 +697,8 @@ async function start(profile, playingAs) {
   let nearTable = null;
   $("action-btn").onclick = () => {
     if (uiOpen) return;
-    if (me.duduk || menungguKursi) berdiriDariKursi();
+    if (mejaGame) tutupGame();
+    else if (me.duduk || menungguKursi) berdiriDariKursi();
     else if (nearTable) useTable(nearTable);
   };
 
@@ -646,7 +748,7 @@ async function start(profile, playingAs) {
     // Gerakkan pemain lain dengan halus
     for (const { av, p } of others.values()) {
       const rp = av.root.position;
-      const duduk = Boolean(p.kursiBimbel);
+      const duduk = Boolean(p.kursiBimbel || p.mejaGame);
       if (av.duduk !== duduk || duduk) {
         rp.set(p.x, 0, p.z);
         av.root.rotation.y = p.ry;
@@ -677,7 +779,7 @@ async function start(profile, playingAs) {
       btn.textContent = matchMedia("(pointer: coarse)").matches ? label : `${label} [E]`;
       btn.hidden = false;
     } else if (nearTable && !uiOpen) {
-      const label = nearTable.action ? nearTable.action : nearTable.ready ? `Main ${nearTable.label}` : `${nearTable.label} (segera hadir)`;
+      const label = nearTable.action ? nearTable.action : nearTable.nomor ? `Duduk · ${nearTable.label}` : nearTable.label;
       btn.textContent = matchMedia("(pointer: coarse)").matches ? label : `${label} [E]`;
       btn.hidden = false;
     } else {

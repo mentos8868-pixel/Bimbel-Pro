@@ -51,6 +51,7 @@ Di setiap zona permainan ada beberapa **meja**. Pemain mendekati meja, lalu munc
 - Aturan catur standar.
 - Bot dengan beberapa tingkat: Pemula, Menengah, Mahir.
 - Mode belajar untuk SD: langkah yang boleh ditampilkan, dan ada tombol petunjuk.
+- **Ruang tunggu** (permintaan pengguna 22 November 2026): anak yang duduk di meja catur langsung masuk ruang tunggu meja itu, bersama pemain yang duduk di kursi seberang. Pop-up menampilkan kedua pemain dan status Siap; permainan baru mulai setelah **keduanya menekan ✅ Siap** (bisa dibatalkan). Bila lawan berdiri sebelum mulai, kursinya kosong lagi dan pemain yang tinggal menunggu lawan baru. Pilihan lain di pop-up: "Lawan bot saja" dan "Berdiri". Ruang tunggu juga dipakai untuk meja privat dengan kode. Aturan keamanan tidak berubah: tanpa izin bermain dengan pemain lain (atau untuk orang tua), menu lama tampil dengan alasannya dan permainan bersama tetap lewat kode meja. Server: status `siap` dan `whiteReady`/`blackReady` di `ChessRoom`.
 
 ### Scramble (susun kata)
 - Huruf diacak, lalu pemain menyusun kata secepat mungkin.

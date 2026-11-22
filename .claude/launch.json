@@ -7,6 +7,14 @@
       "runtimeArgs": ["run", "dev"],
       "cwd": "D:\\Bimbel-Pro",
       "port": 5173
+    },
+    {
+      "name": "online-lokal",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["server/index.js"],
+      "cwd": "D:\\Bimbel-Pro",
+      "env": { "GAME_SERVER_PORT": "2600", "COOKIE_SECURE": "1", "TRUST_PROXY": "1" },
+      "port": 2600
     }
   ]
 }

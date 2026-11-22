@@ -1,3 +1,4 @@
+import { buatAlarm } from "./alarm-anak.js";
 // Dashboard anak: halaman pertama setelah anak masuk. Menu: Home, Tugas, Arena, Bimbel, Report, Chat, Avatar, Toko Avatar.
 // Hanya data milik anak itu sendiri (dari /api/saya, /api/kamarku, /api/toko). Pengaturan tetap di tangan orang tua.
 import { api } from "./api.js";
@@ -46,6 +47,7 @@ let yakinBeli = null;
 // Menu Avatar dibagi tiga tab: Karakter, Aksesori (yang sudah dimiliki), Aura (terbuka sesuai level).
 const TAB_AVATAR = [["karakter", "🐻 Karakter"], ["aksesori", "🎀 Aksesori"], ["aura", "✨ Aura"]];
 let tabAvatar = "karakter";
+let sedangKeluar = false;
 
 const galat = (t) => { $("galat").textContent = t || ""; $("galat").hidden = !t; };
 const gambarAvatar = (coba) => avatarSvg(anak.avatar, anak.color, {
@@ -145,8 +147,10 @@ function uangSakuku(lengkap = false) {
 }
 
 // ---------- isi tiap menu ----------
+let alarmAnak;
 const ISI = {
   home: () => `${kepala()}${kotakAngka()}
+    <section id="alarm-anak" class="panel"></section>
     <div class="dua">
       <section class="panel"><h3>✅ Tugas hari ini</h3>${daftarTugas()}<h3 class="sub-judul">🎯 Misi belajar</h3>${daftarMisi()}</section>
       <section class="panel"><h3>Mau ke mana?</h3><div class="aksi-besar">${tombolArena()}${tombolBimbel()}</div>
@@ -219,6 +223,14 @@ const ISI = {
     </nav>
     <section class="chat-keluarga" aria-labelledby="judul-chat">
       <header class="chat-kepala"><h2 id="judul-chat">${chatFamily ? "Family" : esc(namaChatOrtu())}</h2></header>
+      <div class="chat-lokasi">
+        <p class="muted kecil">Bagikan satu titik lokasi ke orang tua selama 1 jam.</p>
+        <div class="row">
+          <button type="button" id="bagikan-lokasi">Bagikan lokasi</button>
+          <button type="button" id="hapus-lokasi" hidden>Hentikan berbagi</button>
+        </div>
+        <p class="muted kecil" id="pesan-lokasi" role="status"></p>
+      </div>
       ${kotakPesanChat(chatFamily ? "Family" : namaChatOrtu())}
     </section>
   </div>`,
@@ -231,7 +243,8 @@ const ISI = {
       : `<section class="panel"><h3>🐻 Pilih karakter</h3><div id="pilih-avatar"></div><span id="avatar-ok" class="muted" hidden>Avatar tersimpan ✓</span></section>`;
     return `${kepala(true)}
       <div class="tab-avatar" role="tablist">${TAB_AVATAR.map(([id, t]) => `<button role="tab" aria-selected="${tabAvatar === id}" class="${tabAvatar === id ? "on" : ""}" data-tab-avatar="${id}">${t}</button>`).join("")}</div>
-      ${isi}`;
+      ${isi}
+      <div><button type="button" class="ghost" id="btn-keluar" ${sedangKeluar ? "disabled" : ""}>Keluar</button></div>`;
   },
   toko: () => `${kepala()}
     <section class="panel"><h3>🛍️ Toko Avatar <span class="saldo">★ ${toko ? toko.bintang : k.bintang} bintang</span></h3>
@@ -301,6 +314,7 @@ function gambar() {
   bersihkanSuara?.();
   bersihkanSuara = null;
   $("halaman").innerHTML = ISI[hal]();
+  if (hal === "home") alarmAnak.tampilkan();
   if (hal === "avatar" && $("pilih-avatar")) pasangAvatar();
   if ((hal === "toko" || hal === "avatar") && !toko) {
     api("GET", "toko").then((j) => { toko = j; if (hal === "toko" || hal === "avatar") gambar(); }).catch((x) => galat(x.message));
@@ -327,6 +341,43 @@ function pasangChat() {
   const query = grup ? "sebagai=anak&grup=1" : "sebagai=anak";
   const pengirim = { sebagai: "anak", grup };
   const aktif = () => f.isConnected && hal === "chat";
+  const bagikanLokasi = $("bagikan-lokasi");
+  const hapusLokasi = $("hapus-lokasi");
+  const pesanLokasi = $("pesan-lokasi");
+  let mengubahLokasi = false;
+  const tampilLokasi = ({ aktif: dibagikan }) => {
+    hapusLokasi.hidden = !dibagikan;
+    pesanLokasi.textContent = dibagikan ? "Lokasi tersedia untuk orang tua." : "";
+  };
+  api("GET", "chat/lokasi?sebagai=anak").then((data) => {
+    if (aktif() && !mengubahLokasi) tampilLokasi(data);
+  }).catch(() => {});
+  function ubahLokasi(ambilData) {
+    mengubahLokasi = true;
+    bagikanLokasi.disabled = hapusLokasi.disabled = true;
+    return ambilData().then((data) => {
+      if (aktif()) tampilLokasi(data);
+    }).catch((e) => {
+      if (aktif()) pesanLokasi.textContent = e.message;
+    }).finally(() => {
+      bagikanLokasi.disabled = hapusLokasi.disabled = false;
+    });
+  }
+  bagikanLokasi.onclick = () => {
+    if (!navigator.geolocation || !window.isSecureContext) {
+      pesanLokasi.textContent = "Lokasi memerlukan HTTPS atau localhost.";
+      return;
+    }
+    pesanLokasi.textContent = "Mengambil lokasi…";
+    ubahLokasi(async () => {
+      const { coords } = await new Promise((ok, gagal) => navigator.geolocation.getCurrentPosition(ok, () => {
+        gagal(new Error("Lokasi belum tersedia. Periksa izin lokasi dan coba lagi."));
+      }, { timeout: 12000, maximumAge: 0 }));
+      if (!aktif()) return { aktif: false };
+      return api("POST", "chat/lokasi", { sebagai: "anak", lat: coords.latitude, lng: coords.longitude });
+    });
+  };
+  hapusLokasi.onclick = () => ubahLokasi(() => api("POST", "chat/lokasi", { sebagai: "anak", hapus: true }));
   let isiTerakhir;
   let versiMuat = 0;
   const muat = async () => {
@@ -531,11 +582,23 @@ $("halaman").addEventListener("click", async (e) => {
   gambar();
 });
 
-$("btn-keluar").onclick = async () => {
+$("halaman").addEventListener("click", async (e) => {
+  const tombol = e.target.closest("#btn-keluar");
+  if (!tombol || sedangKeluar) return;
+  sedangKeluar = true;
+  tombol.disabled = true;
+  galat("");
   bersihkanSuara?.();
-  await api("POST", "anak/keluar").catch(() => {});
-  location.href = "/";
-};
+  try {
+    await api("POST", "anak/keluar");
+    location.replace("/anak.html");
+  } catch (e) {
+    galat(`Belum bisa keluar. ${e.message}`);
+    sedangKeluar = false;
+    const aktif = $("btn-keluar");
+    if (aktif) aktif.disabled = false;
+  }
+});
 
 // ---------- muat ----------
 async function muat() {
@@ -544,6 +607,7 @@ async function muat() {
   $("memuat").hidden = true;
   if (!me.anak) { $("belum").hidden = false; return; }
   anak = me.anak;
+  alarmAnak = buatAlarm(anak.id);
   try { k = await api("GET", "kamarku"); } catch (x) { $("memuat").hidden = false; $("memuat").textContent = x.message; return; }
   tg = await api("GET", "tugas/saya").catch(() => null);
   uang = await api("GET", "keuangan/saya").catch(() => null);
@@ -563,7 +627,6 @@ async function muat() {
     if (beda && !["avatar", "toko", "chat", "keuangan"].includes(hal)) gambar(); else tandaChat();
   }, 30000);
   $("dash").hidden = false;
-  $("top-nav").hidden = false;
   document.title = `Dashboard ${anak.name}`;
   gambar();
 }

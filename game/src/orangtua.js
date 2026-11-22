@@ -1,4 +1,4 @@
-// Dashboard orang tua: masuk/daftar, laporan per anak, pengaturan, kode masuk, dan hapus data.
+// Dashboard orang tua: masuk/daftar, laporan per anak, pengaturan, dan hapus data.
 import { api } from "./api.js";
 import { pasangSuara } from "./chat-suara.js";
 import { gelembungChat, kotakPesanChat } from "./chat-tampilan.js";
@@ -175,22 +175,6 @@ const PILIH_PERAN = [
 ];
 const peranDaftar = pilihKartu($("peran-daftar"), PILIH_PERAN, "");
 
-// Datang dari layar depan arena dengan kode undangan keluarga: orangtua.html#daftar=KODE&peran=ibu.
-// Formulir Daftar langsung dibuka dengan kode dan peran yang masih kosong sudah terisi.
-let kodeUndangan = "";
-{
-  const m = location.hash.match(/^#daftar=([A-Za-z0-9]{4,8})(?:&peran=(ayah|ibu))?$/);
-  if (m) {
-    kodeUndangan = m[1].toUpperCase();
-    history.replaceState(null, "", location.pathname);
-    showAuth("daftar");
-    const f = $("form-daftar");
-    f.kode.value = kodeUndangan;
-    f.querySelector(".kode-undangan").open = true;
-    if (m[2]) peranDaftar.set(m[2]);
-  }
-}
-
 $("form-daftar").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
@@ -199,18 +183,26 @@ $("form-daftar").addEventListener("submit", async (e) => {
   if (!f.consent.checked) return setErr(f, "Centang persetujuan orang tua dulu.");
   busy(f, true);
   try {
-    await api("POST", "daftar", { name: f.name.value, email: f.email.value, password: f.password.value, consent: true, peran: peranDaftar.get(), kode: f.kode.value });
+    await api("POST", "daftar", { name: f.name.value, email: f.email.value, password: f.password.value, consent: true, peran: peranDaftar.get() });
     peranDaftar.set("");
-    kodeUndangan = "";
     f.reset();
     await load();
   } catch (x) { setErr(f, x.message); } finally { busy(f, false); }
 });
 
-$("btn-keluar").onclick = async () => {
-  await api("POST", "keluar").catch(() => {});
-  load();
-};
+const tombolKeluarOrtu = [$("btn-keluar"), $("avatar-ortu-keluar")];
+async function keluarOrtu() {
+  tombolKeluarOrtu.forEach((b) => (b.disabled = true));
+  try {
+    await api("POST", "keluar");
+    await load();
+  } catch (e) {
+    alert(`Belum bisa keluar. ${e.message}`);
+  } finally {
+    tombolKeluarOrtu.forEach((b) => (b.disabled = false));
+  }
+}
+tombolKeluarOrtu.forEach((b) => (b.onclick = keluarOrtu));
 
 // ---------------- tambah anak ----------------
 let newColor = COLORS[0];
@@ -228,10 +220,9 @@ $("form-anak").addEventListener("submit", async (e) => {
   setErr(f, "");
   if (!f.kurikulum.value) return setErr(f, "Pilih kurikulum sekolah dulu.");
   if (!f.kelas.value) return setErr(f, "Pilih kelas anak.");
-  if (!/^\d{4}$/.test(f.pin.value)) return setErr(f, "PIN harus 4 angka.");
   busy(f, true);
   try {
-    await api("POST", "anak", { name: f.name.value, kelas: Number(f.kelas.value), kurikulum: f.kurikulum.value, negara: f.negara.value, pin: f.pin.value, color: newColor, avatar: newAvatar.get() });
+    await api("POST", "anak", { name: f.name.value, kelas: Number(f.kelas.value), kurikulum: f.kurikulum.value, negara: f.negara.value, color: newColor, avatar: newAvatar.get(), loginAnak: f.loginAnak.value, sandiAnak: f.sandiAnak.value });
     f.reset();
     fillKelasNegara(f, 0, DEFAULT_NEGARA);
     await load();
@@ -445,29 +436,24 @@ function renderKid(c, soc) {
     } catch (x) { setErr(el, x.message); } finally { busy(s, false); }
   });
 
-  el.querySelector(".btn-kode").onclick = async () => {
+  const formLogin = el.querySelector(".form-login-anak");
+  formLogin.loginAnak.value = c.loginAnak || "";
+  formLogin.onsubmit = async (e) => {
+    e.preventDefault();
+    const status = formLogin.querySelector("[role=status]");
+    status.textContent = "";
     setErr(el, "");
+    busy(formLogin, true);
     try {
-      const r = await api("POST", `anak/${c.id}/kode`);
-      const until = new Date(r.expiresAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-      const box = el.querySelector(".kode-box");
-      box.replaceChildren();
-      const strong = document.createElement("strong");
-      strong.textContent = r.code;
-      box.append(`Kode masuk untuk ${c.name}: `, strong,
-        ` — berlaku sekali sampai pukul ${until}. Di HP/tablet anak, buka arena lalu pilih "Saya anak: pakai kode masuk".`);
-      box.hidden = false;
-    } catch (x) { setErr(el, x.message); }
-  };
-  el.querySelector(".btn-pin").onclick = async () => {
-    const pin = prompt(`PIN baru untuk ${c.name} (4 angka):`);
-    if (pin === null) return;
-    if (!/^\d{4}$/.test(pin)) return setErr(el, "PIN harus 4 angka.");
-    try {
-      await api("PATCH", `anak/${c.id}`, { pin });
-      setErr(el, "");
-      alert("PIN sudah diganti.");
-    } catch (x) { setErr(el, x.message); }
+      const hasil = await api("PATCH", `anak/${c.id}/login`, { loginAnak: formLogin.loginAnak.value, sandiAnak: formLogin.sandiAnak.value });
+      formLogin.loginAnak.value = hasil.loginAnak;
+      formLogin.sandiAnak.value = "";
+      status.textContent = "Login anak tersimpan.";
+    } catch (x) {
+      setErr(el, x.message);
+    } finally {
+      busy(formLogin, false);
+    }
   };
   el.querySelector(".btn-hapus").onclick = async () => {
     if (!confirm(`Hapus akun ${c.name} beserta laporan dan riwayatnya? Ini tidak bisa dibatalkan.`)) return;
@@ -491,7 +477,7 @@ const HAL = {
   report: ["Report", "Waktu bermain dan kemajuan belajar."],
   avatar: ["Avatar", "Avatar Anda sendiri, dipakai saat bermain di arena."],
   toko: ["Toko Avatar", "Beli karakter dan aksesori dengan bintang, sama seperti anak."],
-  setting: ["Setting", "Data anak, batas waktu, PIN, dan akun Anda."],
+  setting: ["Setting", "Data anak, batas waktu, sandi anak, dan akun Anda."],
 };
 // Menu yang isinya per anak (menampilkan pilihan anak di atas).
 const PER_ANAK = new Set(["tugas", "arena", "keuangan", "chat", "report", "setting"]);
@@ -531,13 +517,17 @@ function tampilKerja() {
   const sisa = Math.max(0, Math.ceil((kerjaSelesai - performance.now()) / 1000));
   const batas = kerja && kerja.hariIni + kerja.hadiah > kerja.batasHarian;
   const siap = kerja && kerja.sisaMs !== null;
+  const kantor = kerja?.slot?.kantor, sawah = kerja?.slot?.sawah;
+  const penuh = !siap && kantor?.tersedia === 0;
   const waktu = [Math.floor(sisa / 3600), Math.floor(sisa / 60) % 60, sisa % 60].map((n) => String(n).padStart(2, "0")).join(":");
   $("kerja-status").textContent = !kerja ? (kerjaMemuat ? "Memuat sesi kerja…" : "")
     : batas ? "Batas hadiah hari ini sudah tercapai."
+    : penuh ? "Slot Kantor sedang penuh."
     : !siap ? "Siap mulai bekerja."
     : sisa ? `Sedang bekerja · ${waktu} tersisa` : "Sesi selesai. Bintang siap diambil.";
   $("kerja-kuota").textContent = kerja ? `★ ${kerja.hariIni}/${kerja.batasHarian} bintang kerja hari ini · Saldo ${kerja.bintang} bintang` : "";
-  tombol.disabled = kerjaMemuat || Boolean(batas) || sisa > 0;
+  $("kerja-slot").textContent = kantor && sawah ? `Slot tersedia · Kantor ${kantor.tersedia}/${kantor.kapasitas} · Sawah ${sawah.tersedia}/${sawah.kapasitas}` : "";
+  tombol.disabled = kerjaMemuat || Boolean(batas) || penuh || sisa > 0;
   tombol.textContent = !kerja ? "Coba lagi" : siap ? `Ambil ${kerja.hadiah} bintang` : "Mulai bekerja";
 }
 
@@ -746,6 +736,29 @@ async function segarkanBelum() {
   } catch { /* abaikan */ }
 }
 
+function ringkasanLokasi(lokasi) {
+  if (!lokasi.length) return '<p class="muted kecil">Belum ada lokasi anak yang sedang dibagikan.</p>';
+  const lat = lokasi.map((p) => p.lat);
+  const lng = lokasi.map((p) => p.lng);
+  const selatan = Math.min(...lat), utara = Math.max(...lat);
+  const barat = Math.min(...lng), timur = Math.max(...lng);
+  const lebar = Math.max(timur - barat, 0.001), tinggi = Math.max(utara - selatan, 0.001);
+  const penanda = (nama, i) => `<span class="lokasi-inisial warna-${i % 4}" aria-hidden="true">${esc([...nama][0]?.toUpperCase() || "•")}</span>`;
+  const titik = lokasi.map(({ nama, lat, lng }, i) => {
+    const x = 50 + 70 * (lng - (barat + timur) / 2) / lebar;
+    const y = 50 - 60 * (lat - (selatan + utara) / 2) / tinggi;
+    return `<span class="lokasi-titik" style="left:${x}%;top:${y}%" title="${esc(nama)}">${penanda(nama, i)}</span>`;
+  }).join("");
+  return `<div class="lokasi-preview" role="img" aria-label="Pratinjau posisi relatif titik yang dibagikan">${titik}</div>
+    <p class="muted kecil">Pratinjau posisi · buka Google Maps untuk melihat peta.</p>
+    <ul class="lokasi-daftar">${lokasi.map(({ nama, lat, lng, at }, i) => `
+      <li><a target="_blank" rel="noopener noreferrer" href="https://www.google.com/maps/search/?api=1&amp;query=${encodeURIComponent(`${lat},${lng}`)}" aria-label="Buka lokasi ${esc(nama)} di Google Maps">
+        ${penanda(nama, i)}<span class="lokasi-anak"><strong>${esc(nama)}</strong><small>Buka Google Maps ↗</small></span>
+        <time class="muted kecil" data-lokasi-at="${at}" datetime="${new Date(at).toISOString()}" title="${jam(at)}"></time>
+      </a></li>`).join("")}</ul>
+    <p class="muted kecil">Lokasi hanya terlihat oleh orang tua selama dibagikan.</p>`;
+}
+
 async function gambarChat() {
   const box = $("chat-isi");
   clearInterval(chatTimer);
@@ -773,10 +786,15 @@ async function gambarChat() {
       </ul>
     </nav>
     <section class="chat-keluarga" aria-labelledby="judul-chat">
-      <header class="chat-kepala"><h2 id="judul-chat">${nama}</h2>
+      <header class="chat-kepala"><h2 id="judul-chat">${grup ? "Keluarga" : nama}</h2>
         ${grup ? "" : '<button type="button" id="btn-chat-arena" aria-controls="chat-arena" aria-expanded="false">Riwayat arena</button>'}
       </header>
+      <section class="chat-lokasi lokasi-ortu" aria-labelledby="lokasi-judul">
+        <h3 id="lokasi-judul">Lokasi</h3>
+        <div id="lokasi-chat"><p class="muted kecil">Memuat lokasi anak…</p></div>
+      </section>
       <section class="chat-arena" id="chat-arena" hidden aria-label="Riwayat chat arena ${nama}"><p class="muted kecil" id="arena-ket"></p><ul class="arena-log" id="arena-log"></ul></section>
+      <h3 class="judul-obrolan">${grup ? "Obrolan keluarga" : `Obrolan dengan ${nama}`}</h3>
       ${kotakPesanChat(namaAnak)}
       <p class="error" role="status" hidden></p>
     </section>
@@ -788,6 +806,8 @@ async function gambarChat() {
   });
   const f = $("form-chat");
   const g = $("gelembung");
+  const lokasiChat = $("lokasi-chat");
+  let lokasiTerakhir;
   const sec = f.closest(".chat-keluarga");
   const aktif = () => hal === "chat" && f.isConnected && !$("dash").hidden;
   let versiMuat = 0;
@@ -796,8 +816,17 @@ async function gambarChat() {
     if (!aktif()) return;
     const versi = ++versiMuat;
     try {
-      const { pesan } = await api("GET", `chat/keluarga?${query}`);
+      const { pesan, lokasi = [] } = await api("GET", `chat/keluarga?${query}`);
       if (!aktif() || versi !== versiMuat) return;
+      const kunciLokasi = JSON.stringify(lokasi);
+      if (kunciLokasi !== lokasiTerakhir) {
+        lokasiChat.innerHTML = ringkasanLokasi(lokasi);
+        lokasiTerakhir = kunciLokasi;
+      }
+      for (const waktu of lokasiChat.querySelectorAll("[data-lokasi-at]")) {
+        const menit = Math.floor((Date.now() - Number(waktu.dataset.lokasiAt)) / 60000);
+        waktu.textContent = menit > 0 ? `${menit} menit lalu` : "Baru saja";
+      }
       const isi = pesan.length ? pesan.map((p) => gelembungChat(p, "ortu", query, jam, { saya: dataOrtu.id })).join("") : `<p class="muted chat-kosong">Belum ada pesan di percakapan ${nama}.</p>`;
       if (isi !== isiTerakhir && ![...g.querySelectorAll("audio")].some((audio) => !audio.paused)) {
         const bawah = g.scrollTop + g.clientHeight >= g.scrollHeight - 20;
@@ -1152,8 +1181,8 @@ $("toko-ortu-isi").addEventListener("click", async (e) => {
 
 // ---------------- Keluarga (menu Setting) ----------------
 // Kepala keluarga dan orang tua kedua punya hak yang sama atas anak-anak. Orang tua kedua bergabung
-// dengan kode undangan (berlaku 24 jam, sekali pakai). Hanya kepala keluarga yang bisa mengeluarkannya.
-let dataKeluarga = { anggota: [], undangan: null, sayaKepala: true };
+// Hanya kepala keluarga yang bisa mengeluarkan pasangan.
+let dataKeluarga = { anggota: [], sayaKepala: true };
 const NAMA_PERAN = { ayah: "Ayah", ibu: "Ibu" };
 function gambarKeluarga() {
   const k = dataKeluarga;
@@ -1163,16 +1192,19 @@ function gambarKeluarga() {
     <span class="tugas-judul"><b>${esc(a.name)}${a.saya ? " (Anda)" : ""}</b><span class="muted kecil">${NAMA_PERAN[a.peran] || a.peran} · ${esc(a.email)}</span></span>
     ${a.kepala ? '<span class="lencana">👑 Kepala keluarga</span>' : ""}
     ${k.sayaKepala && !a.kepala ? `<button class="ghost danger-text" data-keluarkan="${a.id}">Keluarkan</button>` : ""}</li>`).join("");
-  const undang = k.anggota.length >= 2 ? ""
-    : k.undangan
-      ? `<p class="kode-box">Kode undangan untuk ${pasangan}: <strong>${esc(k.undangan.kode)}</strong> — berlaku sampai ${new Date(k.undangan.sampai).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}.
-          ${pasangan} membuka halaman ini, memilih <b>Daftar</b>, memilih "${pasangan}", lalu memasukkan kode ini.</p>
-        <div class="row"><button data-undang>Buat kode baru</button><button class="ghost" data-batal-undang>Batalkan kode</button></div>`
-      : `<p class="muted">Ajak ${pasangan} bergabung supaya bisa mengurus anak-anak bersama: tugas, uang saku, chat, dan pengaturan.</p>
-        <div><button class="primary" data-undang>➕ Undang ${pasangan}</button></div>`;
+  const buatPasangan = k.sayaKepala && k.anggota.length === 1 ? `
+    <form id="form-pasangan">
+      <h3>Buat akun ${pasangan}</h3>
+      <div class="grid2">
+        <label>Nama ${pasangan} <input name="name" maxlength="40" required /></label>
+        <label>ID masuk (email) <input type="email" name="email" maxlength="120" autocomplete="off" required /></label>
+        <label>Kata sandi <input type="password" name="password" minlength="8" maxlength="128" autocomplete="new-password" required /></label>
+      </div>
+      <div><button type="submit" class="primary">Buat akun ${pasangan}</button></div>
+    </form>` : "";
   $("keluarga-box").innerHTML = `<h2>👪 Keluarga</h2>
     <ul class="tugas-list">${baris}</ul>
-    ${undang}
+    ${buatPasangan}
     <label class="peran-saya">Peran saya
       <select id="peran-saya">${Object.entries(NAMA_PERAN).map(([id, n]) => `<option value="${id}" ${saya?.peran === id ? "selected" : ""}>${n}</option>`).join("")}</select>
     </label>
@@ -1181,6 +1213,19 @@ function gambarKeluarga() {
     ? "Anda kepala keluarga: seluruh keluarga ikut terhapus, termasuk akun anak, laporan, riwayat permainan, dan akun pasangan Anda. Ini permanen dan tidak bisa dikembalikan."
     : "Hanya akun Anda yang terhapus. Anak-anak dan data keluarga tetap ada dan diurus kepala keluarga.";
   $("peran-saya").onchange = (e) => kirimKeluarga("PATCH", "keluarga/peran", { peran: e.target.value });
+  const form = $("form-pasangan");
+  if (form) form.onsubmit = async (e) => {
+    e.preventDefault();
+    setErr($("keluarga-box"), "");
+    busy(form, true);
+    try {
+      dataKeluarga = await api("POST", "keluarga/pasangan", { name: form.elements.name.value, email: form.email.value, password: form.password.value });
+      gambarKeluarga();
+    } catch (x) {
+      setErr($("keluarga-box"), x.message);
+      busy(form, false);
+    }
+  };
 }
 async function kirimKeluarga(metode, alamat, isi) {
   setErr($("keluarga-box"), "");
@@ -1191,8 +1236,6 @@ async function kirimKeluarga(metode, alamat, isi) {
 $("keluarga-box").addEventListener("click", (e) => {
   const b = e.target.closest("button");
   if (!b) return;
-  if (b.hasAttribute("data-undang")) return kirimKeluarga("POST", "keluarga/undang");
-  if (b.hasAttribute("data-batal-undang")) return kirimKeluarga("DELETE", "keluarga/undang");
   if (b.dataset.keluarkan) {
     const nama = b.closest("li").querySelector("b").textContent;
     if (!confirm(`Keluarkan ${nama} dari keluarga? Akunnya tetap ada, tetapi tidak bisa lagi mengurus anak-anak.`)) return;
@@ -1216,8 +1259,7 @@ async function load() {
   }
   if (versi !== versiMuat) return;
   // Tautan atur ulang kata sandi tetap ditampilkan walaupun perangkat ini masih masuk.
-  // Tautan atur sandi atau kode undangan: tampilkan formulirnya walaupun perangkat ini masih masuk.
-  const masuk = !!me.ortu && !resetToken && !kodeUndangan;
+  const masuk = !!me.ortu && !resetToken;
   $("auth").hidden = masuk;
   $("top-nav").hidden = !masuk;
   if (!masuk) {

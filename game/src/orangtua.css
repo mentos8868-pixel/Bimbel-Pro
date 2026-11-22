@@ -119,8 +119,6 @@ label.check input { width: 20px; height: 20px; margin-top: 2px; flex: none; }
 .approval { background: #fff8e6; border-color: #f2b134; }
 .social li button, .approval button { padding: 5px 10px; font-size: 14px; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.kode-box { background: #eef6ff; border: 1px dashed var(--primary); border-radius: 10px; padding: 10px 12px; margin: 0; }
-.kode-box strong { font-size: 24px; letter-spacing: 4px; }
 .danger summary { cursor: pointer; font-weight: 700; color: var(--error); }
 
 /* Kemajuan Ruang Pintar */
@@ -194,6 +192,27 @@ main:has(#dash:not([hidden])) { max-width: 1200px; }
 .chat-belum { margin-inline-start: auto; background: var(--error); color: white; border-radius: 999px; padding: 0 6px; font-size: 12px; }
 .chat-kepala { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
 .chat-kepala button { font-size: 13px; padding: 6px 10px; }
+.lokasi-ortu { padding-block: 12px; background: var(--card); }
+.lokasi-ortu h3, .judul-obrolan { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #385761; }
+.judul-obrolan { padding: 14px 16px 8px; }
+.lokasi-preview {
+  position: relative; height: 135px; margin-top: 8px; border-radius: 12px;
+  background-color: #edf5ef;
+  background-image: linear-gradient(#56766b14 1px, transparent 1px), linear-gradient(90deg, #56766b14 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+.lokasi-titik { position: absolute; transform: translate(-50%, -50%); }
+.lokasi-inisial { display: grid; place-items: center; flex: 0 0 32px; width: 32px; height: 32px; border-radius: 50%; background: #25699a; color: white; font-weight: 800; }
+.lokasi-inisial.warna-1 { background: #a93d76; }
+.lokasi-inisial.warna-2 { background: #216b55; }
+.lokasi-inisial.warna-3 { background: #695394; }
+.lokasi-daftar { list-style: none; margin: 8px 0; padding: 0; border: 1px solid var(--border); border-radius: 12px; }
+.lokasi-daftar li + li { border-top: 1px solid var(--border); }
+.lokasi-daftar a { display: flex; align-items: center; gap: 10px; padding: 10px; color: inherit; text-decoration: none; }
+.lokasi-daftar a:hover { background: #f3f8f7; }
+.lokasi-anak { display: grid; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.lokasi-anak small { color: #285a79; }
+.lokasi-daftar time { flex: 0 0 auto; }
 .chat-arena { padding: 0 16px 10px; border-bottom: 1px solid var(--border); }
 .gelembung { height: clamp(260px, 52dvh, 560px); overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 16px; background: #eef3f8; }
 .chat-kosong { margin: auto; text-align: center; }
@@ -258,9 +277,6 @@ main:has(#dash:not([hidden])) { max-width: 1200px; }
 .kartu-peran .av-face { width: 72px; height: 72px; display: block; }
 .kartu-peran .av-face svg { width: 100%; height: 100%; }
 .kartu-peran.on { border-color: var(--primary); background: #eef6ff; color: #1d4f91; }
-.kode-undangan summary { cursor: pointer; font-weight: 700; color: var(--primary); }
-.kode-undangan p { margin: 6px 0; }
-.kode-input { text-transform: uppercase; letter-spacing: 3px; font-weight: 700; }
 .kecil-ava { width: 40px; height: 40px; flex: none; display: block; }
 .kecil-ava svg { width: 100%; height: 100%; }
 .lencana { background: #fff4d6; color: #7a5200; border-radius: 999px; padding: 2px 10px; font-size: 13px; font-weight: 700; white-space: nowrap; }

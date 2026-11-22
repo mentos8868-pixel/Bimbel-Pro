@@ -11,8 +11,10 @@ const LEVEL_NAME = { 1: "Bot Pemula", 2: "Bot Menengah", 3: "Bot Mahir" };
 const $ = (id) => document.getElementById(id);
 
 export class ChessUI {
-  constructor({ onClose }) {
+  // onBot: dipanggil saat pemain memilih "Lawan bot saja" dari ruang tunggu (membuka pilihan bot).
+  constructor({ onClose, onBot }) {
     this.onClose = onClose;
+    this.onBot = onBot;
     this.el = $("chess");
     this.boardEl = $("board");
     this.chess = new Chess();
@@ -23,6 +25,53 @@ export class ChessUI {
     $("chess-close").onclick = () => this.close();
     $("chess-resign").onclick = () => this.resign();
     $("chess-hint").onclick = () => this.hint();
+
+    // Ruang tunggu (permainan online): Siap / Batal siap, lawan bot, atau berdiri.
+    $("tunggu-siap").onclick = () => {
+      const s = this.room?.state;
+      if (!s || s.status !== "siap") return;
+      const siapSaya = s.white === this.room.sessionId ? s.whiteReady : s.blackReady;
+      this.room.send("siap", !siapSaya);
+    };
+    $("tunggu-keluar").onclick = () => this.close();
+    $("tunggu-bot").onclick = () => {
+      this.tinggalkanRoom();
+      $("chess-tunggu").hidden = true;
+      this.mode = null;
+      this.onBot?.();
+    };
+  }
+
+  tinggalkanRoom() {
+    if (!this.room) return;
+    this.room.removeAllListeners();
+    this.room.leave();
+    this.room = null;
+  }
+
+  // Ruang tunggu tampil selama permainan online belum dimulai (menunggu lawan, atau menunggu keduanya Siap).
+  gambarTunggu(s) {
+    const tunggu = this.mode === "online" && (s.status === "menunggu" || s.status === "siap");
+    $("chess-tunggu").hidden = !tunggu;
+    this.el.hidden = tunggu || this.mode == null;
+    if (!tunggu) return;
+    const saya = this.room.sessionId;
+    const pemain = [[s.white, s.whiteName, s.whiteReady], [s.black, s.blackName, s.blackReady]].filter(([id]) => id);
+    const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+    const baris = pemain.map(([id, nama, siap]) =>
+      `<li class="${siap ? "siap" : ""}"><span>${esc(nama)}${id === saya ? " <span class=\"muted\">(kamu)</span>" : ""}</span><b>${siap ? "✅ Siap" : "⏳ Belum siap"}</b></li>`);
+    if (pemain.length < 2) {
+      baris.push(`<li class="kosong"><span>${this.privat ? `Bagikan kode meja <b>${esc(this.room.roomId)}</b> ke lawanmu` : "Menunggu lawan duduk di kursi seberang…"}</span></li>`);
+    }
+    $("tunggu-pemain").innerHTML = baris.join("");
+    const siapSaya = s.white === saya ? s.whiteReady : s.blackReady;
+    const lawanSiap = s.white === saya ? s.blackReady : s.whiteReady;
+    $("tunggu-info").textContent = s.status === "menunggu"
+      ? "Tunggu lawan datang, lalu tekan Siap bersama-sama."
+      : siapSaya ? (lawanSiap ? "Mulai!" : "Menunggu lawan menekan Siap…") : "Lawan sudah datang. Tekan Siap kalau kamu sudah siap.";
+    $("tunggu-siap").disabled = s.status !== "siap";
+    $("tunggu-siap").textContent = siapSaya ? "Batal siap" : "✅ Siap";
+    $("tunggu-siap").classList.toggle("primary", !siapSaya);
   }
 
   // ---------- mulai permainan ----------
@@ -39,7 +88,8 @@ export class ChessUI {
     this.show();
   }
 
-  startOnline(profile, room) {
+  startOnline(profile, room, privat = true) {
+    this.privat = privat;
     this.mode = "online";
     this.profile = profile;
     this.room = room;
@@ -50,6 +100,7 @@ export class ChessUI {
     room.onLeave(() => {
       if (this.mode === "online" && !this.result) this.flash("Koneksi meja terputus.");
     });
+    this.sebelumnya = "";
     this.syncFromServer(room.state);
     this.show();
   }
@@ -60,8 +111,12 @@ export class ChessUI {
     this.myColor = s.black === this.room.sessionId ? "b" : "w";
     this.names = { w: s.whiteName || "…", b: s.blackName || "…" };
     this.lastMove = s.lastMove;
-    this.serverStatus = s.status;
+    this.serverStatus = s.status;   // dipakai juga untuk tahu kapan permainan baru dimulai
     this.result = s.status === "selesai" ? s.result : "";
+    const mulai = this.serverStatus === "main" && this.sebelumnya && this.sebelumnya !== "main";
+    this.sebelumnya = s.status;
+    this.gambarTunggu(s);
+    if (mulai) this.flash("Kalian berdua siap. Mulai!");
     if (s.status === "selesai") this.report(s.winner === this.room.sessionId ? "menang" : s.winner ? "kalah" : "seri");
     this.render();
   }
@@ -71,18 +126,16 @@ export class ChessUI {
     this.hintSquares = [];
     this.thinking = false;
     $("chess-hint").hidden = !(this.profile.gameJenjang === "SD" && this.mode === "bot");
-    this.el.hidden = false;
+    // Online: papan baru tampil setelah ruang tunggu selesai (kedua pemain Siap).
+    this.el.hidden = this.mode === "online" && this.serverStatus !== "main" && this.serverStatus !== "selesai";
     this.render();
   }
 
   close() {
     clearTimeout(this.botTimer);
-    if (this.mode === "online" && this.room) {
-      this.room.removeAllListeners();
-      this.room.leave();
-      this.room = null;
-    }
+    if (this.mode === "online") this.tinggalkanRoom();
     this.mode = null;
+    $("chess-tunggu").hidden = true;
     this.el.hidden = true;
     this.onClose?.();
   }
@@ -225,7 +278,7 @@ export class ChessUI {
     let status;
     if (this.result) status = this.result;
     else if (this.mode === "online" && this.serverStatus === "menunggu")
-      status = `Menunggu lawan… Kode meja: ${this.room.roomId}`;
+      status = this.privat ? `Menunggu lawan… Kode meja privat: ${this.room.roomId}` : "Menunggu lawan di meja ini…";
     else if (this.thinking) status = "Bot sedang berpikir…";
     else if (this.chess.turn() === this.myColor) status = this.chess.inCheck() ? "Skak! Giliranmu." : "Giliranmu.";
     else status = this.chess.inCheck() ? "Skak! Giliran lawan." : "Giliran lawan.";

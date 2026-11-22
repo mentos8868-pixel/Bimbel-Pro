@@ -1,4 +1,4 @@
-// Layar masuk: anak (kode masuk atau PIN di perangkat keluarga) atau orang tua. Tanpa akun tidak bisa masuk.
+// Layar masuk anak dan orang tua. Anak memakai kata sandi.
 import { api } from "./api.js";
 import { avatarSvg } from "./avatar-svg.js";
 import { DEFAULT_ORTU_AVATAR } from "../../shared/avatars.js";
@@ -28,7 +28,6 @@ const childProfile = (c) => ({ role: "anak", childId: c.id, name: c.name, jenjan
 // Memanggil onStart(profile, playingAs) saat pemain siap masuk arena.
 export function setupLogin(onStart) {
   let me = null;
-  let pinChild = null;
   // Avatar tidak dipilih di sini lagi: layar masuk menampilkan avatar yang dipilih di dashboard
   // (menu Avatar orang tua / anak), lengkap dengan aksesori. Gantinya lewat tautan ke dashboard.
   const WARNA_ORTU = "#5b6b7c";
@@ -40,6 +39,10 @@ export function setupLogin(onStart) {
   };
 
   const go = (step) => show(step);
+  const mainOrtu = () => {
+    box().hidden = true;
+    onStart({ role: "ortu", name: me.ortu.name, jenjang: "Orang tua", gameJenjang: jenjangOrtu(), color: WARNA_ORTU, avatar: me.ortu.avatar || DEFAULT_ORTU_AVATAR, aksesori: (me.ortu.aksesori || []).join(",") }, "ortu");
+  };
   const refresh = async () => {
     show("muat");
     try {
@@ -47,9 +50,19 @@ export function setupLogin(onStart) {
     } catch {
       me = { ortu: null, anak: null, children: [], offline: true };
     }
+    const arena = new URLSearchParams(location.search);
+    if (arena.get("arena") === "ortu") {
+      if (!me.ortu) {
+        if (me.offline) { go("pilih"); return; }
+        location.replace("/orangtua.html");
+        return;
+      }
+      mainOrtu();
+      return;
+    }
     if (me.anak) {
       // Anak selalu mulai dari dashboard anak. Tombol "Masuk arena" di sana membuka /?arena=1.
-      const keArena = new URLSearchParams(location.search).has("arena");
+      const keArena = arena.has("arena");
       if (!keArena) { location.replace("/anak.html"); return; }
       history.replaceState(null, "", location.pathname);
       $("siap-judul").textContent = `Halo, ${me.anak.name}!`;
@@ -89,10 +102,12 @@ export function setupLogin(onStart) {
       s.textContent = c.jenjang;
       b.append(dot, n, s);
       b.onclick = () => {
-        pinChild = c;
-        $("pin-judul").textContent = `PIN ${c.name}`;
-        $("pin-input").value = "";
-        go("pin");
+        const form = $("form-login-anak");
+        form.loginAnak.value = c.loginAnak || "";
+        form.sandiAnak.value = "";
+        go("login-anak");
+        if (c.loginAnak) form.sandiAnak.focus();
+        else err("login-anak", "Atur nama pengguna dan kata sandi anak di Setting dashboard orang tua.");
       };
       return b;
     }));
@@ -106,6 +121,7 @@ export function setupLogin(onStart) {
     if (!b) return;
     if (b.dataset.go) return go(b.dataset.go);
     const act = b.dataset.act;
+    if (act === "kembali-login-anak") return go(me?.ortu ? "keluarga" : "pilih");
     if (act === "keluar") {
       await api("POST", "keluar").catch(() => {});
       return refresh();
@@ -126,74 +142,26 @@ export function setupLogin(onStart) {
       } finally { busy(sec, false); }
       return;
     }
-    if (act === "main-ortu") {
-      box().hidden = true;
-      onStart({ role: "ortu", name: me.ortu.name, jenjang: "Orang tua", gameJenjang: jenjangOrtu(), color: WARNA_ORTU, avatar: me.ortu.avatar || DEFAULT_ORTU_AVATAR, aksesori: (me.ortu.aksesori || []).join(",") }, "ortu");
+    if (act === "main-ortu") mainOrtu();
+  });
+
+  $("form-login-anak").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    err("login-anak", "");
+    busy(form, true);
+    try {
+      await api("POST", "anak/masuk", { loginAnak: form.loginAnak.value, sandiAnak: form.sandiAnak.value });
+      location.replace("/anak.html");
+    } catch (x) {
+      err("login-anak", x.message);
+      form.sandiAnak.value = "";
+      form.sandiAnak.focus();
+    } finally {
+      busy(form, false);
     }
   });
 
-  // Kode masuk
-  $("kode-input").addEventListener("input", () => err("kode", ""));
-  $("form-kode").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const code = $("kode-input").value.trim();
-    if (code.length !== 6) return err("kode", "Kode masuk terdiri dari 6 huruf/angka.");
-    busy(e.target, true);
-    try {
-      await api("POST", "kode", { code });
-      await refresh();
-    } catch (x) {
-      err("kode", x.message);
-    } finally { busy(e.target, false); }
-  });
-
-  // Kode undangan keluarga (orang tua kedua): diperiksa dulu, lalu diantar ke formulir daftar
-  // di dashboard orang tua dengan kode dan peran yang masih kosong sudah terisi.
-  const NAMA_PERAN = { ayah: "Ayah", ibu: "Ibu" };
-  const inputUndangan = $("undangan-input");
-  let versiUndangan = 0;
-  inputUndangan.addEventListener("input", () => {
-    versiUndangan++;
-    err("undangan", "");
-    $("undangan-info").hidden = true;
-    $("undangan-lanjut").hidden = true;
-    $("undangan-cek").hidden = false;
-  });
-  $("form-undangan").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    if ($("undangan-cek").disabled) return;
-    const kode = inputUndangan.value.trim().toUpperCase();
-    if (kode.length !== 6) return err("undangan", "Kode undangan terdiri dari 6 huruf/angka.");
-    const versi = versiUndangan;
-    busy(e.target, true);
-    try {
-      const u = await api("GET", `undangan?kode=${encodeURIComponent(kode)}`);
-      if (versi !== versiUndangan) return;
-      $("undangan-info").textContent = `Kode benar. Anda akan bergabung ke keluarga ${u.namaKepala} sebagai ${NAMA_PERAN[u.peran] || "orang tua"}.`;
-      $("undangan-info").hidden = false;
-      $("undangan-lanjut").href = `/orangtua.html#daftar=${encodeURIComponent(u.kode)}&peran=${u.peran || ""}`;
-      $("undangan-lanjut").hidden = false;
-      $("undangan-cek").hidden = true;
-    } catch (x) {
-      if (versi === versiUndangan) err("undangan", x.message);
-    } finally { busy(e.target, false); }
-  });
-
-  // PIN di perangkat keluarga
-  $("pin-input").addEventListener("input", () => err("pin", ""));
-  $("form-pin").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const pin = $("pin-input").value.trim();
-    if (!/^\d{4}$/.test(pin)) return err("pin", "PIN terdiri dari 4 angka.");
-    busy(e.target, true);
-    try {
-      await api("POST", `anak/${pinChild.id}/masuk`, { pin });
-      await refresh();
-    } catch (x) {
-      err("pin", x.message);
-      $("pin-input").value = "";
-    } finally { busy(e.target, false); }
-  });
 
   refresh();
 }

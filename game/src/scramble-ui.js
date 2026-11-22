@@ -68,7 +68,8 @@ export class ScrambleUI {
     if (e.status === "selesai") clearInterval(this.timer);
   }
 
-  startOnline(profile, room) {
+  startOnline(profile, room, privat = true) {
+    this.privat = privat;
     this.cleanup();
     this.mode = "online";
     this.profile = profile;
@@ -215,7 +216,7 @@ export class ScrambleUI {
 
     if (waiting) {
       const n = v.players.length;
-      let t = this.room ? `Kode meja: ${this.room.roomId}. ` : "";
+      let t = this.room && this.privat ? `Kode meja privat: ${this.room.roomId}. ` : "";
       t += n < 2 ? "Menunggu pemain lain…" : `Mulai otomatis dalam ${v.startIn} detik.`;
       $("scr-wait-text").textContent = t;
       $("scr-start").hidden = !(v.hostId === this.myId && n >= 2);

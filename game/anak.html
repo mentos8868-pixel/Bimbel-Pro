@@ -11,9 +11,6 @@
   <body class="hal-anak">
     <header class="top">
       <strong>Bimbel Pro</strong>
-      <nav id="top-nav" hidden>
-        <button id="btn-keluar" class="ghost">Bukan kamu? Ganti pemain</button>
-      </nav>
     </header>
 
     <main>
@@ -22,8 +19,8 @@
       <!-- Belum masuk sebagai anak -->
       <section id="belum" class="panel" hidden>
         <h2>Masuk dulu, ya</h2>
-        <p class="muted">Dashboard ini untuk akun anak. Masuk dengan PIN di perangkat keluarga, atau dengan kode masuk dari orang tua.</p>
-        <div><a class="btn btn-utama" href="/">Ke halaman masuk</a></div>
+        <p class="muted">Masuk dengan nama pengguna dan kata sandi dari orang tua.</p>
+        <div><a class="btn btn-utama" href="/">Masuk sebagai anak</a></div>
       </section>
 
       <!-- Dashboard anak: menu samping, isi tiap menu digambar oleh anak.js -->
@@ -53,5 +50,13 @@
     </main>
 
     <script type="module" src="/src/anak.js"></script>
-  </body>
+  <dialog id="alarm-editor" aria-labelledby="alarm-edit-judul"><form id="alarm-form">
+    <h2 id="alarm-edit-judul">Tambah alarm</h2>
+    <label>Jam <input name="jam" type="time" required></label>
+    <label>Nama alarm <input name="nama" maxlength="60" placeholder="Alarm"></label>
+    <label><input type="checkbox" name="harian"> Ulangi setiap hari</label>
+    <div><button type="button" id="alarm-kembali">Batal</button> <button>Simpan</button></div>
+  </form></dialog>
+  <dialog id="alarm-pesan" aria-labelledby="alarm-judul"><h2 id="alarm-judul">⏰ Alarm berbunyi</h2><p id="alarm-rincian"></p><form method="dialog"><button>Tutup</button></form></dialog>
+</body>
 </html>

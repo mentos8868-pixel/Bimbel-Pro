@@ -6,7 +6,8 @@
   "description": "Proyek parenting: arena 3D dengan ruang bimbel dan ruang game",
   "scripts": {
     "install:all": "npm install && npm install --prefix server && npm install --prefix game",
-    "dev": "concurrently -n server,game -c blue,green \"npm run dev --prefix server\" \"npm run dev --prefix game\""
+    "dev": "concurrently -n server,game -c blue,green \"npm run dev --prefix server\" \"npm run dev --prefix game\"",
+    "online": "node scripts/online.mjs"
   },
   "devDependencies": {
     "concurrently": "10.0.7"
