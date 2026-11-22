@@ -990,7 +990,7 @@ function gambarHadiah(box, nama) {
   const a = dataHadiah.anak[anakDipilih] || { bintang: 0, riwayat: [] };
   const menunggu = a.riwayat.filter((t) => t.status === "menunggu");
   const lain = a.riwayat.filter((t) => t.status !== "menunggu").slice(0, 8);
-  const harga = (h) => `${h.bintang} ⭐ → ${h.rupiah ? rp(h.rupiah) : "hadiah bukan uang"}`;
+  const harga = (h) => `${h.bintang} ⭐${h.rupiah ? ` → ${rp(h.rupiah)}` : ""}`;
   box.insertAdjacentHTML("beforeend", `
     <section class="panel"><h2>🎁 Hadiah tukar bintang <span class="saldo-ortu">${nama} punya ${a.bintang} ⭐</span></h2>
       <p class="muted">Anak menukar bintang dengan hadiah yang Anda buat. Bintang baru berkurang setelah Anda setujui; hadiah uang otomatis tercatat sebagai uang saku masuk.</p>
