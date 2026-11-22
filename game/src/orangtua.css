@@ -128,6 +128,30 @@ label.check input { width: 20px; height: 20px; margin-top: 2px; flex: none; }
 .belajar-baris { display: grid; grid-template-columns: 140px 1fr 90px; align-items: center; gap: 10px; font-size: 15px; padding: 3px 0; }
 .belajar-baris .bar { margin-top: 0; }
 .belajar-baris .muted { text-align: right; }
+/* Laporan Ruang Pintar di menu Report (sama dengan "Laporan Orang Tua" di Ruang Pintar) */
+.laporan-rp h4 { margin: 18px 0 2px; }
+.rp-ringkas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 10px 0; }
+.rp-kotak { background: #f4f8fc; border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.rp-kotak b { font-size: 22px; }
+.rp-tabel { overflow-x: auto; }
+.rp-tabel table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rp-tabel th { text-align: left; font-size: 13px; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.rp-tabel td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.rp-acc { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.rp-bar { width: 90px; height: 8px; border-radius: 99px; background: #e6ecf3; overflow: hidden; display: inline-block; }
+.rp-bar i { display: block; height: 100%; border-radius: 99px; }
+.rp-bar i.lo, .rp-pill.lo { background: #f8d7d3; } .rp-bar i.lo { background: #e5624f; }
+.rp-bar i.mid { background: #f0b429; } .rp-bar i.hi { background: #2e9e5b; }
+.rp-pill { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.rp-pill.lo { color: #a3321f; } .rp-pill.mid { background: #fdefc7; color: #8a5a00; } .rp-pill.hi { background: #d9f2e2; color: #1d6b3d; }
+.rp-saran { background: #eef6ff; color: #1d4f91; border-radius: 10px; padding: 10px 12px; font-size: 14px; margin: 10px 0 0; }
+.rp-tryout { margin: 6px 0 0; padding-left: 18px; font-size: 14px; }
+.rp-tryout li { padding: 2px 0; }
+.rp-pelajaran { margin-top: 12px; }
+.rp-pelajaran h5 { margin: 0 0 4px; font-size: 15px; display: flex; gap: 8px; align-items: baseline; }
+.rp-pelajaran h5 .muted { font-weight: 500; font-size: 13px; }
+.rp-belum td { color: var(--muted); }
+.rp-pill.none { background: #eef1f5; color: #6b7785; }
 
 /* ---------- Dashboard dengan menu samping (laptop) ---------- */
 main:has(#dash:not([hidden])) { max-width: 1200px; }
@@ -145,6 +169,11 @@ main:has(#dash:not([hidden])) { max-width: 1200px; }
 .luar { display: none !important; }
 .home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
 .home-persetujuan { grid-column: 1 / -1; }
+/* Kegiatan belajar (latihan dan tryout Ruang Pintar) yang menunggu tanggapan orang tua */
+.home-kegiatan { grid-column: 1 / -1; }
+.home-kegiatan h2 .badge { background: var(--error); color: #fff; border-radius: 999px; padding: 0 8px; font-size: 14px; vertical-align: middle; }
+.tugas-list li.kegiatan { flex-wrap: wrap; gap: 8px; background: #eef6ff; border-color: #9cc3f5; }
+.kegiatan-aksi { gap: 6px; flex-wrap: wrap; }
 .home-poin { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 15px; }
 .home-kartu .row button { padding: 6px 12px; font-size: 14px; }
 .segera { border-style: dashed; }

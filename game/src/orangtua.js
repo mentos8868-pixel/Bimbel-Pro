@@ -8,6 +8,7 @@ import { AVATAR_AWAL_ANAK, DEFAULT_ORTU_AVATAR } from "../../shared/avatars.js";
 import { avatarSvg } from "./avatar-svg.js";
 import { AKSESORI, SLOT } from "../../shared/aksesori.js";
 import { NEGARA, DEFAULT_NEGARA, negaraName, KURIKULUM, kurikulumName, namaKelas } from "../../shared/negara.js";
+import { renderLaporanRP } from "./laporan-rp.js";
 
 const $ = (id) => document.getElementById(id);
 // Pilihan kelas mengikuti kurikulum: Merdeka "Kelas 1 SD" … "Kelas 12 SMA", Cambridge/Singapore "Primary 1 (P1)" ….
@@ -289,7 +290,7 @@ function renderSocial(el, c, soc) {
 }
 
 // Kemajuan Ruang Pintar (dari /api/laporan → belajar; null bila anak belum pernah membukanya).
-function renderBelajar(box, b) {
+function renderBelajar(box, b, anak = {}) {
   const q = (sel) => box.querySelector(sel);
   if (!b) {
     q(".belajar-ringkas").textContent = "Belum ada kemajuan. Kemajuan muncul setelah anak berlatih di Ruang Pintar (Ruang Bimbel di arena).";
@@ -316,6 +317,8 @@ function renderBelajar(box, b) {
     return row;
   }));
   q(".belajar-ulangi").textContent = b.ulangi ? `Perlu diulang: ${b.ulangi.nama} (${b.ulangi.best} dari 3 bintang)` : "";
+  renderLaporanRP(q(".laporan-rp"), b.laporan, anak);
+  if (b.laporan) q(".belajar-tryout-box").hidden = true;   // riwayat tryout ada di Laporan Ruang Pintar
   const list = q(".belajar-tryout");
   list.replaceChildren(...(b.tryoutTerakhir.length ? b.tryoutTerakhir : [null]).map((t) => {
     const li = document.createElement("li");
@@ -403,7 +406,7 @@ function renderKid(c, soc) {
     recent.appendChild(li);
   }
 
-  renderBelajar(el.querySelector(".belajar"), c.belajar);
+  renderBelajar(el.querySelector(".belajar"), c.belajar, c);
 
   // Pengaturan
   const s = el.querySelector(".settings");
@@ -508,6 +511,44 @@ function terapkanHal() {
 }
 // Kartu Home digambar ulang setiap kali dibuka, supaya angka tugas yang baru disetujui ikut berubah.
 let dataHome = { children: [], byId: {} };
+// Kegiatan belajar Ruang Pintar (latihan per hari dan tryout, 7 hari) yang menunggu tanggapan orang tua.
+let dataKegiatan = {};
+const hariTeks = (hari) => new Date(hari + "T12:00:00+07:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "short" });
+function bagianKegiatan(children) {
+  const semua = children.flatMap((c) => (dataKegiatan[c.id] || []).map((k) => ({ ...k, anak: c })));
+  const menunggu = semua.filter((k) => !k.tanggapan).sort((a, b) => b.at - a.at);
+  const sudah = semua.filter((k) => k.tanggapan).sort((a, b) => b.tanggapan.at - a.tanggapan.at).slice(0, 10);
+  const el = document.createElement("section");
+  el.className = "panel home-kegiatan";
+  const ikon = (k) => (k.jenis === "tryout" ? "📝" : "📚");
+  const bintang = (k) => (k.jenis === "tryout" && k.max ? ` · ${"★".repeat(k.stars)}${"☆".repeat(Math.max(0, k.max - k.stars))}` : "");
+  el.innerHTML = `<h2>Kegiatan belajar menunggu tanggapan${menunggu.length ? ` <span class="badge">${menunggu.length}</span>` : ""}</h2>
+    ${menunggu.length ? `<ul class="tugas-list">${menunggu.map((k) => `<li class="approval kegiatan">
+      <span class="tugas-judul"><b>${ikon(k)} ${esc(k.teks)}${bintang(k)}</b><span class="muted kecil">${esc(k.anak.name)} · ${hariTeks(k.hari)}</span></span>
+      <span class="row kegiatan-aksi">
+        <button type="button" class="primary" data-tanggap="hebat" data-anak="${k.anak.id}" data-kunci="${esc(k.kunci)}">👏 Hebat!</button>
+        <button type="button" data-tanggap="semangat" data-anak="${k.anak.id}" data-kunci="${esc(k.kunci)}">💪 Semangat!</button>
+        <button type="button" class="ghost" data-tanggap="lihat" data-anak="${k.anak.id}" data-kunci="${esc(k.kunci)}">✔ Sudah dilihat</button>
+      </span></li>`).join("")}</ul>
+      <p class="muted kecil">"Hebat!" dan "Semangat!" juga dikirim sebagai pesan ke chat anak.</p>`
+      : '<p class="muted">Tidak ada kegiatan belajar baru. Latihan dan tryout di Ruang Pintar akan muncul di sini.</p>'}
+    ${sudah.length ? `<details class="recent-box"><summary>Sudah ditanggapi (${sudah.length})</summary><ul class="recent">${sudah.map((k) =>
+      `<li>${ikon(k)} ${esc(k.anak.name)} · ${esc(k.teks)} · <b>${esc(k.tanggapan.label)}</b></li>`).join("")}</ul></details>` : ""}`;
+  el.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-tanggap]");
+    if (!b) return;
+    el.querySelectorAll(`[data-kunci="${CSS.escape(b.dataset.kunci)}"]`).forEach((x) => (x.disabled = true));
+    try {
+      const r = await api("POST", "kegiatan-belajar/tanggapan", { anak: Number(b.dataset.anak), kunci: b.dataset.kunci, jenis: b.dataset.tanggap });
+      dataKegiatan[b.dataset.anak] = r.kegiatan;
+      gambarHome();
+    } catch (x) {
+      alert(x.message);
+      el.querySelectorAll(`[data-kunci="${CSS.escape(b.dataset.kunci)}"]`).forEach((y) => (y.disabled = false));
+    }
+  });
+  return el;
+}
 let kerja = null;
 let kerjaSelesai = 0;
 let kerjaMemuat = false;
@@ -582,7 +623,7 @@ function gambarHome() {
       const tombol = e.target.closest("[data-cek-anak]");
       if (tombol) keHal("tugas", Number(tombol.dataset.cekAnak));
     });
-    $("home").replaceChildren(persetujuan, ...children.map((c) => kartuHome(c, byId[c.id])));
+    $("home").replaceChildren(persetujuan, bagianKegiatan(children), ...children.map((c) => kartuHome(c, byId[c.id])));
     return;
   }
   const kosong = Object.assign(document.createElement("section"), { className: "panel" });
@@ -1032,6 +1073,7 @@ function kartuHome(c, soc) {
   const menang = Object.values(c.stats).reduce((n, s) => n + s.menang, 0), main = Object.values(c.stats).reduce((n, s) => n + s.main, 0);
   const poin = [
     b ? `📚 ${b.latihan7Hari} latihan minggu ini · ${b.medali.punya}/${b.medali.total} medali` : "📚 Belum berlatih di Ruang Pintar",
+    (dataKegiatan[c.id] || []).some((k) => !k.tanggapan) ? `🔔 ${(dataKegiatan[c.id] || []).filter((k) => !k.tanggapan).length} kegiatan belajar menunggu tanggapan Anda` : "",
     b?.ulangi ? `💪 Perlu diulang: ${b.ulangi.nama}` : "",
     tg && tg.hariIni.total ? `✅ Tugas hari ini ${tg.hariIni.disetujui}/${tg.hariIni.total} disetujui` : "✅ Belum ada tugas hari ini",
     belumDibaca[c.id] ? `💬 ${belumDibaca[c.id]} pesan baru dari ${c.name}` : "",
@@ -1270,7 +1312,8 @@ async function load() {
     bersihkanSuara = null;
     return;
   }
-  const data = await Promise.all([api("GET", "laporan"), api("GET", "teman"), api("GET", "tugas"), api("GET", "chat/belum?sebagai=ortu"), api("GET", "keuangan"), api("GET", "hadiah"), api("GET", "keluarga")]).catch((x) => {
+  const data = await Promise.all([api("GET", "laporan"), api("GET", "teman"), api("GET", "tugas"), api("GET", "chat/belum?sebagai=ortu"), api("GET", "keuangan"), api("GET", "hadiah"), api("GET", "keluarga"),
+    api("GET", "kegiatan-belajar").catch(() => ({ anak: {} }))]).catch((x) => {
     if (versi === versiMuat) memuat.textContent = `Dasbor gagal dimuat. ${x.message}`;
     return null;
   });
@@ -1278,7 +1321,8 @@ async function load() {
   namaOrtu = me.ortu.name;
   dataOrtu = { ...me.ortu, aksesori: me.ortu.aksesori || [] };
   tokoOrtu = null;   // dimuat ulang saat menu Toko Avatar dibuka
-  const [{ children }, social, tugas, belum, uang, hadiah, keluarga] = data;
+  const [{ children }, social, tugas, belum, uang, hadiah, keluarga, kegiatan] = data;
+  dataKegiatan = kegiatan.anak || {};
   dataTugas = tugas.anak;
   kuotaBintangTugas = tugas.kuotaBintang;
   belumDibaca = belum.anak;

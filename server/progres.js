@@ -69,6 +69,10 @@ function rapikanRingkasan(r) {
     kur: ID.test(String(r.kur)) ? String(r.kur) : "", kelas: int(r.kelas, 12), mapel,
     ulangi: u.nama ? { nama: teks(u.nama, 80), best: int(u.best, 3) } : null,
     totalMedali: int(r.totalMedali, 99), medaliTerbaru: teks(r.medaliTerbaru, 40),
+    // Nama topik yang pernah dilatih (untuk Laporan Ruang Pintar di dashboard orang tua).
+    laporan: arr(r.laporan).slice(0, 300).map(obj).filter((x) => KUNCI_TOPIK.test(String(x.k))).map((x) => ({
+      k: String(x.k), nama: teks(x.nama, 80), mapel: teks(x.mapel, 40), kelas: teks(x.kelas, 30), kur: teks(x.kur, 20),
+    })),
   };
 }
 
@@ -102,6 +106,29 @@ export function bacaProgres(childId) {
   try { return { data: JSON.parse(r.data), ringkasan: JSON.parse(r.ringkasan), updatedAt: r.updated_at }; } catch { return null; }
 }
 
+// Laporan Ruang Pintar untuk orang tua (sama dengan menu "Laporan Orang Tua" di Ruang Pintar):
+// angka dari kemajuan terbaru di server, nama topik dari ringkasan yang dikirim Ruang Pintar.
+const LV = { 1: "Mudah", 2: "Sedang", 3: "Sulit" };
+function laporanBelajar(d, r, namaMapel) {
+  let soal = 0, benar = 0;
+  for (const t of Object.values(d.topics)) { soal += t.att; benar += t.ok; }
+  // Semua topik yang pernah dilatih. Nama dari ringkasan Ruang Pintar bila ada; selain itu dashboard
+  // mengisinya dari daftar topik Ruang Pintar (lewat id topik).
+  const nama = Object.fromEntries((r.laporan || []).map((x) => [x.k, x]));
+  const topik = Object.entries(d.topics).filter(([, t]) => t.att).map(([k, t]) => {
+    const x = nama[k] || {};
+    const persen = Math.round((t.ok / t.att) * 100);
+    return { id: k.split("|")[0], nama: x.nama || "", mapel: x.mapel || "", kelas: x.kelas || "", kur: x.kur || "",
+      tingkat: LV[k.split("|")[1]] || "", lv: Number(k.split("|")[1]) || 0, soal: t.att, benar: t.ok, persen, status: persen < 60 ? "perlu" : persen < 85 ? "berkembang" : "kuat" };
+  }).sort((a, b) => a.persen - b.persen);
+  return {
+    soal, benarPersen: soal ? Math.round((benar / soal) * 100) : null, sesi: d.sessions,
+    terakhir: d.history[0]?.d || null,
+    topik,
+    tryout: d.tryouts.slice(0, 10).map((t) => ({ d: t.d, mapel: namaMapel[t.mapel] || t.mapel, score: t.score, c: t.c, n: t.n, stars: t.stars, max: t.max })),
+  };
+}
+
 // Ringkasan kemajuan belajar untuk Kamarku dan dashboard orang tua (null bila belum pernah ke Ruang Pintar).
 export function ringkasBelajar(childId, now = Date.now()) {
   const p = bacaProgres(childId);
@@ -123,6 +150,7 @@ export function ringkasBelajar(childId, now = Date.now()) {
     latihan7Hari: d.history.filter((h) => now - Date.parse(h.d) < 7 * 86400000).length,
     sesi: d.sessions,
     tryoutTerakhir: d.tryouts.slice(0, 5).map((t) => ({ d: t.d, mapel: nama[t.mapel] || t.mapel, score: t.score, c: t.c, n: t.n, stars: t.stars })),
+    laporan: laporanBelajar(d, r, nama),
   };
 }
 

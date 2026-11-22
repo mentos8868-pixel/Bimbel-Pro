@@ -14,7 +14,7 @@ for (const bahasa of ["ID", "EN"]) {
 const { Room } = colyseus;
 
 export class ScramblePlayer extends Schema {}
-defineTypes(ScramblePlayer, { name: "string", score: "number", solved: "boolean" });
+defineTypes(ScramblePlayer, { name: "string", score: "number", solved: "boolean", siap: "boolean" });
 
 export class ScrambleState extends Schema {
   constructor() {
@@ -30,7 +30,7 @@ defineTypes(ScrambleState, {
   clue: "string",
   lastWord: "string",
   secondsLeft: "number",
-  startIn: "number", // hitung mundur otomatis sebelum mulai
+  startIn: "number", // tidak dipakai lagi (dulu hitung mundur otomatis); permainan mulai saat semua pemain Siap
   result: "string",
   lang: "string",
   jenjang: "string",
@@ -41,7 +41,6 @@ defineTypes(ScrambleState, {
 const HURUF = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 const buatKode = () =>
   Array.from({ length: 4 }, () => HURUF[Math.floor(Math.random() * HURUF.length)]).join("");
-const AUTO_START_MS = 10000;
 
 export class ScrambleRoom extends Room {
   maxClients = 4;
@@ -50,7 +49,7 @@ export class ScrambleRoom extends Room {
     this.roomId = buatKode();
     if (options.private) this.setPrivate(true);
     this.engine = new ScrambleEngine({ jenjang: options.jenjang, lang: options.lang });
-    this.autoStartAt = 0;
+    this.siap = new Set();   // ruang tunggu: sessionId pemain yang sudah menekan Siap
 
     const s = new ScrambleState();
     Object.assign(s, {
@@ -60,8 +59,12 @@ export class ScrambleRoom extends Room {
     });
     this.setState(s);
 
-    this.onMessage("mulai", (client) => {
-      if (client.sessionId === this.state.hostId) this.tryStart();
+    // Ruang tunggu: tiap pemain menekan Siap; mulai saat minimal 2 pemain dan semuanya Siap.
+    this.onMessage("siap", (client, nilai) => {
+      if (this.engine.status !== "menunggu" || !this.engine.players.has(client.sessionId)) return;
+      if (nilai === false) this.siap.delete(client.sessionId); else this.siap.add(client.sessionId);
+      this.tryStart();
+      this.sync();
     });
     this.onMessage("jawab", (client, data = {}) => {
       const r = this.engine.answer(client.sessionId, data.word, Date.now());
@@ -73,6 +76,7 @@ export class ScrambleRoom extends Room {
 
   tryStart() {
     if (this.engine.status !== "menunggu" || this.engine.players.size < 2) return;
+    if (![...this.engine.players.keys()].every((id) => this.siap.has(id))) return;
     this.lock();
     this.engine.start(Date.now());
     this.sync();
@@ -80,16 +84,7 @@ export class ScrambleRoom extends Room {
 
   update() {
     const now = Date.now();
-    if (this.engine.status === "menunggu") {
-      if (this.engine.players.size >= 2) {
-        if (!this.autoStartAt) this.autoStartAt = now + AUTO_START_MS;
-        if (now >= this.autoStartAt) this.tryStart();
-      } else {
-        this.autoStartAt = 0;
-      }
-    } else {
-      this.engine.tick(now);
-    }
+    if (this.engine.status !== "menunggu") this.engine.tick(now);
     this.sync();
   }
 
@@ -104,13 +99,14 @@ export class ScrambleRoom extends Room {
     s.lastWord = snap.lastWord;
     s.secondsLeft = snap.secondsLeft;
     s.result = snap.result;
-    s.startIn = this.autoStartAt && snap.status === "menunggu" ? Math.max(0, Math.ceil((this.autoStartAt - now) / 1000)) : 0;
+    s.startIn = 0;
     for (const p of snap.players) {
       let sp = s.players.get(p.id);
       if (!sp) { sp = new ScramblePlayer(); s.players.set(p.id, sp); }
       sp.name = p.name;
       sp.score = p.score;
       sp.solved = p.solved;
+      sp.siap = this.siap.has(p.id);
     }
     for (const id of [...s.players.keys()]) if (!this.engine.players.has(id)) s.players.delete(id);
   }
@@ -128,6 +124,8 @@ export class ScrambleRoom extends Room {
 
   onLeave(client) {
     this.engine.removePlayer(client.sessionId);
+    this.siap.delete(client.sessionId);
+    this.tryStart();   // sisa pemain mungkin sudah Siap semua
     if (this.state.hostId === client.sessionId) {
       this.state.hostId = this.engine.players.keys().next().value || "";
     }

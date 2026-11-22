@@ -25,9 +25,11 @@ const httpServer = http.createServer((req, res) => {
 const gameServer = new Server({ transport: new WebSocketTransport({ server: httpServer }) });
 gameServer.define("arena", ArenaRoom);
 // Cari lawan hanya dengan pemain sejenjang (dan sebahasa / sejenis kartu).
-gameServer.define("chess", ChessRoom).filterBy(["jenjang", "meja"]);
-gameServer.define("scramble", ScrambleRoom).filterBy(["jenjang", "lang", "meja"]);
-gameServer.define("kartu", KartuRoom).filterBy(["jenjang", "mode", "meja"]);
+// Catur: satu ruang per meja arena (siapa boleh semeja diperiksa di room-auth.js).
+gameServer.define("chess", ChessRoom).filterBy(["meja"]);
+// Scramble dan Kartu juga satu ruang per meja; bahasa/jenis kartu mengikuti pemain pertama.
+gameServer.define("scramble", ScrambleRoom).filterBy(["meja"]);
+gameServer.define("kartu", KartuRoom).filterBy(["meja"]);
 
 gameServer.listen(PORT).then(() => {
   console.log(`Server Bimbel Pro berjalan di http://localhost:${PORT} (API) dan ws://localhost:${PORT} (game)`);

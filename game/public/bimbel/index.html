@@ -795,6 +795,16 @@ function topicsFor(mapel,k,kur=S.kur){
 }
 const ALLTOPICS=()=>{const out=[];for(const kur in KURS)for(const m in KURS[kur].mapel)for(let k=1;k<=12;k++)out.push(...topicsFor(m,k,kur));return out};
 const topicById=id=>ALLTOPICS().find(t=>t.id===id);
+/* Mode "daftar topik" (?daftar-topik dalam iframe dashboard orang tua): kirim nama pelajaran dan topik ke
+   halaman induk, lalu berhenti sebelum Ruang Pintar dimulai (tidak membaca/menyinkronkan kemajuan anak). */
+if(new URLSearchParams(location.search).has('daftar-topik')&&window.parent!==window){
+  const out={};for(const t of ALLTOPICS()){const K=KURS[t.kur]||KURS.merdeka;out[t.id]={nama:t.name,mapel:mapelName(t),kelas:t.kur?K.label(t.kelas):'-',kur:K.short,kurId:t.kur,mapelId:t.mapel,k:t.kelas,mix:!!t.mix}}
+  /* urutan pelajaran per kurikulum, dan nama kurikulum/kelas, untuk menampilkan SEMUA pelajaran dan topik kelas anak */
+  const kurikulum=Object.fromEntries(Object.entries(KURS).map(([id,K])=>[id,{nama:K.name,singkat:K.short,mapel:Object.entries(K.mapel),kelas:Object.fromEntries(Array.from({length:12},(_,i)=>[i+1,K.label(i+1)]))}]));
+  window.parent.postMessage({daftarTopik:out,kurikulum},location.origin);
+  window.onerror=()=>true;   /* penghentian ini disengaja: jangan tampil sebagai galat di konsol */
+  throw new Error('Mode daftar topik: Ruang Pintar tidak dijalankan.');
+}
 const subjOf=id=>{const t=topicById(id);return t?`${t.kur}:${t.mapel}`:id};
 function makeQ(t){let tt=t;if(t.g==='__mix'){tt=pick(TOPICS[t.kelas].filter(x=>x.g!=='__mix'))}
   const q=G[tt.g](tt.p);q.from=tt.name;if(t.kelas<=2&&q.kind==='int'&&!q.choices)q.choices=choicesFor(q.ans);return q}
@@ -840,7 +850,10 @@ function ringkasan(){
   let ulangi=null;   // topik kelas ini yang terakhir dilatih dengan bintang kurang dari 2
   for(const h of S.history){const t=S.topics[h.id],nm=namaTopik[h.id.split('|')[0]];if(t&&nm&&t.best<2){ulangi={nama:nm,best:t.best};break}}
   const akhir=S.medals.length?MEDALS.find(m=>m.id===S.medals[S.medals.length-1]):null;
-  return {kur,kelas:k,mapel,ulangi,totalMedali:MEDALS.length,medaliTerbaru:akhir?akhir.n:''};
+  /* Nama tiap topik yang pernah dilatih, untuk Laporan Ruang Pintar di dashboard orang tua (server tidak punya daftar topik). */
+  const laporan=Object.keys(S.topics).slice(0,300).map(key=>{const t=topicById(key.split('|')[0]);if(!t)return null;const K=KURS[t.kur]||KURS.merdeka;
+    return {k:key,nama:t.name,mapel:mapelName(t),kelas:t.kur?K.label(t.kelas):'-',kur:K.short}}).filter(Boolean);
+  return {kur,kelas:k,mapel,ulangi,totalMedali:MEDALS.length,medaliTerbaru:akhir?akhir.n:'',laporan};
 }
 async function sinkron(keepalive){
   if(!AKUN)return;clearTimeout(sinkronTimer);sinkronTimer=null;

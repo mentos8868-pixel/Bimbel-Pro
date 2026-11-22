@@ -1,0 +1,5 @@
+RobotExpressive.glb
+Model oleh Tomás Laulhé (Quaternius, https://quaternius.com), lisensi CC0 1.0 (domain publik).
+Modifikasi (ekspresi wajah, konversi glTF) oleh Don McCurdy.
+Sumber: three.js examples/models/gltf/RobotExpressive (tag r160), diunduh 22 November 2026.
+Dipakai sebagai model 3D karakter "Robo" di arena Bimbel Pro.

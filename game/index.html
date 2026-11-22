@@ -60,6 +60,16 @@
           <button class="ghost" data-go="keluarga">Kembali</button>
         </section>
 
+        <!-- Orang tua sedang bekerja (Kantor/Sawah): tidak bisa masuk arena sebelum Stop kerja -->
+        <section data-step="bekerja" hidden>
+          <h2>💼 Sedang bekerja</h2>
+          <p id="bekerja-info" class="muted"></p>
+          <p id="bekerja-sisa" class="bekerja-sisa"></p>
+          <span class="error" hidden></span>
+          <button class="primary" id="bekerja-aksi" data-act="stop-kerja">⏹ Stop kerja</button>
+          <a class="btn" href="/orangtua.html">Dashboard orang tua</a>
+        </section>
+
         <!-- Anak sudah masuk di perangkat ini -->
         <section data-step="siap" hidden>
           <h1 id="siap-judul">Halo!</h1>
@@ -89,6 +99,7 @@
     <div id="hud" hidden>
       <div id="hud-status" class="pill"></div>
       <div id="hud-hint" class="pill muted">WASD / panah untuk berjalan</div>
+      <button id="btn-grafis" class="pill" type="button" title="Ganti kualitas grafis (laptop lambat: pilih Rendah)">✨ Grafis</button>
     </div>
     <div id="social-btns" hidden>
       <button id="btn-dashboard" hidden>🏠 Dashboard</button>
@@ -262,7 +273,8 @@
         <div class="chess-info"><span id="scr-round"></span><span id="scr-timer" class="timer"></span></div>
         <div id="scr-wait" hidden>
           <p id="scr-wait-text" class="center"></p>
-          <button id="scr-start" class="primary" hidden>Mulai sekarang</button>
+          <ul id="scr-wait-list" class="tunggu-pemain"></ul>
+          <button id="scr-start" class="primary" hidden>✅ Siap</button>
         </div>
         <div id="scr-play">
           <div id="scr-clue" class="clue"></div>
@@ -401,7 +413,8 @@
         <div id="ktr-opponents" class="opponents"></div>
         <div id="ktr-wait" hidden>
           <p id="ktr-wait-text" class="center"></p>
-          <button id="ktr-start" class="primary" hidden>Mulai sekarang</button>
+          <ul id="ktr-wait-list" class="tunggu-pemain"></ul>
+          <button id="ktr-start" class="primary" hidden>✅ Siap</button>
         </div>
         <div id="ktr-table" class="table">
           <button id="ktr-deck" class="kcard back" aria-label="Ambil kartu dari tumpukan"><span>Ambil</span><small id="ktr-deck-count"></small></button>

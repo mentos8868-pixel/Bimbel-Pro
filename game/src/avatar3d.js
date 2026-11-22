@@ -1,9 +1,10 @@
 // Avatar 3D di arena: hewan/robot lucu dari bentuk sederhana (bola, kotak, tabung).
 // Ukuran mengikuti anggota keluarga (ayah paling besar, anak lebih kecil).
-import { MeshBuilder, StandardMaterial, Color3, TransformNode, FresnelParameters, DynamicTexture } from "@babylonjs/core";
+import { MeshBuilder, StandardMaterial, Color3, TransformNode, FresnelParameters, DynamicTexture, Vector3, Matrix } from "@babylonjs/core";
 import { parseAvatar, DEFAULT_AVATAR } from "../../shared/avatars.js";
 import { rapikanAksesori, aksesoriById } from "../../shared/aksesori.js";
 import { auraById, auraUrutan } from "../../shared/aura.js";
+import { MODEL, muatWadah } from "./model3d.js";
 
 // Aura di kaki avatar menurut level (lihat shared/aura.js): lingkaran bercahaya yang berdenyut.
 // Emas ke atas: + cincin berputar; berlian ke atas: + bola cahaya yang mengorbit; pelangi: warnanya berganti.
@@ -536,9 +537,61 @@ export function buildManekin(scene, parent, aksesori = []) {
   for (const id of rapikanAksesori(aksesori)) buildAksesori(k, id, h);
 }
 
+// Ganti bentuk sederhana dengan model 3D (.glb) setelah selesai dimuat (lihat model3d.js).
+// Aksesori Toko dan hiasan anggota keluarga ditempel ke kepala model dan ikut bergerak bersamanya.
+async function pakaiModel(scene, { fig, bob, napas, a, accent, pakai, ctx }) {
+  const info = MODEL[a.family.id];
+  const w = await muatWadah(scene, a.family.id);
+  if (!w || fig.isDisposed()) return;
+  // Bahan dipakai bersama semua salinan model: jangan ikut dibuang saat satu avatar keluar.
+  for (const m of w.materials) m.metadata = { ...(m.metadata || {}), bersama: true };
+  const inst = w.instantiateModelsToScene((n) => n, false, { doNotInstantiate: true });
+  const root = inst.rootNodes[0];
+  root.parent = bob;
+  root.scaling.scaleInPlace(info.tinggi / info.tinggiAsli);
+  // Profil pemain tetap terbuka saat model diketuk (arena menyimpan sid di metadata mesh).
+  const contoh = napas.getChildMeshes().find((m) => m.metadata)?.metadata;
+  for (const m of root.getChildMeshes()) { m.isPickable = true; if (contoh) m.metadata = contoh; }
+  // Sembunyikan bentuk sederhana (kecuali alat kerja orang tua).
+  for (const c of napas.getChildren()) if (c.name !== "laptop-kerja" && c.name !== "cangkul-kerja") c.setEnabled(false);
+
+  // Aksesori di kepala: wadah yang tiap frame mengikuti tulang kepala model.
+  const tulang = root.getDescendants(false).find((n) => n.name === info.kepala && n.getClassName() === "TransformNode");
+  if (tulang && (pakai.length || a.member)) {
+    const kepala = new TransformNode("kepala-model", scene);
+    kepala.parent = bob;
+    const k = kit(scene, kepala);
+    const h = info.h;
+    buildMember(k, a.member.id, h, accent, new Set(pakai.map((x) => aksesoriById(x).slot)));
+    for (const id of pakai) buildAksesori(k, id, h);
+    const balik = new Matrix(), pos = new Vector3();
+    const ikut = scene.onBeforeRenderObservable.add(() => {
+      bob.getWorldMatrix().invertToRef(balik);
+      Vector3.TransformCoordinatesToRef(tulang.getAbsolutePosition(), balik, pos);
+      kepala.position.copyFrom(pos);
+    });
+    fig.onDisposeObservable.add(() => scene.onBeforeRenderObservable.remove(ikut));
+  }
+
+  // Animasi: hanya satu yang berjalan; berganti saat keadaan berubah.
+  const grup = Object.fromEntries(inst.animationGroups.map((g) => [g.name, g]));
+  inst.animationGroups.forEach((g) => g.stop());
+  let sekarang = "";
+  ctx.anim = (keadaan) => {
+    if (keadaan === sekarang) return;
+    grup[info[sekarang]]?.stop();
+    sekarang = keadaan;
+    grup[info[keadaan]]?.start(true);
+  };
+  fig.onDisposeObservable.add(() => {
+    inst.animationGroups.forEach((g) => g.dispose());
+    inst.skeletons.forEach((sk) => sk.dispose());
+  });
+}
+
 // Gerak kecil supaya avatar terasa hidup: bernapas dan berkedip saat diam, tangan berayun saat berjalan.
 // Berjalan dikenali dari bob yang dinaikturunkan oleh arena (main.js), jadi arena tidak perlu diubah.
-function hidupkan(scene, fig, bob, napas, mata, lengan, laptop, cangkul) {
+function hidupkan(scene, fig, bob, napas, mata, lengan, laptop, cangkul, ctx = {}) {
   let t = Math.random() * 10, kedipLagi = 1 + Math.random() * 3, kedip = 0, gerak = 0, yLama = 0, tertutup = false;
   const sy = mata.map((m) => m.scaling.y);   // tinggi mata asli
   const obs = scene.onBeforeRenderObservable.add(() => {
@@ -548,6 +601,8 @@ function hidupkan(scene, fig, bob, napas, mata, lengan, laptop, cangkul) {
     if (Math.abs(bob.position.y - yLama) > 0.0005) gerak = 0.2; else gerak = Math.max(0, gerak - dt);
     yLama = bob.position.y;
     const jalan = gerak > 0;
+    // Model 3D (bila sudah dimuat): animasi jalan / duduk / diam mengikuti gerak pemain.
+    ctx.anim?.(jalan ? "jalan" : bob.position.y > 0.2 ? "duduk" : "diam");
     const s = jalan ? 0 : Math.sin(t * 2.2) * 0.018;
     napas.scaling.set(1 - s * 0.5, 1 + s, 1 - s * 0.5);
     const mengetik = laptop?.root.isEnabled() && !jalan;
@@ -612,7 +667,10 @@ export function buildAvatar3d(scene, parent, avatarId, accent, aksesori = [], au
     alatSawah.box(0.23, 0.13, 0.05, "#53636d", [0, -0.53, 0.19], [-0.35, 0, 0]);
     cangkul.setEnabled(false);
   }
-  hidupkan(scene, fig, bob, napas, k.mata, lengan, laptop, cangkul);
+  const ctx = {};
+  hidupkan(scene, fig, bob, napas, k.mata, lengan, laptop, cangkul, ctx);
+  // Karakter dengan model 3D sungguhan (.glb): dimuat di belakang layar; sampai siap, bentuk sederhana yang tampil.
+  if (MODEL[a.family.id]) pakaiModel(scene, { fig, bob, napas, a, accent, pakai, ctx });
   const meshes = bob.getChildMeshes();
   const tinggi = pakai.some((x) => x === "topi-penyihir" || x === "topi-pesta") ? 0.55 : 0;   // papan nama di atas topi
   const height = (head.y + head.r + 0.35 + tinggi) * a.member.scale;

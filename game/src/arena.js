@@ -5,6 +5,7 @@ import {
   MeshBuilder, StandardMaterial, Color3, Color4, DynamicTexture, TransformNode, Mesh,
 } from "@babylonjs/core";
 import { buildAvatar3d, buildManekin } from "./avatar3d.js";
+import { pasangGrafis } from "./grafis.js";
 import { drawFlag, namaKelas } from "../../shared/negara.js";
 import { BARIS_BIMBEL, KOLOM_BIMBEL, TITIK_BIMBEL } from "../../shared/kursi-bimbel.js";
 import { MEJA_GAME } from "../../shared/meja-game.js";
@@ -322,7 +323,7 @@ export function createArena(canvas) {
   // Tanah dan alun-alun
   const ground = MeshBuilder.CreateCylinder("ground", { diameter: ARENA_RADIUS * 2 + 6, height: 0.5, tessellation: 64 }, scene);
   ground.position.y = -0.25;
-  ground.material = mat(scene, "#8fd16a");
+  ground.material = mat(scene, "#a8cf8b");   // hijau rumput lembut (gaya ilustrasi)
   const plaza = MeshBuilder.CreateCylinder("plaza", { diameter: 16, height: 0.06, tessellation: 48 }, scene);
   plaza.position.y = 0.03;
   plaza.material = mat(scene, "#e8dcc2");
@@ -420,7 +421,9 @@ export function createArena(canvas) {
   const bot = createAvatar(scene, { name: "Elon Musk", jenjang: "Bot simulasi", avatar: "manusia-ayah", color: "#39465f" });
   bot.root.position.set(mentor.x, 0, mentor.z);
   bot.root.rotation.y = Math.PI / 3;
-  return { engine, scene, camera, walls, tables: [...tables, studyDesk, kios, mentor, ...mejaKantor, sawah] };
+  // Cahaya hangat, bayangan lembut, dan efek ala film (lihat grafis.js); dipasang setelah semua benda dibuat.
+  const grafis = pasangGrafis({ scene, camera, sun, hemi });
+  return { engine, scene, camera, walls, grafis, tables: [...tables, studyDesk, kios, mentor, ...mejaKantor, sawah] };
 }
 
 // Gelembung chat di atas kepala avatar (hilang setelah 5 detik).

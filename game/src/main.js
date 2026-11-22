@@ -18,6 +18,7 @@ import { pasangOtello } from "./otello-ui.js";
 import { pasangBedaGambar } from "./beda-gambar.js";
 import { TokoUI } from "./toko-ui.js";
 import { pasangChatKeluarga } from "./chat-keluarga-arena.js";
+import { KUALITAS, NAMA_KUALITAS } from "./grafis.js";
 import { siapkanMentor } from "./mentor-arena.js";
 import { api, reportResult } from "./api.js";
 
@@ -82,7 +83,16 @@ function timeUp(text) {
 
 async function start(profile, playingAs) {
   setPlayingAs(playingAs);
-  const { engine, scene, camera, walls, tables } = createArena($("arena"));
+  const { engine, scene, camera, walls, tables, grafis } = createArena($("arena"));
+  // Tombol kualitas grafis: Rendah → Sedang → Tinggi (disimpan di perangkat ini).
+  const tombolGrafis = $("btn-grafis");
+  const labelGrafis = () => (tombolGrafis.textContent = `✨ Grafis: ${NAMA_KUALITAS[grafis.kualitas]}`);
+  tombolGrafis.onclick = () => {
+    grafis.setKualitas(KUALITAS[(KUALITAS.indexOf(grafis.kualitas) + 1) % KUALITAS.length]);
+    labelGrafis();
+    tombolGrafis.blur();
+  };
+  labelGrafis();
   const me = createAvatar(scene, profile);
   me.root.position.set(0, 0, -3);
   // Membuat ulang figur avatar (mis. setelah membeli aksesori) di posisi dan arah yang sama.
@@ -278,6 +288,8 @@ async function start(profile, playingAs) {
     });
   } catch (e) {
     if (e?.code === 4403) return timeUp(e.message);
+    // Orang tua sedang bekerja: kembali ke layar "Sedang bekerja" (ada tombol Stop kerja).
+    if (e?.code === 4409) { location.replace("/?arena=ortu"); return; }
     $("hud-status").textContent = playingAs ? "Offline (lawan bot tetap bisa)" : "Mode tamu: lawan bot saja";
   }
   const updateCount = () => {
@@ -550,9 +562,9 @@ async function start(profile, playingAs) {
       keys.clear();
       $("bot-levels").hidden = true;
       menuError("");
-      // Anak yang duduk di meja catur langsung masuk ruang tunggu meja ini (bersama yang duduk di seberang).
-      // Bila tidak bisa (mis. belum diizinkan bermain dengan pemain lain), tampilkan menu dengan alasannya.
-      if (room && playingAs === "anak") {
+      // Anak atau orang tua yang duduk di meja catur langsung masuk ruang tunggu meja ini (bersama yang duduk
+      // di seberang). Bila tidak bisa (mis. lawan bukan keluarga dan belum diizinkan), tampilkan menu dengan alasannya.
+      if (room && (playingAs === "anak" || playingAs === "ortu")) {
         findChessMatch(profile, kunciMeja()).then((r) => {
           if (!mejaGame) { r.leave(); return; }
           chessUI.startOnline(profile, r, false);
@@ -638,6 +650,8 @@ async function start(profile, playingAs) {
     try {
       kantorStatus = await (aksi ? api("POST", `kantor/${aksi}`, aksi === "mulai" ? { pekerjaan: tempatKerja } : {}) : api("GET", "kantor"));
       kantorSelesai = performance.now() + (kantorStatus.sisaMs ?? 0);
+      // Mulai bekerja = keluar dari arena; layar masuk menampilkan "Sedang bekerja" dengan tombol Stop kerja.
+      if (aksi === "mulai" && kantorStatus.sisaMs > 0) { location.replace("/?arena=ortu"); return; }
       if (aksi === "ambil") {
         kantorPesan.textContent = `${kantorStatus.hadiah} bintang masuk ke saldo.`;
         kantorPesan.hidden = false;

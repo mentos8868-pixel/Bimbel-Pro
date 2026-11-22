@@ -13,7 +13,7 @@ import { levelDariXp, auraUntukLevel } from "../../shared/aura.js";
 import { JARAK_INTERAKSI_BIMBEL, POSISI_KURSI_BIMBEL, TITIK_BIMBEL } from "../../shared/kursi-bimbel.js";
 
 
-const { Room } = colyseus;
+const { Room, ServerError } = colyseus;
 import { Schema, MapSchema, defineTypes } from "@colyseus/schema";
 
 export const ARENA_RADIUS = 38;
@@ -125,7 +125,11 @@ export class ArenaRoom extends Room {
   }
 
   onAuth(client, options) {
-    return authPlayer(options);
+    const p = authPlayer(options);
+    // Orang tua yang sedang bekerja (Kantor/Sawah) tidak bisa masuk arena sampai sesi selesai atau dihentikan.
+    const kerja = p.role === "ortu" ? sedangBekerja(p.parentId) : "";
+    if (kerja) throw new ServerError(4409, `Kamu sedang bekerja di ${kerja === "sawah" ? "Sawah" : "Kantor"}. Tekan Stop kerja dulu untuk masuk arena.`);
+    return p;
   }
 
   segarkanStatusKerja(sekarang = Date.now()) {

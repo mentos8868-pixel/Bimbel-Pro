@@ -68,6 +68,17 @@ if (!kolomPesan.includes("tipe_suara")) db.exec("ALTER TABLE pesan_keluarga ADD 
 if (!kolomPesan.includes("ortu_id")) db.exec("ALTER TABLE pesan_keluarga ADD COLUMN ortu_id INTEGER");
 
 // Dipanggil ruang arena setiap kali anak berhasil mengirim chat.
+// Pesan dari orang tua ke anaknya (dipakai juga oleh fitur lain, mis. tanggapan kegiatan belajar).
+// Sama dengan mengirim lewat menu Chat: tersimpan di chat pribadi, dan anak di arena diberi tahu.
+export function pesanOrtuKeAnak(childId, ortuId, isi) {
+  db.prepare("INSERT INTO pesan_keluarga (child_id, dari, isi, created_at, suara, tipe_suara, ortu_id) VALUES (?, 'ortu', ?, ?, NULL, NULL, ?)")
+    .run(childId, isi, Date.now(), ortuId);
+  db.prepare(`DELETE FROM pesan_keluarga WHERE child_id = ? AND id NOT IN
+              (SELECT id FROM pesan_keluarga WHERE child_id = ? ORDER BY id DESC LIMIT ${MAKS_PESAN})`).run(childId, childId);
+  const p = db.prepare("SELECT name, peran FROM parents WHERE id = ?").get(ortuId);
+  notify(`a${childId}`, "info", `💬 Pesan dari ${p ? sapaanOrtu(p) : "orang tua"}: ${isi.length > 60 ? isi.slice(0, 60) + "…" : isi}`);
+}
+
 export function catatChatArena(childId, isi, preset) {
   db.prepare("INSERT INTO chat_arena_log (child_id, isi, preset, created_at) VALUES (?, ?, ?, ?)").run(childId, isi, preset ? 1 : 0, Date.now());
 }

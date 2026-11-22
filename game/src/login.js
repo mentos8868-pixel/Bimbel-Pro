@@ -39,7 +39,36 @@ export function setupLogin(onStart) {
   };
 
   const go = (step) => show(step);
-  const mainOrtu = () => {
+  // Orang tua yang sedang bekerja tidak bisa masuk arena: tampilkan sisa waktu dan tombol Stop kerja.
+  let timerKerja = 0;
+  const tampilBekerja = (status) => {
+    clearInterval(timerKerja);
+    const selesai = Date.now() + status.sisaMs;
+    const tempat = status.pekerjaan === "sawah" ? "Sawah" : "Kantor";
+    const aksi = $("bekerja-aksi");
+    const detak = () => {
+      const sisa = Math.max(0, Math.ceil((selesai - Date.now()) / 1000));
+      if (!sisa) {
+        clearInterval(timerKerja);
+        $("bekerja-info").textContent = `Sesi kerja di ${tempat} sudah selesai. Ambil bintangmu di ${tempat} dalam arena.`;
+        $("bekerja-sisa").textContent = "";
+        aksi.textContent = "Masuk ke arena";
+        aksi.dataset.act = "main-ortu";
+        return;
+      }
+      $("bekerja-sisa").textContent = [Math.floor(sisa / 3600), Math.floor(sisa / 60) % 60, sisa % 60].map((n) => String(n).padStart(2, "0")).join(":") + " lagi";
+    };
+    $("bekerja-info").textContent = `Kamu sedang bekerja di ${tempat}. Selama bekerja kamu tidak bisa masuk arena. Tekan Stop kerja untuk berhenti (bintang hanya didapat bila sesi selesai).`;
+    aksi.textContent = "⏹ Stop kerja";
+    aksi.dataset.act = "stop-kerja";
+    go("bekerja");
+    detak();
+    timerKerja = setInterval(detak, 1000);
+  };
+  const mainOrtu = async () => {
+    const kerja = await api("GET", "kantor").catch(() => null);
+    if (kerja?.sisaMs > 0) return tampilBekerja(kerja);
+    clearInterval(timerKerja);
     box().hidden = true;
     onStart({ role: "ortu", name: me.ortu.name, jenjang: "Orang tua", gameJenjang: jenjangOrtu(), color: WARNA_ORTU, avatar: me.ortu.avatar || DEFAULT_ORTU_AVATAR, aksesori: (me.ortu.aksesori || []).join(",") }, "ortu");
   };
@@ -143,6 +172,16 @@ export function setupLogin(onStart) {
       return;
     }
     if (act === "main-ortu") mainOrtu();
+    if (act === "stop-kerja") {
+      const sec = b.closest("[data-step]");
+      busy(sec, true);
+      try {
+        await api("POST", "kantor/stop");
+        await mainOrtu();
+      } catch (x) {
+        err("bekerja", x.message);
+      } finally { busy(sec, false); }
+    }
   });
 
   $("form-login-anak").addEventListener("submit", async (e) => {

@@ -3,6 +3,7 @@
 import { ScrambleEngine } from "../../shared/scramble-engine.js";
 import { muatKamusBesar } from "../../shared/kamus-kata.js";
 import { reportResult } from "./api.js";
+import { gambarRuangTunggu, kirimSiap } from "./ruang-tunggu.js";
 
 const $ = (id) => document.getElementById(id);
 const BOT = {
@@ -24,7 +25,7 @@ export class ScrambleUI {
     $("scr-close").onclick = () => this.close();
     $("scr-clear").onclick = () => { this.picked = []; this.renderTiles(); };
     $("scr-submit").onclick = () => this.submit();
-    $("scr-start").onclick = () => this.room?.send("mulai");
+    $("scr-start").onclick = () => kirimSiap(this.room, this.view, this.myId);
     $("scr-again").onclick = () => this.startBot(this.profile, this.lang, this.level);
     window.addEventListener("keydown", (e) => this.onKey(e));
   }
@@ -86,7 +87,7 @@ export class ScrambleUI {
 
   fromServer(s) {
     const players = [];
-    s.players.forEach((p, id) => players.push({ id, name: p.name, score: p.score, solved: p.solved }));
+    s.players.forEach((p, id) => players.push({ id, name: p.name, score: p.score, solved: p.solved, siap: !!p.siap }));
     return {
       status: s.status, round: s.round, totalRounds: s.totalRounds, scrambled: s.scrambled, clue: s.clue,
       lastWord: s.lastWord, secondsLeft: s.secondsLeft, startIn: s.startIn, result: s.result,
@@ -216,10 +217,10 @@ export class ScrambleUI {
 
     if (waiting) {
       const n = v.players.length;
-      let t = this.room && this.privat ? `Kode meja privat: ${this.room.roomId}. ` : "";
-      t += n < 2 ? "Menunggu pemain lain…" : `Mulai otomatis dalam ${v.startIn} detik.`;
-      $("scr-wait-text").textContent = t;
-      $("scr-start").hidden = !(v.hostId === this.myId && n >= 2);
+      let info = this.room && this.privat ? `Kode meja privat: ${this.room.roomId}. ` : "";
+      info += `Bahasa: ${v.lang === "EN" ? "Inggris" : "Indonesia"}. `;
+      gambarRuangTunggu({ v, myId: this.myId, online: !!this.room, info, maks: 4,
+        teksEl: $("scr-wait-text"), daftarEl: $("scr-wait-list"), tombolEl: $("scr-start") });
       $("scr-round").textContent = `Pemain: ${n}/4`;
       $("scr-timer").textContent = "";
     } else {

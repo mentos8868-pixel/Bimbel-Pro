@@ -11,6 +11,7 @@ const auraAnak = (c) => auraDipakai(levelDariXp(c.xp), c.aura_pakai);
 import { avatarDimiliki, handleToko, simpanAvatarAwal } from "./toko.js";
 import { kamarku } from "./kamarku.js";
 import { handleProgres, ringkasBelajar } from "./progres.js";
+import { handleTanggapanBelajar } from "./tanggapan-belajar.js";
 import { handleTugas } from "./tugas.js";
 import { handleChat, MAKS_BODY_SUARA } from "./chat.js";
 import { handleKeuangan } from "./keuangan.js";
@@ -714,6 +715,9 @@ export async function handleApi(req, res) {
     if (handleChat({ m, path, body, url, ortuId: ortu ? keluargaId : null, ortuSaya, anak, ownChild, send, sendAudio, ApiError })) return true;
 
     // --- keuangan anak: uang saku dan tabungan (diisi orang tua, anak hanya melihat) ---
+    // --- kegiatan belajar anak (latihan dan tryout) yang menunggu tanggapan orang tua ---
+    if (handleTanggapanBelajar({ m, path, body, ortuId: ortu ? keluargaId : null, ortuSaya, ownChild, send, ApiError })) return true;
+
     if (handleKeuangan({ m, path, body, ortuId: ortu ? keluargaId : null, ortuSaya, anak, ownChild, send, ApiError })) return true;
 
     // --- hadiah tukar bintang (orang tua membuat, anak menukar, orang tua menyetujui) ---

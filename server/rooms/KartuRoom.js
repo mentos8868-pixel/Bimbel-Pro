@@ -6,7 +6,7 @@ import { KartuEngine } from "../../shared/kartu-engine.js";
 const { Room } = colyseus;
 
 export class KartuPlayer extends Schema {}
-defineTypes(KartuPlayer, { name: "string", count: "number", seat: "number" });
+defineTypes(KartuPlayer, { name: "string", count: "number", seat: "number", siap: "boolean" });
 
 // Hanya informasi umum. Isi kartu di tangan dikirim terpisah ke pemiliknya saja.
 export class KartuState extends Schema {
@@ -39,7 +39,6 @@ defineTypes(KartuState, {
 const HURUF = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 const buatKode = () =>
   Array.from({ length: 4 }, () => HURUF[Math.floor(Math.random() * HURUF.length)]).join("");
-const AUTO_START_MS = 10000;
 
 export class KartuRoom extends Room {
   maxClients = 4;
@@ -48,7 +47,6 @@ export class KartuRoom extends Room {
     this.roomId = buatKode();
     if (options.private) this.setPrivate(true);
     this.engine = new KartuEngine({ jenjang: options.jenjang, mode: options.mode, turnSecs: 30 });
-    this.autoStartAt = 0;
     const s = new KartuState();
     Object.assign(s, {
       status: "menunggu", mode: this.engine.mode, jenjang: this.engine.jenjang, topColor: "", topKind: "", topLabel: "",
@@ -56,8 +54,13 @@ export class KartuRoom extends Room {
     });
     this.setState(s);
 
-    this.onMessage("mulai", (client) => {
-      if (client.sessionId === this.state.hostId) this.tryStart();
+    // Ruang tunggu: tiap pemain menekan Siap; mulai saat minimal 2 pemain dan semuanya Siap.
+    this.siap = new Set();
+    this.onMessage("siap", (client, nilai) => {
+      if (this.engine.status !== "menunggu" || !this.engine.find(client.sessionId)) return;
+      if (nilai === false) this.siap.delete(client.sessionId); else this.siap.add(client.sessionId);
+      this.tryStart();
+      this.sync(false);
     });
     this.onMessage("main", (client, d = {}) => this.act(client, this.engine.play(client.sessionId, Number(d.cardId), d.color, Date.now())));
     this.onMessage("ambil", (client) => this.act(client, this.engine.draw(client.sessionId, Date.now())));
@@ -72,6 +75,7 @@ export class KartuRoom extends Room {
 
   tryStart() {
     if (this.engine.status !== "menunggu" || this.engine.players.length < 2) return;
+    if (!this.engine.players.every((p) => this.siap.has(p.id))) return;
     this.lock();
     this.engine.start(Date.now());
     this.sync(true);
@@ -80,16 +84,7 @@ export class KartuRoom extends Room {
   update() {
     const now = Date.now();
     let changed = false;
-    if (this.engine.status === "menunggu") {
-      if (this.engine.players.length >= 2) {
-        if (!this.autoStartAt) this.autoStartAt = now + AUTO_START_MS;
-        if (now >= this.autoStartAt) this.tryStart();
-      } else {
-        this.autoStartAt = 0;
-      }
-    } else {
-      changed = this.engine.tick(now);
-    }
+    if (this.engine.status !== "menunggu") changed = this.engine.tick(now);
     this.sync(changed);
   }
 
@@ -110,13 +105,14 @@ export class KartuRoom extends Room {
     s.message = p.message;
     s.result = p.result;
     s.winner = p.winner || "";
-    s.startIn = this.autoStartAt && p.status === "menunggu" ? Math.max(0, Math.ceil((this.autoStartAt - now) / 1000)) : 0;
+    s.startIn = 0;
     p.players.forEach((pl, seat) => {
       let sp = s.players.get(pl.id);
       if (!sp) { sp = new KartuPlayer(); s.players.set(pl.id, sp); }
       sp.name = pl.name;
       sp.count = pl.count;
       sp.seat = seat;
+      sp.siap = this.siap.has(pl.id);
     });
     for (const id of [...s.players.keys()]) if (!this.engine.find(id)) s.players.delete(id);
     if (sendHands) for (const c of this.clients) c.send("tangan", this.engine.handOf(c.sessionId));
@@ -135,6 +131,8 @@ export class KartuRoom extends Room {
 
   onLeave(client) {
     this.engine.removePlayer(client.sessionId, Date.now());
+    this.siap.delete(client.sessionId);
+    this.tryStart();   // sisa pemain mungkin sudah Siap semua
     if (this.state.hostId === client.sessionId) this.state.hostId = this.engine.players[0]?.id || "";
     this.sync(true);
   }

@@ -54,6 +54,9 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 .panel-float.right { left: auto; right: 12px; }
 
+/* Layar "Sedang bekerja" (orang tua tidak bisa masuk arena sampai Stop kerja) */
+.bekerja-sisa { font-size: 32px; font-weight: 800; text-align: center; margin: 4px 0; font-variant-numeric: tabular-nums; }
+
 /* Ruang tunggu catur: dua pemain menekan Siap sebelum mulai */
 .ruang-tunggu { width: min(380px, calc(100% - 24px)); display: flex; flex-direction: column; gap: 10px; }
 .ruang-tunggu h2 { margin: 0; }
@@ -64,6 +67,9 @@ button:disabled { opacity: 0.5; cursor: default; }
 .tunggu-pemain li.kosong { background: none; border: 2px dashed #c9d4e0; color: #64748b; justify-content: center; text-align: center; }
 .ruang-tunggu #tunggu-siap { font-size: 18px; padding: 12px; }
 .ruang-tunggu .row { justify-content: space-between; }
+#scr-wait, #ktr-wait { display: flex; flex-direction: column; gap: 8px; }
+#scr-wait[hidden], #ktr-wait[hidden] { display: none; }
+#scr-start, #ktr-start { width: 100%; font-size: 17px; padding: 10px; }
 
 /* Chat keluarga di arena (Family dan orang tua ↔ anak) */
 .panel-float.keluarga { width: min(380px, calc(100% - 24px)); max-height: 70vh; overflow: hidden; }
@@ -261,6 +267,7 @@ a.btn {
 
 #hud { position: fixed; top: 12px; left: 12px; right: 12px; display: flex; gap: 8px; flex-wrap: wrap; z-index: 5; pointer-events: none; }
 .pill { background: rgba(255, 255, 255, 0.9); border-radius: 999px; padding: 6px 12px; font-size: 14px; font-weight: 700; }
+#btn-grafis { pointer-events: auto; border: none; cursor: pointer; }
 .action { position: fixed; bottom: 28px; right: 24px; z-index: 5; font-size: 18px; padding: 14px 22px; }
 .toast {
   position: fixed; top: 60px; left: 50%; transform: translateX(-50%); z-index: 20;

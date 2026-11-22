@@ -93,6 +93,12 @@ export function handleKantor({ m, path, body, ortuSaya, keluargaId, anak, url, s
     send(200, status(ortuSaya));
     return true;
   }
+  // Stop kerja: menghentikan sesi yang belum selesai, tanpa bintang. Setelah itu boleh masuk arena lagi.
+  if (m === "POST" && path.length === 2 && path[1] === "stop") {
+    db.prepare("DELETE FROM kerja_ortu WHERE parent_id = ? AND selesai_at > ?").run(ortuSaya, Date.now());
+    send(200, status(ortuSaya));
+    return true;
+  }
   if (m === "POST" && path.length === 2 && path[1] === "ambil") {
     db.exec("BEGIN IMMEDIATE");
     try {

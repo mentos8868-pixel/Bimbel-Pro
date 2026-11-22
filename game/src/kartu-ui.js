@@ -2,6 +2,7 @@
 // dan kartu di tangan hanya dikirim ke pemiliknya.
 import { KartuEngine, botMove, COLOR_NAME } from "../../shared/kartu-engine.js";
 import { reportResult } from "./api.js";
+import { gambarRuangTunggu, kirimSiap } from "./ruang-tunggu.js";
 
 const $ = (id) => document.getElementById(id);
 const BOT_NAMES = { 1: "Bot Pemula", 2: "Bot Menengah", 3: "Bot Mahir" };
@@ -36,7 +37,7 @@ export class KartuUI {
     $("ktr-close").onclick = () => this.close();
     $("ktr-deck").onclick = () => this.draw();
     $("ktr-pass").onclick = () => this.pass();
-    $("ktr-start").onclick = () => this.room?.send("mulai");
+    $("ktr-start").onclick = () => kirimSiap(this.room, this.view, this.myId);
     $("ktr-again").onclick = () => this.startBot(this.profile, this.mode, this.level, this.bots);
     $("ktr-colors").addEventListener("click", (e) => {
       const c = e.target.closest("button")?.dataset.color;
@@ -96,7 +97,7 @@ export class KartuUI {
 
   fromServer(s) {
     const players = [];
-    s.players.forEach((p, id) => players.push({ id, name: p.name, count: p.count, seat: p.seat }));
+    s.players.forEach((p, id) => players.push({ id, name: p.name, count: p.count, seat: p.seat, siap: !!p.siap }));
     players.sort((a, b) => a.seat - b.seat);
     this.mode = s.mode;
     return {
@@ -227,6 +228,7 @@ export class KartuUI {
     const waiting = v.status === "menunggu";
     $("ktr-wait").hidden = !waiting;
     $("ktr-table").hidden = waiting;
+    $("ktr-opponents").hidden = waiting;   // saat menunggu, daftar pemain ada di ruang tunggu
 
     $("ktr-opponents").replaceChildren(...v.players.map((p) => {
       const d = document.createElement("div");
@@ -236,11 +238,10 @@ export class KartuUI {
     }));
 
     if (waiting) {
-      const n = v.players.length;
-      let t = this.room && this.privat ? `Kode meja privat: ${this.room.roomId}. ` : "";
-      t += n < 2 ? "Menunggu pemain lain…" : `Mulai otomatis dalam ${v.startIn} detik.`;
-      $("ktr-wait-text").textContent = t;
-      $("ktr-start").hidden = !(v.hostId === this.myId && n >= 2);
+      let info = this.room && this.privat ? `Kode meja privat: ${this.room.roomId}. ` : "";
+      info += `Jenis: ${v.mode === "biasa" ? "Angka biasa" : "Hitung"}. `;
+      gambarRuangTunggu({ v, myId: this.myId, online: !!this.room, info, maks: 4,
+        teksEl: $("ktr-wait-text"), daftarEl: $("ktr-wait-list"), tombolEl: $("ktr-start") });
     }
 
     if (v.top) $("ktr-top").replaceChildren(makeCard(v.top, { big: true }));
