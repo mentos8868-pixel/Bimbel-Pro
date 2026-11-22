@@ -15,6 +15,7 @@ import { ScrambleUI } from "./scramble-ui.js";
 import { pasangPapanKata } from "./papan-kata.js";
 import { pasangOtello } from "./otello-ui.js";
 import { TokoUI } from "./toko-ui.js";
+import { pasangChatKeluarga } from "./chat-keluarga-arena.js";
 import { siapkanMentor } from "./mentor-arena.js";
 import { api, reportResult } from "./api.js";
 
@@ -589,6 +590,7 @@ async function start(profile, playingAs) {
     $("btn-dashboard").hidden = false;
     $("btn-dashboard").onclick = () => (location.href = playingAs === "ortu" ? "/orangtua.html" : "/anak.html");
     if (playingAs === "ortu" || !social) { $("btn-chat").hidden = true; $("btn-teman").hidden = true; }
+    pasangChatKeluarga(playingAs);   // chat keluarga (Family dan orang tua ↔ anak) di dalam arena
   }
 
   let nearTable = null;

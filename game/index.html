@@ -114,6 +114,7 @@
     </div>
     <div id="social-btns" hidden>
       <button id="btn-dashboard" hidden>🏠 Dashboard</button>
+      <button id="btn-keluarga" hidden>💬 Keluarga <span id="keluarga-badge" class="badge" hidden></span></button>
       <button id="btn-chat">Chat</button>
       <button id="btn-teman">Teman <span id="teman-badge" class="badge" hidden></span></button>
     </div>
@@ -132,6 +133,18 @@
     </div>
 
     <!-- Panel teman -->
+    <!-- Chat keluarga (Family dan orang tua ↔ anak), sama dengan menu Chat di dashboard -->
+    <div id="keluarga-panel" class="panel-float keluarga" hidden>
+      <div class="panel-head"><strong>💬 Chat keluarga</strong><button class="ghost x" data-close="keluarga-panel" aria-label="Tutup chat keluarga">✕</button></div>
+      <div id="keluarga-tab" class="keluarga-tab" role="group" aria-label="Percakapan"></div>
+      <div id="keluarga-log" class="keluarga-log gelembung" role="region" aria-label="Pesan keluarga" tabindex="0"></div>
+      <form id="keluarga-form" class="row">
+        <input id="keluarga-input" maxlength="300" autocomplete="off" placeholder="Tulis pesan untuk keluarga…" aria-label="Pesan keluarga" />
+        <button class="primary" type="submit">Kirim</button>
+      </form>
+      <span id="keluarga-error" class="error" hidden></span>
+    </div>
+
     <div id="teman-panel" class="panel-float right" hidden>
       <div class="panel-head"><strong>Teman</strong><button class="ghost x" data-close="teman-panel" aria-label="Tutup teman">✕</button></div>
       <p class="muted small">Ketuk avatar pemain lain di arena untuk menambah teman.</p>

@@ -153,6 +153,7 @@ Dirancang 21 November 2026 dari susunan menu pengguna, **fokus laptop**. Kedua d
 
 **Tahap 3 (Chat) sudah dibangun (22 November 2026):** `server/chat.js`.
 - Chat keluarga: tabel `pesan_keluarga`, satu percakapan per anak dengan orang tuanya. API `GET/POST /api/chat/keluarga` dengan `sebagai=ortu|anak` (di perangkat keluarga orang tua dan anak bisa sama-sama masuk), dan `GET /api/chat/belum` untuk tanda pesan baru (anak juga mendapat pesan terakhir dan nama orang tua untuk Home). Pesan maksimal 300 huruf, disaring kata kasar (`cekPesanKeluarga` di `shared/chat.js`), paling banyak 10 pesan per 30 detik, disimpan 500 pesan terakhir per anak. Anak yang sedang di arena mendapat pemberitahuan pesan dari orang tua. Pesan dimuat ulang tiap 5 detik selama menu Chat terbuka.
+- **Chat keluarga di arena** (permintaan pengguna 22 November 2026): tombol **💬 Keluarga** di arena (untuk anak dan orang tua) membuka panel berisi percakapan **Family** dan chat pribadi (anak: dengan orang tuanya; orang tua: tiap anaknya), dengan tanda pesan belum dibaca. Memakai API yang sama dengan menu Chat di dashboard, jadi pesannya sama di kedua tempat. Pesan suara bisa diputar, tetapi merekam suara hanya dari dashboard. Kode: `game/src/chat-keluarga-arena.js`.
 - Riwayat chat arena: tabel `chat_arena_log`, hanya pesan yang **dikirim** anak (pesan pemain lain tidak disimpan), dihapus otomatis setelah 7 hari, dibaca orang tua lewat `GET /api/chat/arena?anak=ID`.
 - "Data apa yang disimpan?" di halaman daftar sudah menyebut kedua jenis chat ini.
 
