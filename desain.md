@@ -221,4 +221,11 @@ Dibangun 22 November 2026 atas permintaan pengguna.
 - **Peran** bisa diganti di Setting (`PATCH /api/keluarga/peran`), asal tidak sama dengan pasangan.
 - **Chat keluarga** mencatat orang tua pengirim (`pesan_keluarga.ortu_id`): pesan pasangan tampil di sisi kiri beserta namanya, anak melihat nama Ayah/Ibu di atas pesan, dan judul chat anak menampilkan nama keduanya. Pemberitahuan uang saku dan chat ke anak memakai nama orang tua yang mengirim.
 - **Tambah anak:** langsung memilih **Anak laki-laki** atau **Anak perempuan** (avatar `manusia-putra` / `manusia-putri`).
+- **Pemilih avatar tanpa anggota:** di menu Avatar orang tua, menu Avatar anak, dan "Ganti avatar anak" di Setting, hanya karakter (Manusia, Ulat, Robo, …) yang dipilih. Anggota keluarga otomatis: orang tua mengikuti perannya (Ayah/Ibu), anak mengikuti laki-laki/perempuan dari avatarnya (`anggota` di `avatar-picker.js`). Mengganti peran di Setting ikut mengganti avatar ke anggota yang sesuai.
 - Akun lama otomatis menjadi kepala keluarga dengan peran Ayah; perannya bisa diganti di Setting.
+
+### Toko Avatar orang tua (22 November 2026)
+- Atas permintaan pengguna, **orang tua diperlakukan sama dengan anak**: punya saldo bintang sendiri (`parents.bintang`), membeli karakter dan aksesori di menu **🛍️ Toko Avatar** dengan harga yang sama (`server/toko-ortu.js`, `GET /api/toko-ortu`, `POST /api/toko-ortu/beli-avatar|beli|pakai`). Ini menggantikan aksesori gratis untuk orang tua.
+- Katalog karakter orang tua hanya versi perannya (Ayah: `<jenis>-ayah`, Ibu: `<jenis>-ibu`), karena anggota avatar orang tua otomatis. Karakter yang dibeli dicatat di tabel `parent_avatar`.
+- Aksesori yang sudah dipakai orang tua sebelum toko ini ada dianggap sudah dimiliki (`parents.aksesori_punya`), jadi tidak hilang. Tab Aksesori di menu Avatar kini hanya menampilkan yang dimiliki.
+- **Sumber bintang orang tua belum ada**; pengguna akan menentukannya nanti. Server sudah menyediakan `tambahBintangOrtu(parentId, n)` di `server/toko-ortu.js`.

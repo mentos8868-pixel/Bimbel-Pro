@@ -119,6 +119,7 @@
           <button data-ke="chat">💬 Chat <span id="chat-badge" class="badge" hidden></span></button>
           <button data-ke="report">📊 Report</button>
           <button data-ke="avatar">🐻 Avatar</button>
+          <button data-ke="toko">🛍️ Toko Avatar</button>
           <button data-ke="setting">⚙️ Setting</button>
         </nav>
 
@@ -131,10 +132,19 @@
             <div id="pilih-anak" class="pilih-anak" role="tablist" aria-label="Pilih anak"></div>
           </div>
 
+          <section class="panel" data-hal="home">
+            <h2>Mode Bekerja</h2>
+            <p class="muted">Satu sesi kerja berlangsung 1 jam dan memberi 2 bintang. Maksimal 10 bintang per hari WIB.</p>
+            <p id="kerja-status"></p>
+            <p id="kerja-kuota" class="muted"></p>
+            <p id="kerja-pesan" role="status" hidden></p>
+            <div><button type="button" class="primary" id="kerja-aksi" disabled>Mulai bekerja</button></div>
+          </section>
           <div id="home" class="home-grid" data-hal="home"></div>
 
           <!-- Avatar orang tua sendiri (dipakai saat bermain di arena). Avatar anak ada di kartu anak di bawah. -->
           <div id="avatar-ortu-isi" class="tugas-isi" data-hal="avatar"></div>
+          <div id="toko-ortu-isi" class="tugas-isi" data-hal="toko"></div>
 
           <div id="kids"></div>
 

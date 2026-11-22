@@ -7,7 +7,7 @@ import {
   registerOnline, unregisterOnline, isOnline, notify,
 } from "../social.js";
 
-const GAMES = { catur: "Catur", scramble: "Scramble", kartu: "Kartu Kilat" };
+const GAMES = { catur: "Catur", scramble: "Scramble Words", kartu: "Kartu Kilat" };
 
 export function setupSocial(room) {
   room.lastChats = new Map(); // uid -> pesan terakhir (bukti untuk laporan)

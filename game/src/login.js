@@ -29,10 +29,15 @@ const childProfile = (c) => ({ role: "anak", childId: c.id, name: c.name, jenjan
 export function setupLogin(onStart) {
   let me = null;
   let pinChild = null;
-  let ortuLevel = "SD";
   // Avatar tidak dipilih di sini lagi: layar masuk menampilkan avatar yang dipilih di dashboard
   // (menu Avatar orang tua / anak), lengkap dengan aksesori. Gantinya lewat tautan ke dashboard.
   const WARNA_ORTU = "#5b6b7c";
+
+  // Orang tua tidak memilih SD/SMP/SMA: tingkat soal mengikuti anak termuda di keluarga (SD bila belum ada anak).
+  const jenjangOrtu = () => {
+    const anak = [...(me?.children || [])].sort((a, b) => (a.kelas || 99) - (b.kelas || 99))[0];
+    return anak?.jenjang || "SD";
+  };
 
   const go = (step) => show(step);
   const refresh = async () => {
@@ -100,11 +105,6 @@ export function setupLogin(onStart) {
     const b = e.target.closest("button");
     if (!b) return;
     if (b.dataset.go) return go(b.dataset.go);
-    if (b.dataset.level) {
-      ortuLevel = b.dataset.level;
-      $("ortu-level").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
-      return;
-    }
     const act = b.dataset.act;
     if (act === "keluar") {
       await api("POST", "keluar").catch(() => {});
@@ -128,7 +128,7 @@ export function setupLogin(onStart) {
     }
     if (act === "main-ortu") {
       box().hidden = true;
-      onStart({ role: "ortu", name: me.ortu.name, jenjang: "Orang tua", gameJenjang: ortuLevel, color: WARNA_ORTU, avatar: me.ortu.avatar || DEFAULT_ORTU_AVATAR, aksesori: (me.ortu.aksesori || []).join(",") }, "ortu");
+      onStart({ role: "ortu", name: me.ortu.name, jenjang: "Orang tua", gameJenjang: jenjangOrtu(), color: WARNA_ORTU, avatar: me.ortu.avatar || DEFAULT_ORTU_AVATAR, aksesori: (me.ortu.aksesori || []).join(",") }, "ortu");
     }
   });
 
@@ -144,6 +144,38 @@ export function setupLogin(onStart) {
       await refresh();
     } catch (x) {
       err("kode", x.message);
+    } finally { busy(e.target, false); }
+  });
+
+  // Kode undangan keluarga (orang tua kedua): diperiksa dulu, lalu diantar ke formulir daftar
+  // di dashboard orang tua dengan kode dan peran yang masih kosong sudah terisi.
+  const NAMA_PERAN = { ayah: "Ayah", ibu: "Ibu" };
+  const inputUndangan = $("undangan-input");
+  let versiUndangan = 0;
+  inputUndangan.addEventListener("input", () => {
+    versiUndangan++;
+    err("undangan", "");
+    $("undangan-info").hidden = true;
+    $("undangan-lanjut").hidden = true;
+    $("undangan-cek").hidden = false;
+  });
+  $("form-undangan").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if ($("undangan-cek").disabled) return;
+    const kode = inputUndangan.value.trim().toUpperCase();
+    if (kode.length !== 6) return err("undangan", "Kode undangan terdiri dari 6 huruf/angka.");
+    const versi = versiUndangan;
+    busy(e.target, true);
+    try {
+      const u = await api("GET", `undangan?kode=${encodeURIComponent(kode)}`);
+      if (versi !== versiUndangan) return;
+      $("undangan-info").textContent = `Kode benar. Anda akan bergabung ke keluarga ${u.namaKepala} sebagai ${NAMA_PERAN[u.peran] || "orang tua"}.`;
+      $("undangan-info").hidden = false;
+      $("undangan-lanjut").href = `/orangtua.html#daftar=${encodeURIComponent(u.kode)}&peran=${u.peran || ""}`;
+      $("undangan-lanjut").hidden = false;
+      $("undangan-cek").hidden = true;
+    } catch (x) {
+      if (versi === versiUndangan) err("undangan", x.message);
     } finally { busy(e.target, false); }
   });
 

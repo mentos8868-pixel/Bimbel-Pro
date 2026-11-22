@@ -5,6 +5,7 @@ import { setupSocial, socialJoin, socialLeave } from "./arena-social.js";
 import { uidOf } from "../social.js";
 import { avatarOr } from "../../shared/avatars.js";
 import { db } from "../db.js";
+import { sedangBekerja } from "../kantor.js";
 import { rapikanAksesori } from "../../shared/aksesori.js";
 import { levelDariXp, auraUntukLevel } from "../../shared/aura.js";
 import { JARAK_INTERAKSI_BIMBEL, POSISI_KURSI_BIMBEL, TITIK_BIMBEL } from "../../shared/kursi-bimbel.js";
@@ -33,6 +34,7 @@ defineTypes(Player, {
   z: "number",
   ry: "number",
   kursiBimbel: "number", // 0 = berdiri, 1 dst. = nomor kursi
+  pekerjaan: "string",
 });
 
 export class ArenaState extends Schema {
@@ -55,6 +57,7 @@ export class ArenaRoom extends Room {
       const now = Date.now();
       for (const id of [...this.timers.keys()]) this.checkTime(id, now);
     }, 15000);
+    this.clock.setInterval(() => this.segarkanStatusKerja(), 1000);
 
     setupSocial(this);
     this.posisiSebelumBelajar = new Map();
@@ -119,6 +122,14 @@ export class ArenaRoom extends Room {
     return authPlayer(options);
   }
 
+  segarkanStatusKerja(sekarang = Date.now()) {
+    for (const client of this.clients) {
+      if (client.auth?.role !== "ortu") continue;
+      const p = this.state.players.get(client.sessionId);
+      if (p) p.pekerjaan = sedangBekerja(client.auth.parentId, sekarang);
+    }
+  }
+
   onJoin(client) {
     const a = client.auth;
     const p = new Player();
@@ -138,6 +149,7 @@ export class ArenaRoom extends Room {
     p.z = Math.sin(ang) * 3;
     p.ry = 0;
     p.kursiBimbel = 0;
+    p.pekerjaan = a.role === "ortu" ? sedangBekerja(a.parentId) : "";
     this.state.players.set(client.sessionId, p);
     socialJoin(client);
     if (a.role === "anak") {

@@ -1,6 +1,7 @@
 // Mesin permainan Scramble (susun kata). Dipakai di server (online) dan di browser (lawan bot).
 // Tidak bergantung pada jam sistem: waktu "now" (milidetik) selalu diberikan oleh pemanggil.
 import { WORDS, JENJANG, LANGS } from "./scramble-words.js";
+import { pemeriksaKata } from "./kamus-kata.js";
 
 const letters = (w) => w.split("").sort().join("");
 export const normalize = (w) => String(w || "").toUpperCase().replace(/[^A-Z]/g, "");
@@ -38,7 +39,7 @@ export class ScrambleEngine {
     this.phaseEnds = 0;
     this.firstSolver = null;
     // Kata lain dalam bahasa yang sama boleh diterima bila hurufnya persis sama (anagram yang sah).
-    this.dictionary = new Set(JENJANG.flatMap((j) => WORDS[j][this.lang].map(([w]) => w)));
+    this.dictionary = pemeriksaKata(this.lang);
   }
 
   addPlayer(id, name) {
@@ -108,7 +109,7 @@ export class ScrambleEngine {
   // Mengembalikan { ok, points } atau { ok: false, reason }.
   answer(id, raw, now) {
     const p = this.players.get(id);
-    if (!p || this.status !== "main") return { ok: false, reason: "bukan-waktunya" };
+    if (!p || this.status !== "main" || now >= this.phaseEnds) return { ok: false, reason: "bukan-waktunya" };
     if (p.solved) return { ok: false, reason: "sudah" };
     const w = normalize(raw);
     const correct = w === this.word || (letters(w) === letters(this.word) && this.dictionary.has(w));

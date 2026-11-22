@@ -1,9 +1,12 @@
-// Pemilih avatar: deretan jenis (Ulat, Robo, ...) lalu satu keluarga berisi 4 anggota.
-import { FAMILIES, MEMBERS, parseAvatar, avatarOr } from "../../shared/avatars.js";
+// Pemilih avatar: deretan jenis (Manusia, Ulat, Robo, ...) lalu satu keluarga berisi 4 anggota.
+// Dengan opsi `anggota` (ayah | ibu | putra | putri), anggota keluarga ditentukan otomatis:
+// hanya deretan jenis yang tampil, dan memilih jenis langsung memilih "<jenis>-<anggota>".
+// Dipakai untuk orang tua (anggota = peran Ayah/Ibu) dan anak (anggota = laki-laki/perempuan).
+import { FAMILIES, MEMBERS, parseAvatar, avatarOr, isAvatar } from "../../shared/avatars.js";
 import { avatarSvg } from "./avatar-svg.js";
 
-// wrap: elemen kosong. Mengembalikan { get, set, setAccent }.
-export function avatarPicker(wrap, { value, accent = "#4f9cf0", onPick = () => {}, dimiliki = null } = {}) {
+// wrap: elemen kosong. Mengembalikan { get, set, setAccent, setDimiliki, setAnggota }.
+export function avatarPicker(wrap, { value, accent = "#4f9cf0", onPick = () => {}, dimiliki = null, anggota = null } = {}) {
   let current = avatarOr(value);
   let family = parseAvatar(current).family.id;
   wrap.classList.add("avatar-picker");
@@ -15,21 +18,39 @@ export function avatarPicker(wrap, { value, accent = "#4f9cf0", onPick = () => {
   grid.className = "av-family";
   wrap.replaceChildren(tabs, grid);
 
+  const punya = (id) => isAvatar(id) && (!dimiliki || dimiliki.includes(id));
+
   function render() {
-    tabs.replaceChildren(...FAMILIES.filter((f) => !dimiliki || dimiliki.some((id) => parseAvatar(id)?.family.id === f.id)).map((f) => {
+    const jenis = FAMILIES.filter((f) => (anggota
+      ? punya(`${f.id}-${anggota}`)
+      : !dimiliki || dimiliki.some((id) => parseAvatar(id)?.family.id === f.id)));
+    tabs.replaceChildren(...jenis.map((f) => {
+      const id = anggota ? `${f.id}-${anggota}` : null;
+      const on = anggota ? id === current : f.id === family;
       const b = document.createElement("button");
       b.type = "button";
-      b.className = "av-tab" + (f.id === family ? " on" : "");
-      b.setAttribute("role", "tab");
-      b.setAttribute("aria-selected", f.id === family);
-      b.innerHTML = avatarSvg(`${f.id}-putra`, accent);
+      b.className = "av-tab" + (on ? " on" : "");
+      b.setAttribute("role", anggota ? "button" : "tab");
+      b.setAttribute(anggota ? "aria-pressed" : "aria-selected", on);
+      b.innerHTML = avatarSvg(id || `${f.id}-${f.hanyaAnggota || "putra"}`, accent);
       const t = document.createElement("span");
       t.textContent = f.name;
       b.append(t);
-      b.onclick = () => { family = f.id; render(); };
+      b.onclick = () => {
+        family = f.id;
+        if (anggota) {
+          if (id === current) return;
+          current = id;
+          render();
+          onPick(id);
+        } else render();
+      };
       return b;
     }));
-    grid.replaceChildren(...MEMBERS.filter((m) => !dimiliki || dimiliki.includes(`${family}-${m.id}`)).map((m) => {
+    // Anggota otomatis: baris anggota (Ayah/Ibu/anak) tidak ditampilkan.
+    grid.hidden = !!anggota;
+    if (anggota) { grid.replaceChildren(); return; }
+    grid.replaceChildren(...MEMBERS.filter((m) => punya(`${family}-${m.id}`)).map((m) => {
       const id = `${family}-${m.id}`;
       const b = document.createElement("button");
       b.type = "button";
@@ -49,5 +70,9 @@ export function avatarPicker(wrap, { value, accent = "#4f9cf0", onPick = () => {
     set(v) { current = avatarOr(v); family = parseAvatar(current).family.id; render(); },
     setAccent(c) { accent = c; render(); },
     setDimiliki(ids) { dimiliki = ids; render(); },
+    setAnggota(a) { anggota = a; render(); },
   };
 }
+
+// Anggota keluarga dari id avatar, mis. "ulat-putri" -> "putri".
+export const anggotaDari = (id) => parseAvatar(id)?.member.id || null;

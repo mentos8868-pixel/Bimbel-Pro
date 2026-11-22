@@ -21,6 +21,7 @@ export const FAMILIES = [
   { id: "ayam", name: "Ayam", body: "#fffdf8", belly: "#fff1c9", accent: "#e8463b" },
   { id: "anjing", name: "Anjing", body: "#e0b07a", belly: "#fff1dc", accent: "#8a5a33" },
   { id: "babi", name: "Babi", body: "#f7a8b8", belly: "#ffd1dc", accent: "#e07a92" },
+  { id: "dino", name: "Putri Dino", body: "#ecaf87", belly: "#f5e7d0", accent: "#392821", hanyaAnggota: "putri" },
 ];
 
 export const MEMBERS = [
@@ -41,16 +42,18 @@ export function parseAvatar(id) {
   if (sisa.length) return null;
   const family = FAMILIES.find((x) => x.id === f);
   const member = MEMBERS.find((x) => x.id === m);
-  return family && member ? { family, member } : null;
+  return family && member && (!family.hanyaAnggota || family.hanyaAnggota === member.id) ? { family, member } : null;
 }
 
 export const isAvatar = (id) => !!parseAvatar(id);
 export const avatarOr = (id, fallback = DEFAULT_AVATAR) => (isAvatar(id) ? id : fallback);
 export const avatarName = (id) => {
   const a = parseAvatar(id);
-  return a ? `${a.family.name} ${a.member.name.toLowerCase()}` : "";
+  if (!a) return "";
+  return a.family.hanyaAnggota ? a.family.name : `${a.family.name} ${a.member.name.toLowerCase()}`;
 };
 
-export const KATALOG_AVATAR = FAMILIES.filter((f) => f.id !== "manusia").flatMap((f) => MEMBERS.map((m) => ({
-  id: `${f.id}-${m.id}`, nama: `${f.name} ${m.name.toLowerCase()}`, harga: HARGA_AVATAR,
-})));
+export const KATALOG_AVATAR = FAMILIES.filter((f) => f.id !== "manusia").flatMap((f) =>
+  MEMBERS.map((m) => `${f.id}-${m.id}`).filter(isAvatar).map((id) => ({
+    id, nama: avatarName(id), harga: HARGA_AVATAR,
+  })));

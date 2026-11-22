@@ -2,6 +2,14 @@ import colyseus from "colyseus";
 import { authTable } from "../room-auth.js";
 import { Schema, MapSchema, defineTypes } from "@colyseus/schema";
 import { ScrambleEngine } from "../../shared/scramble-engine.js";
+import { tambahKamusBesar } from "../../shared/kamus-kata.js";
+import { readFileSync } from "node:fs";
+
+// Kamus besar untuk menerima anagram sah (file yang sama dengan yang dimuat browser).
+for (const bahasa of ["ID", "EN"]) {
+  try { tambahKamusBesar(bahasa, readFileSync(new URL(`../../game/public/kamus/${bahasa.toLowerCase()}.txt`, import.meta.url), "utf8")); }
+  catch { console.warn(`Kamus ${bahasa} tidak ditemukan; Scramble memakai kamus umum saja.`); }
+}
 
 const { Room } = colyseus;
 

@@ -69,12 +69,14 @@ export class ChessUI {
   show() {
     this.selected = null;
     this.hintSquares = [];
+    this.thinking = false;
     $("chess-hint").hidden = !(this.profile.gameJenjang === "SD" && this.mode === "bot");
     this.el.hidden = false;
     this.render();
   }
 
   close() {
+    clearTimeout(this.botTimer);
     if (this.mode === "online" && this.room) {
       this.room.removeAllListeners();
       this.room.leave();
@@ -122,7 +124,7 @@ export class ChessUI {
     this.thinking = true;
     this.render();
     // Beri waktu layar menggambar dulu sebelum bot berpikir.
-    setTimeout(() => {
+    this.botTimer = setTimeout(() => {
       if (this.mode !== "bot") return;
       const m = bestMove(this.chess.fen(), this.level);
       if (m) {
@@ -153,6 +155,8 @@ export class ChessUI {
       else this.close();
       return;
     }
+    clearTimeout(this.botTimer);
+    this.thinking = false;
     this.result = `${this.profile.name} menyerah. Coba lagi ya!`;
     this.report("kalah");
     this.render();
@@ -182,8 +186,12 @@ export class ChessUI {
     if (this.el.hidden) return;
     const flip = this.myColor === "b";
     const opp = this.myColor === "w" ? "b" : "w";
-    $("chess-top").innerHTML = `<span>${opp === "w" ? "Putih" : "Hitam"}: ${this.names[opp]}</span>`;
-    $("chess-bottom").innerHTML = `<span>${this.myColor === "w" ? "Putih" : "Hitam"}: ${this.names[this.myColor]} (kamu)</span>`;
+    const topName = document.createElement("span");
+    topName.textContent = `${opp === "w" ? "Putih" : "Hitam"}: ${this.names[opp]}`;
+    $("chess-top").replaceChildren(topName);
+    const bottomName = document.createElement("span");
+    bottomName.textContent = `${this.myColor === "w" ? "Putih" : "Hitam"}: ${this.names[this.myColor]} (kamu)`;
+    $("chess-bottom").replaceChildren(bottomName);
 
     const targets = new Map();
     if (this.selected) {

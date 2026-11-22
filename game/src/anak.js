@@ -3,7 +3,7 @@
 import { api } from "./api.js";
 import { pasangSuara } from "./chat-suara.js";
 import { gelembungChat, kotakPesanChat } from "./chat-tampilan.js";
-import { avatarPicker } from "./avatar-picker.js";
+import { avatarPicker, anggotaDari } from "./avatar-picker.js";
 import { katalogAvatar } from "./katalog-avatar.js";
 import { avatarSvg } from "./avatar-svg.js";
 import { namaKelas, kurikulumName, negaraName } from "../../shared/negara.js";
@@ -13,7 +13,7 @@ import { KATALOG_AVATAR, parseAvatar } from "../../shared/avatars.js";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-const NAMA_GAME = { catur: "Catur", scramble: "Scramble", kartu: "Kartu Kilat" };
+const NAMA_GAME = { catur: "Catur", scramble: "Scramble Words", kartu: "Kartu Kilat" };
 const HARI = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 const menit = (m) => (m >= 60 ? `${Math.floor(m / 60)} jam${m % 60 ? ` ${m % 60} menit` : ""}` : `${m} menit`);
 const bar = (persen, warna = "") => `<span class="bar"><span class="bar-fill ${warna}" style="width:${Math.max(0, Math.min(100, persen))}%"></span></span>`;
@@ -35,6 +35,9 @@ let k = null;      // ringkasan dari /api/kamarku
 let toko = null;   // isi toko dari /api/toko (dimuat saat menu Toko Avatar dibuka)
 let tg = null;     // tugas dari orang tua: /api/tugas/saya
 let ch = { n: 0, terakhir: null, namaOrtu: "Orang tua" };   // ringkasan chat keluarga: /api/chat/belum
+const namaChatOrtu = () => ch.namaChat || ch.namaOrtu;
+let chatFamily = true;
+const kontakOrtu = (label) => `<button type="button" data-ruang-chat="ortu" aria-pressed="${!chatFamily}">${esc(label)} <span class="badge" id="ortu-belum" aria-label="Pesan orang tua belum dibaca" hidden></span></button>`;
 let chatTimer = 0;
 let bersihkanSuara;
 let uang = null;   // uang saku (diberi orang tua) dan belanja/tabungan (dicatat anak): /api/keuangan/saya
@@ -147,8 +150,8 @@ const ISI = {
     <div class="dua">
       <section class="panel"><h3>✅ Tugas hari ini</h3>${daftarTugas()}<h3 class="sub-judul">🎯 Misi belajar</h3>${daftarMisi()}</section>
       <section class="panel"><h3>Mau ke mana?</h3><div class="aksi-besar">${tombolArena()}${tombolBimbel()}</div>
-        <h3 class="sub-judul">💬 Pesan dari ${esc(ch.namaOrtu)}</h3>${ch.terakhir
-          ? `<p class="pesan-ortu">"${esc(ch.terakhir.isi)}"</p><button data-ke-hal="chat">${ch.n ? `Baca ${ch.n} pesan baru` : "Balas"}</button>`
+        <h3 class="sub-judul">💬 Pesan dari ${esc(namaChatOrtu())}</h3>${ch.terakhir
+          ? `<p class="pesan-ortu">"${esc(ch.terakhir.isi)}"</p><button data-ruang-chat="ortu">${ch.n ? `Baca ${ch.n} pesan baru` : "Balas"}</button>`
           : `<p class="muted kecil">Belum ada pesan. <button class="link" data-ke-hal="chat">Kirim pesan</button></p>`}</section>
     </div>
     ${uangSakuku()}`,
@@ -181,7 +184,7 @@ const ISI = {
     <section class="panel"><h3>🎯 Misi belajar hari ini</h3>${daftarMisi()}</section>
     ${tukarBintang()}`,
   arena: () => `<div class="dua">
-      <section class="panel"><h3>🌍 Dunia arena</h3><p class="muted">Jalan-jalan, main Catur, Scramble, dan Kartu Kilat, lalu belanja di Toko Avatar.</p>
+      <section class="panel"><h3>🌍 Dunia arena</h3><p class="muted">Jalan-jalan, main Catur, Scramble Words, dan Kartu Kilat, lalu belanja di Toko Avatar.</p>
         ${kotakWaktu()}<div class="aksi-besar">${tombolArena()}</div></section>
       <section class="panel"><h3>🤝 Teman</h3>${daftarTeman()}</section>
     </div>
@@ -206,18 +209,17 @@ const ISI = {
   chat: () => `<div class="chat-jendela">
     <nav class="chat-daftar" aria-label="Percakapan"><h2>Percakapan</h2>
       <ul class="chat-prioritas">
-        <li><span>Family</span>
-          <div class="chat-kontak" aria-current="true"><span class="chat-inisial" aria-hidden="true">${esc(ch.namaOrtu.slice(0, 1).toUpperCase())}</span><span>${esc(ch.namaOrtu)}</span></div>
-        </li>
-        <li><span>Papa</span><small>Belum terhubung</small></li>
-        <li><span>Mama</span><small>Belum terhubung</small></li>
+        <li><button type="button" data-ruang-chat="family" aria-pressed="${chatFamily}">Family <span class="badge" id="family-belum" aria-label="Pesan Family belum dibaca" hidden></span></button></li>
+        <li>${namaChatOrtu() === "Papa" ? kontakOrtu("Papa") : `<span>Papa</span><small>${ch.peranOrtu?.includes("ayah") ? "Terhubung di Family" : "Belum terhubung"}</small>`}</li>
+        <li>${namaChatOrtu() === "Mama" ? kontakOrtu("Mama") : `<span>Mama</span><small>${ch.peranOrtu?.includes("ibu") ? "Terhubung di Family" : "Belum terhubung"}</small>`}</li>
         <li><span>Anak</span><small>Belum ada percakapan</small></li>
         <li><span>Teman</span><small>Chat teman di arena</small></li>
+        ${["Papa", "Mama"].includes(namaChatOrtu()) ? "" : `<li>${kontakOrtu(namaChatOrtu())}</li>`}
       </ul>
     </nav>
     <section class="chat-keluarga" aria-labelledby="judul-chat">
-      <header class="chat-kepala"><h2 id="judul-chat">${esc(ch.namaOrtu)}</h2></header>
-      ${kotakPesanChat(ch.namaOrtu)}
+      <header class="chat-kepala"><h2 id="judul-chat">${chatFamily ? "Family" : esc(namaChatOrtu())}</h2></header>
+      ${kotakPesanChat(chatFamily ? "Family" : namaChatOrtu())}
     </section>
   </div>`,
   avatar: () => {
@@ -307,12 +309,23 @@ function gambar() {
   if (hal === "keuangan") pasangKeuangan();
   tandaChat();
 }
-function tandaChat() { $("chat-badge").textContent = ch.n; $("chat-badge").hidden = !ch.n || hal === "chat"; }
+function tandaChat() {
+  const family = ch.family ?? 0;
+  for (const [id, n] of [["chat-badge", ch.n + family], ["family-belum", family], ["ortu-belum", ch.n]]) {
+    const badge = $(id);
+    if (!badge) continue;
+    badge.textContent = n;
+    badge.hidden = !n;
+  }
+}
 
 // Chat keluarga: pesan dimuat ulang tiap 5 detik selama menu Chat terbuka. Enter mengirim, Shift+Enter baris baru.
 function pasangChat() {
   const f = $("form-chat");
   const g = $("gelembung");
+  const grup = chatFamily;
+  const query = grup ? "sebagai=anak&grup=1" : "sebagai=anak";
+  const pengirim = { sebagai: "anak", grup };
   const aktif = () => f.isConnected && hal === "chat";
   let isiTerakhir;
   let versiMuat = 0;
@@ -320,19 +333,20 @@ function pasangChat() {
     if (!aktif()) return;
     const versi = ++versiMuat;
     try {
-      const { pesan } = await api("GET", "chat/keluarga?sebagai=anak");
+      const { pesan } = await api("GET", `chat/keluarga?${query}`);
       if (!aktif() || versi !== versiMuat) return;
       const bawah = g.scrollTop + g.clientHeight >= g.scrollHeight - 20;
       const isi = pesan.length
-        ? pesan.map((p) => gelembungChat(p, "anak", "sebagai=anak", (at) =>
+        ? pesan.map((p) => gelembungChat(p, "anak", query, (at) =>
           new Date(at).toLocaleString("id-ID", { weekday: "short", hour: "2-digit", minute: "2-digit" }))).join("")
-        : `<p class="muted chat-kosong">Belum ada pesan dengan ${esc(ch.namaOrtu)}.</p>`;
+        : `<p class="muted chat-kosong">Belum ada pesan di percakapan ${grup ? "Family" : esc(namaChatOrtu())}.</p>`;
       if (isi !== isiTerakhir && ![...g.querySelectorAll("audio")].some((audio) => !audio.paused)) {
         g.innerHTML = isi;
         if (bawah || isiTerakhir === undefined) g.scrollTop = g.scrollHeight;
         isiTerakhir = isi;
       }
-      ch.n = 0;
+      if (grup) ch.family = 0;
+      else ch.n = 0;
       tandaChat();
     } catch (x) { if (aktif() && versi === versiMuat) galat(x.message); }
   };
@@ -343,14 +357,14 @@ function pasangChat() {
     if (kirimTeks.disabled || !f.isi.value.trim()) return;
     kirimTeks.disabled = true;
     try {
-      await api("POST", "chat/keluarga", { sebagai: "anak", isi: f.isi.value });
+      await api("POST", "chat/keluarga", { ...pengirim, isi: f.isi.value });
       f.isi.value = "";
       await muat();
       g.scrollTop = g.scrollHeight;
     } catch (x) { if (aktif()) galat(x.message); } finally { kirimTeks.disabled = false; if (aktif()) f.isi.focus(); }
   };
   f.isi.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); f.requestSubmit(); } });
-  bersihkanSuara = pasangSuara(f, { sebagai: "anak" }, async () => {
+  bersihkanSuara = pasangSuara(f, pengirim, async () => {
     await muat();
     g.scrollTop = g.scrollHeight;
   }, galat);
@@ -364,13 +378,31 @@ function keHal(h) {
   gambar();
   window.scrollTo(0, 0);
 }
-$("menu").addEventListener("click", (e) => { const b = e.target.closest("[data-ke]"); if (b) keHal(b.dataset.ke); });
-$("halaman").addEventListener("click", (e) => { const b = e.target.closest("[data-ke-hal]"); if (b) keHal(b.dataset.keHal); });
+$("menu").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-ke]");
+  if (!b) return;
+  if (b.dataset.ke === "chat") chatFamily = true;
+  keHal(b.dataset.ke);
+});
+$("halaman").addEventListener("click", (e) => {
+  const ruang = e.target.closest("[data-ruang-chat]");
+  if (ruang) {
+    const grup = ruang.dataset.ruangChat === "family";
+    if (hal !== "chat" || chatFamily !== grup) {
+      chatFamily = grup;
+      keHal("chat");
+    }
+    return;
+  }
+  const b = e.target.closest("[data-ke-hal]");
+  if (b) keHal(b.dataset.keHal);
+});
 
 function pasangAvatar() {
   let okTimer = 0;
   avatarPicker($("pilih-avatar"), {
     value: anak.avatar, accent: anak.color, dimiliki: anak.avatarPunya,
+    anggota: anggotaDari(anak.avatar),   // laki-laki/perempuan otomatis, anak cukup memilih karakter
     onPick: async (avatar) => {
       galat("");
       try {
@@ -527,7 +559,7 @@ async function muat() {
     if (u2) { if (JSON.stringify(u2) !== JSON.stringify(uang)) beda = true; uang = u2; }
     const h2 = await api("GET", "hadiah/saya").catch(() => null);
     if (h2) { if (JSON.stringify(h2) !== JSON.stringify(hd)) beda = true; hd = h2; }
-    if (ch2 && hal !== "chat") ch = ch2;
+    if (ch2) ch = ch2;
     if (beda && !["avatar", "toko", "chat", "keuangan"].includes(hal)) gambar(); else tandaChat();
   }, 30000);
   $("dash").hidden = false;

@@ -15,6 +15,9 @@ import { handleTugas } from "./tugas.js";
 import { handleChat, MAKS_BODY_SUARA } from "./chat.js";
 import { handleKeuangan } from "./keuangan.js";
 import { handleHadiah } from "./hadiah.js";
+import { handleTokoOrtu, avatarOrtuDimiliki, aksesoriOrtuDimiliki } from "./toko-ortu.js";
+import { handleKantor } from "./kantor.js";
+import { tanyaMentor } from "./mentor.js";
 import { negaraOr, isNegara, jenjangDariKelas } from "../shared/negara.js";
 import { parentView, parentDecide, unblock, purgeUid, notify, kick } from "./social.js";
 import { sendMail, APP_URL } from "./mailer.js";
@@ -272,8 +275,13 @@ async function readJson(req, maks = 20000) {
     chunks.push(c);
   }
   if (!chunks.length) return {};
-  try { return JSON.parse(Buffer.concat(chunks).toString("utf8")); }
+  let body;
+  try { body = JSON.parse(Buffer.concat(chunks).toString("utf8")); }
   catch { throw new ApiError(400, "Format data salah."); }
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw new ApiError(400, "Format data salah.");
+  }
+  return body;
 }
 
 function report(parentId) {
@@ -294,7 +302,7 @@ function report(parentId) {
   });
 }
 
-const avatarOrtuDimiliki = (p) => [...new Set([...AVATAR_AWAL_ORTU, ...[p.avatar, p.avatar_lama].filter((id) => avatarOr(id, ""))])];
+// avatarOrtuDimiliki ada di toko-ortu.js (ikut menghitung avatar yang dibeli di Toko Avatar orang tua).
 
 // Mengembalikan true bila permintaan ditangani (jalur /api/...).
 export async function handleApi(req, res) {
@@ -308,8 +316,10 @@ export async function handleApi(req, res) {
     // Hanya terima permintaan dari halaman sendiri (perlindungan CSRF sederhana).
     if (req.method !== "GET" && req.headers["x-bimbel"] !== "1") throw new ApiError(403, "Permintaan ditolak.");
     const cookies = parseCookies(req);
-    const ortu = sessionFromToken(cookies[COOKIE.ortu]);
-    const anak = sessionFromToken(cookies[COOKIE.anak]);
+    const sesiOrtu = sessionFromToken(cookies[COOKIE.ortu]);
+    const sesiAnak = sessionFromToken(cookies[COOKIE.anak]);
+    const ortu = sesiOrtu?.role === "ortu" ? sesiOrtu : null;
+    const anak = sesiAnak?.role === "anak" ? sesiAnak : null;
     const ip = req.socket.remoteAddress || "?";
     const path = url.pathname.slice(5).split("/").filter(Boolean); // tanpa "/api/"
     const m = req.method;
@@ -317,6 +327,10 @@ export async function handleApi(req, res) {
     const maksBody = path[0] === "progres" ? 300000
       : path[0] === "chat" && path[1] === "keluarga" && path.length === 2 ? MAKS_BODY_SUARA : 20000;
     const body = m === "GET" ? {} : await readJson(req, maksBody);
+    if (m === "POST" && url.pathname === "/api/mentor/tanya") {
+      send(200, await tanyaMentor(body, ApiError));
+      return true;
+    }
     // ortuSaya = akun orang tua yang sedang masuk; keluargaId = kepala keluarga (pemilik data anak).
     const ortuSaya = ortu?.parent_id ?? null;
     const keluargaId = ortuSaya ? idKeluarga(ortuSaya) : null;
@@ -401,10 +415,10 @@ export async function handleApi(req, res) {
     if (m === "GET" && path[0] === "saya") {
       const out = { ortu: null, anak: null, children: [] };
       if (ortu) {
-        const p = db.prepare("SELECT id, name, email, avatar, avatar_lama, aksesori_pakai, peran, kepala_id FROM parents WHERE id = ?").get(ortu.parent_id);
+        const p = db.prepare("SELECT id, name, email, avatar, avatar_lama, aksesori_pakai, aksesori_punya, bintang, peran, kepala_id FROM parents WHERE id = ?").get(ortu.parent_id);
         out.ortu = p ? {
           name: p.name, email: p.email, avatar: avatarOr(p.avatar, DEFAULT_ORTU_AVATAR), avatarPunya: avatarOrtuDimiliki(p), aksesori: rapikanAksesori(p.aksesori_pakai),
-          id: p.id, peran: p.peran, kepala: !p.kepala_id,
+          id: p.id, peran: p.peran, kepala: !p.kepala_id, bintang: p.bintang, aksesoriPunya: aksesoriOrtuDimiliki(p),
         } : null;
         out.children = keluargaId ? db.prepare("SELECT * FROM children WHERE parent_id = ? ORDER BY id").all(keluargaId).map(publicChild) : [];
       }
@@ -430,7 +444,7 @@ export async function handleApi(req, res) {
       }
       if (body.sebagai !== "ortu") throw new ApiError(400, "Pilih avatar untuk siapa.");
       const pid = needOrtuSaya();
-      const p = db.prepare("SELECT avatar, avatar_lama FROM parents WHERE id = ?").get(pid);
+      const p = db.prepare("SELECT id, avatar, avatar_lama FROM parents WHERE id = ?").get(pid);
       if (!avatarOrtuDimiliki(p).includes(avatar)) throw new ApiError(403, "Avatar ini belum dimiliki.");
       db.prepare("UPDATE parents SET avatar = ? WHERE id = ?").run(avatar, pid);
       return send(200, { ok: true, avatar }), true;
@@ -441,7 +455,9 @@ export async function handleApi(req, res) {
       const pid = needOrtuSaya();
       const a = aksesoriById(String(body.id || ""));
       if (!a) throw new ApiError(400, "Aksesori tidak dikenal.");
-      const lama = rapikanAksesori(db.prepare("SELECT aksesori_pakai FROM parents WHERE id = ?").get(pid)?.aksesori_pakai);
+      const row = db.prepare("SELECT aksesori_pakai, aksesori_punya FROM parents WHERE id = ?").get(pid);
+      if (body.pakai !== false && !aksesoriOrtuDimiliki(row).includes(a.id)) throw new ApiError(403, "Beli aksesori ini dulu di Toko Avatar.");
+      const lama = rapikanAksesori(row?.aksesori_pakai);
       const baru = body.pakai === false ? lama.filter((x) => x !== a.id) : [...lama.filter((x) => aksesoriById(x).slot !== a.slot), a.id];
       const simpan = rapikanAksesori(baru);
       db.prepare("UPDATE parents SET aksesori_pakai = ? WHERE id = ?").run(simpan.join(","), pid);
@@ -486,6 +502,11 @@ export async function handleApi(req, res) {
         if (!peran) throw new ApiError(400, "Pilih Ayah atau Ibu.");
         if (anggotaKeluarga(kepala).some((a) => a.id !== saya && a.peran === peran)) throw new ApiError(400, `Keluarga ini sudah punya ${PERAN[peran]}.`);
         db.prepare("UPDATE parents SET peran = ? WHERE id = ?").run(peran, saya);
+        // Avatar ikut peran: karakter yang sama dengan anggota Ayah/Ibu yang baru (atau manusia bila belum dimiliki).
+        const p = db.prepare("SELECT id, avatar, avatar_lama FROM parents WHERE id = ?").get(saya);
+        const jenis = String(p.avatar || "manusia-ayah").split("-")[0];
+        const baru = avatarOrtuDimiliki(p).includes(`${jenis}-${peran}`) ? `${jenis}-${peran}` : AVATAR_PERAN[peran];
+        db.prepare("UPDATE parents SET avatar = ? WHERE id = ?").run(baru, saya);
         return send(200, ringkas()), true;
       }
       // Kepala keluarga mengeluarkan orang tua kedua: akunnya tetap ada tetapi tidak lagi terhubung ke anak-anak.
@@ -616,12 +637,33 @@ export async function handleApi(req, res) {
       }
     }
 
+    // --- cek kode undangan keluarga sebelum mendaftar (tanpa masuk): nama kepala keluarga dan peran yang masih kosong ---
+    if (m === "GET" && path[0] === "undangan") {
+      const lim = limited(`undangan-cek:${ip}`, 15);
+      const kode = str(url.searchParams.get("kode"), 12).toUpperCase().replace(/[^A-Z0-9]/g, "");
+      const u = db.prepare("SELECT * FROM undangan_ortu WHERE kode = ?").get(kode);
+      if (!u || u.expires_at < Date.now()) { lim.fail(); throw new ApiError(404, "Kode undangan salah atau sudah kedaluwarsa. Minta kode baru ke pasangan Anda."); }
+      lim.ok();
+      const anggota = anggotaKeluarga(u.kepala_id);
+      if (anggota.length >= 2) throw new ApiError(400, "Keluarga ini sudah punya dua orang tua.");
+      const kepala = anggota.find((a) => !a.kepala_id) || anggota[0];
+      const kosong = Object.keys(PERAN).find((p) => !anggota.some((a) => a.peran === p));
+      return send(200, { kode, namaKepala: kepala.name, peran: kosong }), true;
+    }
+
     // --- anak masuk di perangkatnya sendiri dengan kode dari orang tua ---
     if (m === "POST" && path[0] === "kode") {
       const lim = limited(`kode:${ip}`, 10);
       const code = str(body.code, 12).toUpperCase().replace(/[^A-Z0-9]/g, "");
       const row = db.prepare("SELECT * FROM login_codes WHERE code = ?").get(code);
-      if (!row || row.expires_at < Date.now()) { lim.fail(); throw new ApiError(401, "Kode masuk salah atau sudah kedaluwarsa."); }
+      if (!row || row.expires_at < Date.now()) {
+        lim.fail();
+        // Kode undangan keluarga diketik di kolom kode anak: arahkan ke jalur pendaftaran orang tua.
+        if (db.prepare("SELECT 1 FROM undangan_ortu WHERE kode = ? AND expires_at > ?").get(code, Date.now())) {
+          throw new ApiError(400, "Ini kode undangan keluarga untuk orang tua. Kembali, lalu pilih \"Saya diundang pasangan\".");
+        }
+        throw new ApiError(401, "Kode masuk salah atau sudah kedaluwarsa.");
+      }
       lim.ok();
       db.prepare("DELETE FROM login_codes WHERE code = ?").run(code); // sekali pakai
       const c = childRow(row.child_id);
@@ -690,6 +732,10 @@ export async function handleApi(req, res) {
 
     // --- hadiah tukar bintang (orang tua membuat, anak menukar, orang tua menyetujui) ---
     if (handleHadiah({ m, path, body, ortuId: ortu ? keluargaId : null, ortuSaya, anak, send, ApiError })) return true;
+
+    // --- Toko Avatar orang tua (bintang orang tua sendiri) ---
+    if (handleTokoOrtu({ m, path, body, ortuSaya: ortu ? ortuSaya : null, send, ApiError })) return true;
+    if (handleKantor({ m, path, body, ortuSaya: ortu?.role === "ortu" ? ortuSaya : null, keluargaId, anak, url, send, ApiError })) return true;
 
     // --- kemajuan Ruang Pintar (anak) ---
     if (handleProgres({ m, path, body, anak, send, ApiError })) return true;

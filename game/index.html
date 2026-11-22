@@ -22,6 +22,7 @@
           <p class="muted">Siapa yang mau bermain?</p>
           <button class="primary" data-go="kode">Saya anak: pakai kode masuk</button>
           <a class="btn" href="/orangtua.html">Saya orang tua: masuk / daftar</a>
+          <button data-go="undangan">Saya diundang pasangan: punya kode keluarga</button>
           <p class="muted">Belum punya akun? Orang tua mendaftar dulu, lalu membuat akun anak di dashboard orang tua.</p>
         </section>
 
@@ -35,6 +36,18 @@
           <button type="button" class="ghost" data-go="pilih">Kembali</button>
         </form>
 
+        <!-- Orang tua kedua (mis. Ibu) bergabung ke keluarga dengan kode undangan dari pasangannya -->
+        <form data-step="undangan" id="form-undangan" hidden>
+          <h2>Gabung ke keluarga</h2>
+          <p class="muted">Masukkan kode undangan 6 huruf dari pasangan Anda (dibuat di dashboard orang tua, menu Setting → Keluarga).</p>
+          <input id="undangan-input" maxlength="6" autocomplete="off" class="code big-code" placeholder="KODE" />
+          <p id="undangan-info" class="notice-kecil" hidden></p>
+          <span class="error" hidden></span>
+          <button type="submit" class="primary" id="undangan-cek">Periksa kode</button>
+          <a class="btn utama" id="undangan-lanjut" hidden>Lanjut daftar</a>
+          <button type="button" class="ghost" data-go="pilih">Kembali</button>
+        </form>
+
         <!-- Perangkat keluarga: orang tua sudah masuk -->
         <section data-step="keluarga" hidden>
           <h2 id="keluarga-judul">Pilih pemain</h2>
@@ -45,6 +58,7 @@
             <a class="btn" href="/orangtua.html">Dashboard orang tua</a>
           </div>
           <button class="ghost" data-act="keluar">Keluar dari akun</button>
+          <button class="ghost" data-go="undangan">Pasangan belum punya akun? Daftar dengan kode keluarga</button>
         </section>
 
         <!-- PIN anak -->
@@ -59,15 +73,10 @@
         <!-- Orang tua memilih tingkat soal sebelum bermain -->
         <section data-step="ortu" hidden>
           <h2>Main sebagai orang tua</h2>
-          <p class="muted">Pilih tingkat soal yang sama dengan anak, lalu ajak anak bermain lewat kode meja.</p>
+          <p class="muted">Ajak anak bermain bersama lewat kode meja. Tingkat soal mengikuti anak Anda.</p>
           <div class="label">Avatar orang tua</div>
           <div id="ortu-avatar" class="siap-avatar av-face"></div>
           <a class="btn-link" href="/orangtua.html#avatar">✏️ Ganti avatar di dashboard</a>
-          <div class="row toggle" id="ortu-level">
-            <button type="button" data-level="SD" class="on">SD</button>
-            <button type="button" data-level="SMP">SMP</button>
-            <button type="button" data-level="SMA">SMA</button>
-          </div>
           <span class="error" hidden></span>
           <button class="primary" data-act="main-ortu">Masuk ke arena</button>
           <button class="ghost" data-go="keluarga">Kembali</button>
@@ -199,14 +208,15 @@
     <!-- Menu meja scramble -->
     <div id="scramble-menu" class="overlay" hidden>
       <div class="card">
-        <h2>Meja scramble</h2>
-        <p class="muted">Susun huruf acak menjadi kata secepat mungkin.</p>
+        <h2>Scramble Words</h2>
+        <p class="muted">Susun kata bersilangan di papan atau main susun huruf cepat.</p>
         <div class="label">Bahasa</div>
         <div class="row" id="scr-lang">
           <button type="button" data-lang="ID" class="on">Indonesia</button>
           <button type="button" data-lang="EN">English</button>
         </div>
-        <button class="primary" data-mode="bot">Lawan bot</button>
+        <button type="button" class="primary" data-mode="papan-kata">Papan kata · Lawan bot</button>
+        <button data-mode="bot">Susun huruf cepat · Lawan bot</button>
         <div class="row" id="scr-bot-levels" hidden>
           <button data-level="1">Pemula</button>
           <button data-level="2">Menengah</button>
@@ -223,9 +233,27 @@
       </div>
     </div>
 
+    <div id="papan-kata-panel" class="overlay" hidden>
+      <div class="card kartu-papan-kata">
+        <h2>Scramble Words</h2>
+        <p data-skor></p>
+        <div class="papan-kata" data-papan aria-label="Papan kata 11 kali 11"></div>
+        <div class="rak-kata" data-rak aria-label="Rak huruf"></div>
+        <p data-pesan role="status"></p>
+        <div class="row">
+          <button data-kirim data-perlu-giliran class="primary">Kirim kata</button>
+          <button data-batal data-perlu-giliran>Reset huruf</button>
+          <button data-lewati data-perlu-giliran>Lewati</button>
+          <button data-main>Main baru</button>
+          <button data-tutup>Keluar</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Permainan scramble -->
     <div id="scramble" class="overlay" hidden>
       <div class="card scr-card">
+        <h2>Scramble Words</h2>
         <div class="chess-info"><span id="scr-round"></span><span id="scr-timer" class="timer"></span></div>
         <div id="scr-wait" hidden>
           <p id="scr-wait-text" class="center"></p>
@@ -245,6 +273,20 @@
         <div class="row">
           <button id="scr-again" class="primary" hidden>Main lagi</button>
           <button id="scr-close" class="ghost">Keluar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="otello-panel" class="overlay" hidden>
+      <div class="card kartu-otello">
+        <h2>Otello</h2>
+        <p class="muted">Kamu bermain dengan keping biru. Pilih petak bertanda titik untuk mengapit keping lawan.</p>
+        <p data-skor></p>
+        <div class="papan-otello" data-papan aria-label="Papan Otello 8 kali 8"></div>
+        <p data-pesan role="status"></p>
+        <div class="row">
+          <button type="button" data-main class="primary">Main baru</button>
+          <button type="button" data-tutup>Keluar</button>
         </div>
       </div>
     </div>
@@ -299,6 +341,30 @@
         <div id="toko-isi"></div>
         <span id="toko-error" class="error" hidden></span>
         <button class="ghost" id="toko-tutup">Tutup</button>
+      </div>
+    </div>
+
+    <div id="mentor-panel" class="overlay" hidden>
+      <section class="card" role="dialog" aria-modal="true" aria-labelledby="mentor-judul">
+        <h2 id="mentor-judul">Elon Musk · Bot simulasi</h2>
+        <p id="mentor-jawaban" aria-live="polite"></p>
+        <div class="row" id="mentor-pilihan"></div>
+        <form id="mentor-form">
+          <label for="mentor-input">Pertanyaan atau jawabanmu</label>
+          <input id="mentor-input" maxlength="600" autocomplete="off" required>
+          <button class="primary" type="submit">Kirim</button>
+        </form>
+        <button class="ghost" id="mentor-tutup">Selesai</button>
+      </section>
+    </div>
+    <div id="kantor-panel" class="overlay" hidden>
+      <div class="card" role="dialog" aria-modal="true" aria-labelledby="kantor-judul">
+        <h2 id="kantor-judul">Kantor Ayah dan Ibu</h2>
+        <p id="kantor-saldo" class="muted"></p>
+        <p id="kantor-status"></p>
+        <p id="kantor-pesan" role="status" hidden></p>
+        <button class="primary" id="kantor-aksi">Mulai bekerja</button>
+        <button class="ghost" id="kantor-tutup">Tutup</button>
       </div>
     </div>
 

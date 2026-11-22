@@ -47,6 +47,21 @@ const badan = (c, b) => `<ellipse cx="50" cy="78" rx="22" ry="18" fill="${c}"/><
 function familyParts(f) {
   const { body: c, belly: b, accent: a } = f;
   switch (f.id) {
+    case "dino":
+      return {
+        back: `<path d="M64 49 Q85 55 75 75 Q72 80 66 78 Q72 66 60 62Z" fill="${a}"/>
+          <path d="M69 55 L75 58" stroke="#cf8596" stroke-width="3" stroke-linecap="round"/>`,
+        body: `<rect x="27" y="62" width="46" height="31" rx="12" fill="${b}"/>
+          <path d="M46 83 Q41 82 41 77 L39 73 Q34 74 35 70 Q38 66 42 69 L46 77 Q55 74 61 80 L68 78 Q66 82 60 84 L59 88 H55 V85 H50 V88 H46Z" fill="#4d798b"/>
+          <path d="M30 78 l3 2 3-2-1 3 2 2-3-1-2 2v-3z M62 69 l2 2 3-1-2 2 1 3-2-2-3 1 2-2z" fill="#bd955e"/>`,
+        head: `<ellipse cx="50" cy="41" rx="26" ry="27" fill="${a}"/>
+          <circle cx="28" cy="46" r="5" fill="${c}"/><circle cx="72" cy="46" r="5" fill="${c}"/>
+          <ellipse cx="50" cy="44" rx="22" ry="23" fill="${c}"/>
+          <path d="M25 45 Q21 16 47 15 Q76 13 75 42 Q64 35 57 25 Q45 38 27 41Z" fill="${a}"/>`,
+        face: eyes(50, 44, 9, 4) + cheeks(52) + `<path d="M43 52 Q50 55 57 52 Q55 61 50 61 Q45 61 43 52Z" fill="#843f37"/>
+          <path d="M45 53 Q50 54 55 53 L54 55 H46Z" fill="#fffaf4"/>`,
+        top: 15, eyeY: 44, gap: 9,
+      };
     case "manusia":
       return {
         back: "",
@@ -275,7 +290,7 @@ export function avatarSvg(id, accent = "#4f9cf0", { sized = false, aksesori = []
   const s = sized ? a.member.scale / 1.15 : 1;
   const pakai = rapikanAksesori(aksesori);
   const slots = new Set(pakai.map((x) => aksesoriById(x).slot));
-  const mp = memberParts(a.member, p, accent);
+  const mp = a.family.id === "dino" ? {} : memberParts(a.member, p, accent);
   const bawaan = ["wajah", "bulu", "leher", "kepala"].filter((k) => mp[k] && !slots.has(k)).map((k) => mp[k]).join("");
   // Urutan: hiasan leher dulu (di atas badan), lalu wajah, lalu kepala paling atas.
   const urut = ["leher", "wajah", "kepala"];

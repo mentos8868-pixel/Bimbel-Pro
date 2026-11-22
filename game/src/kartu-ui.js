@@ -115,6 +115,9 @@ export class KartuUI {
 
   cleanup() {
     clearInterval(this.timer);
+    clearTimeout(this.hintTimer);
+    this.hint = "";
+    this.lastClicked = null;
     if (this.room) {
       this.room.removeAllListeners();
       this.room.leave();
@@ -161,6 +164,7 @@ export class KartuUI {
   play(cardId, color) {
     $("ktr-colors").hidden = true;
     this.pendingWild = null;
+    if (!this.myTurn()) return;
     if (this.kind === "online") return this.room.send("main", { cardId, color });
     const r = this.engine.play("me", cardId, color, Date.now());
     this.lastAction = Date.now();
@@ -207,7 +211,9 @@ export class KartuUI {
   // ---------- gambar ----------
   setView(v) {
     this.view = v;
+    if (!this.myTurn()) this.pendingWild = null;
     if (v.status === "selesai" && !this.reported) {
+      clearInterval(this.timer);
       this.reported = true;
       reportResult("kartu", this.kind, v.winner === this.myId ? "menang" : "kalah");
     }

@@ -1,6 +1,7 @@
 // Tampilan permainan Scramble: susun huruf acak menjadi kata.
 // Mode "bot": mesin permainan berjalan di browser. Mode "online": server yang menentukan.
 import { ScrambleEngine } from "../../shared/scramble-engine.js";
+import { muatKamusBesar } from "../../shared/kamus-kata.js";
 import { reportResult } from "./api.js";
 
 const $ = (id) => document.getElementById(id);
@@ -17,7 +18,7 @@ export class ScrambleUI {
     this.view = null;
     this.letters = [];
     this.picked = [];
-    this.lastScrambled = "";
+    this.lastRound = 0;
     this.locked = false;
 
     $("scr-close").onclick = () => this.close();
@@ -36,6 +37,7 @@ export class ScrambleUI {
     this.lang = lang;
     this.level = level;
     this.myId = "me";
+    muatKamusBesar(lang);
     const engine = new ScrambleEngine({ jenjang: profile.gameJenjang, lang });
     engine.addPlayer("me", profile.name);
     engine.addPlayer("bot", BOT[level].name);
@@ -94,7 +96,8 @@ export class ScrambleUI {
   show() {
     this.reported = false;
     this.el.hidden = false;
-    this.lastScrambled = "";
+    this.lastRound = 0;
+    this.locked = false;
     this.feedback("");
   }
 
@@ -121,7 +124,8 @@ export class ScrambleUI {
   }
 
   canPlay() {
-    return this.view?.status === "main" && !this.me()?.solved && !this.locked;
+    const me = this.me();
+    return this.view?.status === "main" && !!me && !me.solved && !this.locked;
   }
 
   pick(i) {
@@ -138,9 +142,9 @@ export class ScrambleUI {
   }
 
   onKey(e) {
-    if (this.el.hidden || !this.mode || e.target.tagName === "INPUT") return;
-    if (e.key === "Enter") return this.submit();
-    if (e.key === "Backspace") { this.picked.pop(); return this.renderTiles(); }
+    if (this.el.hidden || !this.mode || e.target.tagName === "INPUT" || !this.canPlay()) return;
+    if (e.key === "Enter" && e.target.tagName !== "BUTTON") return this.submit();
+    if (e.key === "Backspace") return this.unpick(this.picked.length - 1);
     const k = e.key.toUpperCase();
     if (/^[A-Z]$/.test(k)) {
       const i = this.letters.findIndex((l, idx) => l === k && !this.picked.includes(idx));
@@ -190,9 +194,9 @@ export class ScrambleUI {
       const tie = v.players.filter((p) => p.score === best).length > 1;
       reportResult("scramble", this.mode, mine < best ? "kalah" : tie ? "seri" : "menang", mine);
     }
-    if (v.scrambled && v.scrambled !== this.lastScrambled) {
+    if (v.scrambled && v.round !== this.lastRound) {
       // Ronde baru
-      this.lastScrambled = v.scrambled;
+      this.lastRound = v.round;
       this.letters = v.scrambled.split("");
       this.picked = [];
       this.locked = false;

@@ -22,10 +22,23 @@ Lalu buka:
 - Dashboard anak: http://localhost:5173/anak.html (anak diarahkan ke sini setelah masuk)
 - Di HP/tablet yang tersambung ke Wi-Fi yang sama: http://ALAMAT-IP-LAPTOP:5173 (alamatnya muncul di terminal pada baris "Network")
 
+## Bertanya kepada mentor AI arena
+
+Dekati Elon Musk (bot simulasi) di alun-alun dan tekan **E** atau tombol **Bicara**. Ketik pertanyaan dan tekan **Kirim**. Mentor mengingat tiga pertukaran terakhir selama panel terbuka.
+
+Server Bimbel Pro memakai Ollama pada `127.0.0.1:11434`. Pada komputer server baru, jalankan Ollama dan unduh model dengan `ollama pull qwen2.5:1.5b`. Untuk memakai model Ollama lain yang sudah terpasang, isi variabel `BIMBEL_MODEL` dengan nama model sebelum menjalankan server.
+
+Untuk menjalankan kembali Ollama portabel di komputer proyek ini, gunakan PowerShell dari folder proyek dan biarkan proses berjalan selama mentor digunakan.
+
+```powershell
+$env:OLLAMA_MODELS = (Resolve-Path 'server/data/mentor-runtime/models').Path
+& ./server/data/mentor-runtime/ollama.exe serve
+```
+
 ## Cara memakai akun
 
 1. **Orang tua** membuka dashboard, lalu mendaftar: memilih **Ayah** atau **Ibu**, mengisi nama, email, kata sandi, dan mencentang persetujuan data anak. Yang mendaftar pertama menjadi **kepala keluarga**.
-2. Pasangan bisa bergabung: kepala keluarga menekan **Undang Ibu/Ayah** di menu Setting dan mendapat kode 6 huruf (berlaku 24 jam). Pasangan mendaftar seperti biasa, memilih perannya, lalu mengisi kode itu. Kedua orang tua punya hak yang sama atas anak-anak; hanya kepala keluarga yang bisa mengeluarkan pasangan atau menghapus seluruh keluarga.
+2. Pasangan bisa bergabung: kepala keluarga menekan **Undang Ibu/Ayah** di menu Setting dan mendapat kode 6 huruf (berlaku 24 jam). Pasangan mendaftar seperti biasa, memilih perannya, lalu mengisi kode itu. Bisa juga dari layar depan arena: pilih "Saya diundang pasangan: punya kode keluarga", ketik kodenya, lalu "Lanjut daftar" (kode dan peran langsung terisi). Kedua orang tua punya hak yang sama atas anak-anak; hanya kepala keluarga yang bisa mengeluarkan pasangan atau menghapus seluruh keluarga.
 3. Di dashboard, orang tua **menambah akun anak**: nama panggilan, kelas, pilihan **Anak laki-laki** atau **Anak perempuan**, warna, dan PIN 4 angka.
 4. Anak masuk dengan salah satu cara berikut:
    - **Perangkat keluarga** (orang tua sudah masuk di browser itu): buka arena, pilih nama anak, lalu masukkan PIN.

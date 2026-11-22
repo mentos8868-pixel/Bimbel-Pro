@@ -217,6 +217,9 @@
 <main id="app"></main>
 
 <script src="bank_soal.js"></script>
+<script src="bank_soal_tambahan_big.js"></script>
+<script src="bank_soal_tambahan_bin.js"></script>
+<script src="bank_soal_tambahan_ipa.js"></script>
 <script src="bank_intl.js"></script>
 <script src="bank_intl_tambahan.js"></script>
 <script src="topik_tambahan.js"></script>
@@ -893,7 +896,45 @@ function go(v,paksa){
   view=v;sess=null;render();window.scrollTo(0,0)}
 document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));
 
-function render(){header();const app=$('#app');
+const ATURAN_SP1={salahBeruntun:4,batasJawabMs:2000,jedaMs:5*60*1000};
+let timerSP1;
+function batasSP1(){
+  if(!SKEY)return 0;
+  try{return Number(localStorage.getItem(`${SKEY}_sp1`))||0}catch(e){return 0}
+}
+function catatSP1(ok,s){
+  s.salahCepat=!ok&&performance.now()-s.soalMulai<ATURAN_SP1.batasJawabMs
+    ? (s.salahCepat||0)+1 : 0;
+  if(s.salahCepat<ATURAN_SP1.salahBeruntun||jedaSP1())return false;
+  const sampai=Date.now()+ATURAN_SP1.jedaMs;
+  try{localStorage.setItem(`${SKEY}_sp1`,String(sampai))}catch(e){}
+  batasSP1Sesi=sampai;
+  sess=null;
+  render();
+  window.scrollTo(0,0);
+  return true;
+}
+let batasSP1Sesi=0;
+const jedaSP1=()=>Math.max(batasSP1(),batasSP1Sesi);
+function tampilSP1(app,sampai){
+  app.innerHTML=`<h1>SP 1 · Jeda latihan</h1>
+    <p>Beberapa jawaban salah dikirim berturut-turut dengan sangat cepat. Ambil jeda 5 menit sebelum melanjutkan.</p>
+    <p>Waktu tersisa <strong id="sisa-sp1" role="timer"></strong></p>`;
+  const perbarui=()=>{
+    const sisa=sampai-Date.now();
+    if(sisa<=0){render();return}
+    $('#sisa-sp1').textContent=fmtT(sisa/1000);
+    timerSP1=setTimeout(perbarui,250);
+  };
+  perbarui();
+}
+window.addEventListener('storage',e=>{
+  if(SKEY&&e.key===`${SKEY}_sp1`&&jedaSP1()>Date.now()){sess=null;render()}
+});
+
+function render(){clearTimeout(timerSP1);header();const app=$('#app');
+  const sampai=jedaSP1();
+  if(sampai>Date.now()&&(view==='belajar'||view==='tryout'))return tampilSP1(app,sampai);
   if(sess){ return sess.done?renderResult(app):renderQ(app); }
   ({belajar:renderHome,tryout:renderTryout,medali:renderMedals,laporan:renderReport})[view](app);
 }
@@ -932,20 +973,33 @@ function renderHome(app){
   $('#lihat-xp').onclick=()=>go('tryout');
 }
 
-function start(id){const t=topicsFor(S.mapel,S.kelas).find(x=>x.id===id)||topicById(id);LV=S.lv;
+function start(id){if(jedaSP1()>Date.now())return render();const t=topicsFor(S.mapel,S.kelas).find(x=>x.id===id)||topicById(id);LV=S.lv;
   const qs=buildSession(t,JUMLAH_SOAL);if(!qs.length){alert('Belum ada soal untuk topik ini.');return}
   sess={t,lv:S.lv,qs,i:0,res:[],streak:0,answered:false,done:false};render();
 }
 function ansText(q){if(q.kind==='str')return esc(q.ans);if(q.kind==='frac'){let [n,d]=q.ans;if(d<0){n=-n;d=-d}const g=gcd(n,d);n/=g;d/=g;return d===1?`${n}`:(n<0?'−':'')+F(Math.abs(n),d)}
   return q.kind==='dec'?fmtD(q.ans,2):(Math.abs(q.ans)>=1000?q.ans.toLocaleString('id-ID'):q.ans)}
-function check(q,v){v=String(v).trim().toLowerCase().replace(/−/g,'-');if(!v)return null;
+function check(q,v){
+  // Pilihan ganda teks: harus sama persis, termasuk huruf besar/kecil (soal huruf kapital, genotipe Mm/mm).
+  if(q.choices&&q.kind==='str'){const t=String(v).trim();return t?t===String(q.ans).trim():null}
+  v=String(v).trim().toLowerCase().replace(/−/g,'-');if(!v)return null;
   if(q.kind==='str')return v===String(q.ans).trim().toLowerCase().replace(/−/g,'-');
-  if(q.kind==='frac'){let n,d;if(v.includes('/')){[n,d]=v.split('/').map(x=>parseInt(x.trim()))}else{n=parseInt(v);d=1}
-    if(!isFinite(n)||!isFinite(d)||d===0)return false;return n*q.ans[1]===q.ans[0]*d}
-  if(q.kind==='dec'){const x=parseFloat(v.replace(',','.'));return Math.abs(x-q.ans)<1e-9}
-  const x=parseInt(v.replace(/rp|\$|\.|,|\s/g,''));return x===q.ans;
+  if(q.kind==='frac'){
+    const parts=v.match(/^([+-]?\d+)(?:\s*\/\s*([+-]?\d+))?$/);
+    if(!parts)return false;
+    const n=Number(parts[1]),d=Number(parts[2]??1);
+    return Number.isSafeInteger(n)&&Number.isSafeInteger(d)&&d!==0&&n*q.ans[1]===q.ans[0]*d;
+  }
+  if(q.kind==='dec'){
+    if(!/^[+-]?(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(v))return false;
+    return Math.abs(Number(v.replace(',','.'))-q.ans)<1e-9;
+  }
+  const angka=v.replace(/^(?:rp|\$)\s*/, '');
+  if(!/^[+-]?(?:\d+|\d{1,3}(?:\.\d{3})+|\d{1,3}(?:,\d{3})+|\d{1,3}(?:\s+\d{3})+)$/.test(angka))return false;
+  return Number(angka.replace(/[.,\s]/g,''))===q.ans;
 }
 function renderQ(app){const s=sess,q=s.qs[s.i];
+  if(!s.answered)s.soalMulai??=performance.now();
   const dots=s.qs.map((_,i)=>`<i class="${i<s.res.length?(s.res[i]?'ok':'bad'):(i===s.i?'cur':'')}"></i>`).join('');
   const input=q.choices?`<div class="choices ${q.text?'long':''}">${q.choices.map(c=>`<button class="choice" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>`
     :`<div class="ans"><input id="inp" inputmode="text" autocomplete="off" placeholder="Jawaban"><button class="btn" id="cek">Periksa</button></div>${q.hint?`<div class="hint">${q.hint}</div>`:''}`;
@@ -965,7 +1019,10 @@ function renderQ(app){const s=sess,q=s.qs[s.i];
     $('#cek').onclick=f;inp.onkeydown=e=>{if(e.key==='Enter'){s.answered?nextQ():f()}}}
   $('#next').onclick=nextQ;
 }
-function answer(ok,btn){const s=sess,q=s.qs[s.i];s.answered=true;s.res.push(ok);
+function answer(ok,btn){const s=sess;if(!s||s.answered)return;
+  if(jedaSP1()>Date.now()){sess=null;return render()}
+  if(catatSP1(ok,s))return;
+  const q=s.qs[s.i];s.answered=true;s.res.push(ok);
   if(ok)s.streak++;else s.streak=0;
   if(btn){$('#app').querySelectorAll('.choice').forEach(b=>{if(check(q,b.dataset.c))b.classList.add('right')});if(!ok)btn.classList.add('wrong')}
   const inp=$('#inp');if(inp){inp.disabled=true;inp.style.borderColor=ok?'var(--ok)':'var(--bad)';$('#cek').disabled=true}
@@ -977,7 +1034,7 @@ function answer(ok,btn){const s=sess,q=s.qs[s.i];s.answered=true;s.res.push(ok);
   if(ok)$('#lihat').onclick=()=>{$('#pb').style.display='block';$('#lihat').remove()};
   const n=$('#next');n.style.display='inline-block';n.focus();
 }
-function nextQ(){const s=sess;if(!s.answered)return;if(s.i<s.qs.length-1){s.i++;s.answered=false;render()}else finish()}
+function nextQ(){const s=sess;if(!s?.answered)return;if(s.i<s.qs.length-1){s.i++;s.answered=false;s.soalMulai=null;render()}else finish()}
 function finish(){const s=sess,c=s.res.filter(Boolean).length,N=s.qs.length,pc=c/N,stars=pc===1?3:pc>=.8?2:pc>=.6?1:0;
   const before=new Set(S.medals),key=`${s.t.id}|${s.lv}`;
   const t=S.topics[key]||{best:0,att:0,ok:0,ses:0};
@@ -1147,6 +1204,7 @@ function renderTryout(app){
 }
 
 function startExam(){
+  if(jedaSP1()>Date.now())return render();
   if(sudahTryout(S.kur,S.mapel)){alert('Tryout pelajaran ini hari ini sudah dikerjakan. Coba lagi besok, ya.');return}
   const qs=buildExam(tryoutTopics(),TO.n);
   if(!qs.length){alert('Belum ada soal untuk kelas ini.');return}

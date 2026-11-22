@@ -89,7 +89,7 @@ const rupiah = (v) => {
 };
 
 // Mengembalikan true bila permintaan ditangani.
-export function handleKeuangan({ m, path, body, ortuId, anak, ownChild, send, ApiError }) {
+export function handleKeuangan({ m, path, body, ortuId, ortuSaya, anak, ownChild, send, ApiError }) {
   if (path[0] !== "keuangan") return false;
   const salah = (fn) => { try { return fn(); } catch (e) { throw e instanceof ApiError ? e : new ApiError(400, e.message); } };
 
@@ -154,7 +154,7 @@ export function handleKeuangan({ m, path, body, ortuId, anak, ownChild, send, Ap
     if (masalah) throw new ApiError(400, masalah);
     db.prepare("INSERT INTO keuangan_catatan (child_id, jenis, jumlah, catatan, tanggal, created_at, oleh) VALUES (?, ?, ?, ?, ?, ?, 'ortu')")
       .run(c.id, jenis, jumlah, teks(body.catatan, 80), tanggal, Date.now());
-    const nama = db.prepare("SELECT name FROM parents WHERE id = ?").get(ortuId)?.name || "Orang tua";
+    const nama = db.prepare("SELECT name FROM parents WHERE id = ?").get(ortuSaya ?? ortuId)?.name || "Orang tua";
     notify(`a${c.id}`, "info", `💰 ${nama} memberimu uang saku Rp${jumlah.toLocaleString("id-ID")}`);
     return send(200, ringkasKeuangan(c.id)), true;
   }

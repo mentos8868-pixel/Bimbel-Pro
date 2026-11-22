@@ -47,6 +47,9 @@ const normalize = value => String(value ?? '').normalize('NFKC').toLowerCase()
   .replace(/&nbsp;|&#160;/g, ' ').replace(/<br\s*\/?>/g, ' ')
   .replace(/\s+/g, ' ').trim();
 const visible = value => normalize(value).replace(/<[^>]*>/g, '').trim();
+const optionText = value => String(value ?? '').normalize('NFKC')
+  .replace(/&nbsp;|&#160;/g, ' ').replace(/<br\s*\/?>/g, ' ')
+  .replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 const questionKey = value => /<(svg|img)\b/i.test(value)
   ? normalize(value)
   : visible(value);
@@ -75,7 +78,7 @@ for (const topic of curriculum) {
   for (const [index, item] of (topic.bank ?? []).entries()) {
     bankCount++;
     const entry = { ...loc, number: index + 1, level: item.lv, question: item.q, answer: item.o?.[item.a] };
-    const options = Array.isArray(item.o) ? item.o.map(visible) : [];
+    const options = Array.isArray(item.o) ? item.o.map(optionText) : [];
     if (!entry.question?.trim() || !item.p?.trim() || ![1, 2, 3].includes(item.lv)
         || options.length !== 4 || options.includes('') || new Set(options).size !== 4
         || !Number.isInteger(item.a) || item.a < 0 || item.a >= options.length) {
@@ -114,7 +117,7 @@ for (const topic of curriculum) {
         }
         seen.add(key);
         if (!key || item.ans == null || !item.steps?.length
-            || (item.choices && (new Set(item.choices.map(visible)).size !== item.choices.length
+            || (item.choices && (new Set(item.choices.map(optionText)).size !== item.choices.length
                 || item.choices.filter(choice => check(item, choice) === true).length !== 1))) {
           invalidItems++;
           invalidExample ??= { question: visible(item.q), answer: item.ans, choices: item.choices,

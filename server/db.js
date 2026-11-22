@@ -108,6 +108,22 @@ if (!db.prepare("PRAGMA table_info(parents)").all().some((c) => c.name === "akse
   )`);
 }
 
+// Toko Avatar orang tua (aturan sama dengan anak): saldo bintang, aksesori yang dimiliki, dan avatar yang dibeli.
+// Aksesori yang sudah dipakai orang tua sebelum toko ini ada dianggap sudah dimiliki.
+{
+  const cols = db.prepare("PRAGMA table_info(parents)").all().map((c) => c.name);
+  if (!cols.includes("bintang")) db.exec("ALTER TABLE parents ADD COLUMN bintang INTEGER NOT NULL DEFAULT 0");
+  if (!cols.includes("aksesori_punya")) {
+    db.exec("ALTER TABLE parents ADD COLUMN aksesori_punya TEXT NOT NULL DEFAULT ''");
+    db.exec("UPDATE parents SET aksesori_punya = aksesori_pakai");
+  }
+  db.exec(`CREATE TABLE IF NOT EXISTS parent_avatar (
+    parent_id INTEGER NOT NULL REFERENCES parents(id) ON DELETE CASCADE,
+    avatar TEXT NOT NULL,
+    PRIMARY KEY (parent_id, avatar)
+  )`);
+}
+
 // Kolom negara dan kelas anak (diisi orang tua; 0 = kelas belum diisi).
 {
   const cols = db.prepare("PRAGMA table_info(children)").all().map((c) => c.name);

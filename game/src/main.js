@@ -1,5 +1,5 @@
 import { Vector3, Scalar, PointerEventTypes } from "@babylonjs/core";
-import { aturPoseBelajar, createArena, createAvatar, disposeAvatar, moveWithCollision, showBubble } from "./arena.js";
+import { aturPoseBelajar, aturStatusKerja, createArena, createAvatar, disposeAvatar, moveWithCollision, showBubble } from "./arena.js";
 import { JARAK_INTERAKSI_BIMBEL } from "../../shared/kursi-bimbel.js";
 import { SocialUI } from "./social-ui.js";
 import {
@@ -12,7 +12,11 @@ import { setupLogin } from "./login.js";
 import { KartuUI } from "./kartu-ui.js";
 import { ChessUI } from "./chess-ui.js";
 import { ScrambleUI } from "./scramble-ui.js";
+import { pasangPapanKata } from "./papan-kata.js";
+import { pasangOtello } from "./otello-ui.js";
 import { TokoUI } from "./toko-ui.js";
+import { siapkanMentor } from "./mentor-arena.js";
+import { api, reportResult } from "./api.js";
 
 const $ = (id) => document.getElementById(id);
 const SPEED = 5.5; // meter per detik
@@ -84,6 +88,7 @@ async function start(profile, playingAs) {
     baru.root.position.copyFrom(lama.root.position);
     baru.root.rotation.copyFrom(lama.root.rotation);
     aturPoseBelajar(baru, lama.duduk);
+    aturStatusKerja(baru, lama.pekerjaan);
     disposeAvatar(lama);   // material bersama tidak ikut dibuang
     return baru;
   }
@@ -97,10 +102,28 @@ async function start(profile, playingAs) {
   let tabBelajar = null;
   let pantauTabBelajar;
   let menungguKursi = false;
+  let batasWaktuKursi;
+
+  function selesaiMenungguKursi() {
+    clearTimeout(batasWaktuKursi);
+    menungguKursi = false;
+  }
+
+  function berdiriDariKursi() {
+    selesaiMenungguKursi();
+    keys.clear();
+    room?.send("belajar-bimbel", false);
+  }
+
   window.addEventListener("keydown", (e) => {
     if (e.target.tagName === "INPUT") return;
-    keys.add(e.key.toLowerCase());
-    if (e.key.toLowerCase() === "e" && !uiOpen && !me.duduk && !menungguKursi && nearTable) useTable(nearTable);
+    const key = e.key.toLowerCase();
+    keys.add(key);
+    if (e.repeat || uiOpen) return;
+    if ((key === "e" || key === "escape") && (me.duduk || menungguKursi)) {
+      e.preventDefault();
+      berdiriDariKursi();
+    } else if (key === "e" && nearTable) useTable(nearTable);
   });
   window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
   window.addEventListener("blur", () => keys.clear());
@@ -113,19 +136,58 @@ async function start(profile, playingAs) {
     ry: +me.root.rotation.y.toFixed(2),
   });
   const others = new Map();
+  const pekerjaKeluarga = new Map();
+  let hasilKerjaKeluarga = [];
+  let memuatKerjaKeluarga = false;
+
+  function gambarPekerjaKeluarga() {
+    const online = new Set(room ? [...others.values()].map(({ p }) => p.uid) : []);
+    const tampil = hasilKerjaKeluarga.filter((p) => !online.has(p.uid));
+    for (const [uid, av] of pekerjaKeluarga) {
+      if (tampil.some((p) => p.uid === uid && p.pekerjaan === av.pekerjaan)) continue;
+      disposeAvatar(av);
+      pekerjaKeluarga.delete(uid);
+    }
+    for (const p of tampil) {
+      if (pekerjaKeluarga.has(p.uid)) continue;
+      const av = createAvatar(scene, { ...p, role: "ortu", jenjang: "Orang tua", color: "#5b6b7c" });
+      const ibu = p.peran === "ibu";
+      if (p.pekerjaan === "sawah") av.root.position.set(ibu ? -22 : -25, 0, -12.7);
+      else av.root.position.set(ibu ? -22.2 : -25.3, 0, 4.65);
+      aturStatusKerja(av, p.pekerjaan);
+      pekerjaKeluarga.set(p.uid, av);
+    }
+  }
+
+  async function muatPekerjaKeluarga() {
+    if (memuatKerjaKeluarga) return;
+    memuatKerjaKeluarga = true;
+    try {
+      const { bekerja } = await api("GET", `kantor/keluarga?sebagai=${playingAs}`);
+      hasilKerjaKeluarga = bekerja;
+      gambarPekerjaKeluarga();
+    } catch {
+      hasilKerjaKeluarga = [];
+      gambarPekerjaKeluarga();
+    } finally {
+      memuatKerjaKeluarga = false;
+    }
+  }
   try {
     if (!playingAs) throw new Error("tamu");
     room = await joinArena();
     room.onMessage("waktu-hampir", (m) => toast(`Waktu bermain tinggal ${m} menit lagi.`));
     room.onMessage("waktu-habis", (m) => timeUp(m));
     room.onMessage("kursi-bimbel-gagal", (pesan) => {
-      menungguKursi = false;
+      selesaiMenungguKursi();
       toast(pesan);
     });
     $("hud-status").textContent = "Online";
     room.state.players.onAdd((p, id) => {
       if (id === room.sessionId) {
         me.root.position.set(p.x, 0, p.z);
+        aturStatusKerja(me, p.pekerjaan || "");
+        p.listen("pekerjaan", (pekerjaan) => aturStatusKerja(me, pekerjaan));
         // Aksesori atau aura sendiri berubah di server (mis. naik level di Ruang Pintar): perbarui figur.
         const cocokkan = () => {
           if (p.avatar === profile.avatar && (p.aksesori || "") === (profile.aksesori || "") && (p.aura || "") === (profile.aura || "")) return;
@@ -139,26 +201,30 @@ async function start(profile, playingAs) {
         p.listen("aura", cocokkan);
         p.listen("kursiBimbel", (kursi, sebelumnya) => {
           if (!kursi && !sebelumnya) return;
-          menungguKursi = false;
+          selesaiMenungguKursi();
           me.root.position.set(p.x, 0, p.z);
           me.root.rotation.y = p.ry;
           aturPoseBelajar(me, Boolean(kursi));
         });
         return;
       }
-      const opsi = () => ({ name: p.name, jenjang: p.jenjang, negara: p.negara, kelas: p.kelas, kurikulum: p.kurikulum, color: p.color, avatar: p.avatar, aksesori: p.aksesori, aura: p.aura, sid: id });
+      const opsi = () => ({ name: p.name, jenjang: p.jenjang, role: p.jenjang === "Orang tua" ? "ortu" : "anak", negara: p.negara, kelas: p.kelas, kurikulum: p.kurikulum, color: p.color, avatar: p.avatar, aksesori: p.aksesori, aura: p.aura, sid: id });
       const o = { av: createAvatar(scene, opsi()), p };
       o.av.root.position.set(p.x, 0, p.z);
+      aturStatusKerja(o.av, p.pekerjaan || "");
       others.set(id, o);
+      gambarPekerjaKeluarga();
       // Pemain lain mengganti aksesori di Toko atau naik ke aura baru: buat ulang avatarnya.
       const ganti = () => { if (others.get(id) === o) o.av = gantiAvatar(o.av, opsi()); };
       p.listen("aksesori", (v, lama) => { if (lama !== undefined) ganti(); });
       p.listen("avatar", (v, lama) => { if (lama !== undefined) ganti(); });
       p.listen("aura", (v, lama) => { if (lama !== undefined) ganti(); });
+      p.listen("pekerjaan", (pekerjaan) => aturStatusKerja(o.av, pekerjaan));
     });
     room.state.players.onRemove((_, id) => {
       const o = others.get(id);
       if (o) { disposeAvatar(o.av); others.delete(id); }
+      gambarPekerjaKeluarga();
     });
     if (playingAs === "anak") {
       let terakhir = 0;
@@ -172,8 +238,12 @@ async function start(profile, playingAs) {
     }
     room.onLeave((code) => {
       room = null;
-      menungguKursi = false;
+      for (const { av } of others.values()) disposeAvatar(av);
+      others.clear();
+      gambarPekerjaKeluarga();
+      selesaiMenungguKursi();
       aturPoseBelajar(me, false);
+      aturStatusKerja(me, "");
       $("hud-status").textContent = "Offline";
       if (code !== 4000) toast("Koneksi ke server terputus.");
     });
@@ -185,6 +255,11 @@ async function start(profile, playingAs) {
     if (room) $("hud-status").textContent = `Online · ${others.size + 1} pemain di arena`;
   };
   setInterval(updateCount, 1000);
+  if (playingAs === "anak" || playingAs === "ortu") {
+    muatPekerjaKeluarga();
+    setInterval(muatPekerjaKeluarga, 5000);
+    window.addEventListener("focus", muatPekerjaKeluarga);
+  }
 
   // ---------- Catur ----------
   const chessUI = new ChessUI({ onClose: () => (uiOpen = false) });
@@ -223,6 +298,9 @@ async function start(profile, playingAs) {
 
   // ---------- Scramble ----------
   const scrambleUI = new ScrambleUI({ onClose: () => (uiOpen = false) });
+  const mulaiPapanKata = pasangPapanKata($("papan-kata-panel"), () => (uiOpen = false), (p, hasil, poin) => {
+    if (p.role === "anak") reportResult("scramble", "bot", { win: "menang", loss: "kalah", draw: "seri" }[hasil], poin);
+  });
   const sMenu = $("scramble-menu");
   let scrLang = "ID";
   const sError = (t) => {
@@ -245,6 +323,7 @@ async function start(profile, playingAs) {
     }
     const mode = btn.dataset.mode;
     if (mode === "tutup") { sMenu.hidden = true; uiOpen = false; return; }
+    if (mode === "papan-kata") { sMenu.hidden = true; mulaiPapanKata(profile, scrLang); return; }
     if (mode === "bot") { $("scr-bot-levels").hidden = false; return; }
     sError("");
     try {
@@ -347,7 +426,26 @@ async function start(profile, playingAs) {
     });
   }
 
+  const bukaMentor = siapkanMentor(() => { uiOpen = false; keys.clear(); });
+  const bukaOtello = pasangOtello($("otello-panel"), () => { uiOpen = false; keys.clear(); });
   function useTable(t) {
+    if (t.id === "otello") {
+      uiOpen = true;
+      keys.clear();
+      bukaOtello();
+      return;
+    }
+    if (t.id === "mentor") {
+      uiOpen = true;
+      keys.clear();
+      bukaMentor();
+      return;
+    }
+    if (t.id === "kantor" || t.id === "sawah") {
+      if (playingAs !== "ortu") return toast("Pekerjaan ini khusus untuk Ayah dan Ibu.");
+      bukaKantor(t.id);
+      return;
+    }
     if (t.id === "toko") {
       if (playingAs !== "anak") return toast("Toko Avatar khusus untuk akun anak.");
       uiOpen = true;
@@ -358,23 +456,23 @@ async function start(profile, playingAs) {
     if (t.id === "bimbel") {
       if (tabBelajar && !tabBelajar.closed) {
         tabBelajar.focus();
-        return;
+      } else {
+        tabBelajar = window.open("/bimbel/index.html", "_blank");
+        if (!tabBelajar) return toast("Izinkan tab baru untuk membuka Ruang Pintar.");
+        tabBelajar.opener = null;
       }
-      tabBelajar = window.open("/bimbel/index.html", "_blank");
-      if (!tabBelajar) return toast("Izinkan tab baru untuk membuka Ruang Pintar.");
-      tabBelajar.opener = null;
       if (playingAs !== "anak" || !room) return;
       keys.clear();
       menungguKursi = true;
       room.send("move", posisiPemain());
       room.send("belajar-bimbel", true);
+      batasWaktuKursi = setTimeout(berdiriDariKursi, 4000);
       clearInterval(pantauTabBelajar);
       pantauTabBelajar = setInterval(() => {
         if (!tabBelajar.closed) return;
         clearInterval(pantauTabBelajar);
         tabBelajar = null;
-        menungguKursi = false;
-        room?.send("belajar-bimbel", false);
+        if (me.duduk || menungguKursi) berdiriDariKursi();
       }, 500);
       return;
     }
@@ -402,6 +500,76 @@ async function start(profile, playingAs) {
       toast(`${t.label} segera hadir!`);
     }
   }
+
+  const kantorPanel = $("kantor-panel");
+  const kantorAksi = $("kantor-aksi");
+  const kantorPesan = $("kantor-pesan");
+  let kantorStatus = null;
+  let kantorSelesai = 0;
+  let kantorTimer;
+  let kantorMemuat = false;
+  let tempatKerja = "kantor";
+
+  function tampilKantor() {
+    const sisa = Math.max(0, Math.ceil((kantorSelesai - performance.now()) / 1000));
+    const batas = kantorStatus && kantorStatus.hariIni + kantorStatus.hadiah > kantorStatus.batasHarian;
+    kantorAksi.disabled = kantorMemuat || sisa > 0 || Boolean(batas);
+    $("kantor-saldo").textContent = kantorStatus ? `★ ${kantorStatus.bintang} bintang` : "";
+    if (!kantorStatus) {
+      $("kantor-status").textContent = kantorMemuat ? "Memuat sesi kerja…" : "";
+      kantorAksi.textContent = "Coba lagi";
+    } else if (batas) {
+      $("kantor-status").textContent = `Batas ${kantorStatus.batasHarian} bintang kerja hari ini sudah tercapai.`;
+    } else if (kantorStatus.sisaMs === null) {
+      $("kantor-status").textContent = `Bekerja selama ${kantorStatus.durasi / 3600} jam untuk mendapat ${kantorStatus.hadiah} bintang.`;
+      kantorAksi.textContent = tempatKerja === "sawah" ? "Mulai bertani" : "Mulai bekerja";
+    } else {
+      const waktu = [Math.floor(sisa / 3600), Math.floor(sisa / 60) % 60, sisa % 60].map((n) => String(n).padStart(2, "0")).join(":");
+      $("kantor-status").textContent = sisa ? `Sedang bekerja · ${waktu} tersisa` : "Sesi kerja selesai.";
+      kantorAksi.textContent = `Ambil ${kantorStatus.hadiah} bintang`;
+    }
+  }
+
+  async function muatKantor(aksi) {
+    if (kantorMemuat) return;
+    kantorMemuat = true;
+    kantorPesan.hidden = true;
+    tampilKantor();
+    try {
+      kantorStatus = await (aksi ? api("POST", `kantor/${aksi}`, aksi === "mulai" ? { pekerjaan: tempatKerja } : {}) : api("GET", "kantor"));
+      kantorSelesai = performance.now() + (kantorStatus.sisaMs ?? 0);
+      if (aksi === "ambil") {
+        kantorPesan.textContent = `${kantorStatus.hadiah} bintang masuk ke saldo.`;
+        kantorPesan.hidden = false;
+      }
+    } catch (err) {
+      kantorStatus = null;
+      kantorSelesai = 0;
+      kantorPesan.textContent = err.message;
+      kantorPesan.hidden = false;
+    } finally {
+      kantorMemuat = false;
+      tampilKantor();
+    }
+  }
+
+  function bukaKantor(tempat) {
+    uiOpen = true;
+    keys.clear();
+    tempatKerja = tempat;
+    $("kantor-judul").textContent = tempat === "sawah" ? "Pekerjaan pertanian" : "Kantor Ayah dan Ibu";
+    kantorPanel.hidden = false;
+    $("kantor-tutup").focus();
+    kantorTimer = setInterval(tampilKantor, 250);
+    muatKantor();
+  }
+  kantorAksi.onclick = () => muatKantor(kantorStatus && (kantorStatus.sisaMs === null ? "mulai" : "ambil"));
+  $("kantor-tutup").onclick = () => {
+    clearInterval(kantorTimer);
+    kantorPanel.hidden = true;
+    uiOpen = false;
+  };
+
   // Toko Aksesori: setelah beli/pakai/lepas, avatar sendiri dibuat ulang dan server diminta
   // membaca ulang aksesori dari database supaya pemain lain ikut melihat.
   const toko = new TokoUI({
@@ -415,16 +583,20 @@ async function start(profile, playingAs) {
     },
   });
 
-  // ---------- Kembali ke dashboard anak ----------
-  if (playingAs === "anak") {
+  // ---------- Kembali ke dashboard sesuai akun ----------
+  if (playingAs === "anak" || playingAs === "ortu") {
     $("social-btns").hidden = false;
     $("btn-dashboard").hidden = false;
-    $("btn-dashboard").onclick = () => (location.href = "/anak.html");
-    if (!social) { $("btn-chat").hidden = true; $("btn-teman").hidden = true; }
+    $("btn-dashboard").onclick = () => (location.href = playingAs === "ortu" ? "/orangtua.html" : "/anak.html");
+    if (playingAs === "ortu" || !social) { $("btn-chat").hidden = true; $("btn-teman").hidden = true; }
   }
 
   let nearTable = null;
-  $("action-btn").onclick = () => nearTable && !uiOpen && useTable(nearTable);
+  $("action-btn").onclick = () => {
+    if (uiOpen) return;
+    if (me.duduk || menungguKursi) berdiriDariKursi();
+    else if (nearTable) useTable(nearTable);
+  };
 
   // ---------- Loop per frame ----------
   let sendTimer = 0;
@@ -488,12 +660,21 @@ async function start(profile, playingAs) {
 
     // Meja terdekat
     nearTable = null;
+    let jarakTerdekat = Infinity;
     for (const t of tables) {
       const jarak = t.id === "bimbel" ? JARAK_INTERAKSI_BIMBEL : 2.6;
-      if (Math.hypot(pos.x - t.x, pos.z - t.z) < jarak) { nearTable = t; break; }
+      const jarakMeja = Math.hypot(pos.x - t.x, pos.z - t.z);
+      if (jarakMeja < jarak && jarakMeja < jarakTerdekat) {
+        nearTable = t;
+        jarakTerdekat = jarakMeja;
+      }
     }
     const btn = $("action-btn");
-    if (nearTable && !uiOpen && !me.duduk && !menungguKursi) {
+    if (!uiOpen && (me.duduk || menungguKursi)) {
+      const label = me.duduk ? "Berdiri" : "Batal duduk";
+      btn.textContent = matchMedia("(pointer: coarse)").matches ? label : `${label} [E]`;
+      btn.hidden = false;
+    } else if (nearTable && !uiOpen) {
       const label = nearTable.action ? nearTable.action : nearTable.ready ? `Main ${nearTable.label}` : `${nearTable.label} (segera hadir)`;
       btn.textContent = matchMedia("(pointer: coarse)").matches ? label : `${label} [E]`;
       btn.hidden = false;

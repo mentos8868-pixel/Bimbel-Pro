@@ -111,12 +111,9 @@ function tree(scene, x, z, s = 1) {
   top.material = mat(scene, "#3e9b4f");
 }
 
-function chessTable(scene, x, z, walls) {
-  const leg = MeshBuilder.CreateCylinder("leg", { height: 0.8, diameter: 0.3, tessellation: 8 }, scene);
-  leg.position.set(x, 0.4, z);
-  leg.material = mat(scene, "#6d5036");
-  const top = MeshBuilder.CreateBox("chessTop", { width: 1.8, height: 0.12, depth: 1.8 }, scene);
-  top.position.set(x, 0.86, z);
+function papanCatur(scene, x, z) {
+  const board = MeshBuilder.CreateGround("papanCatur", { width: 1.42, height: 1.42 }, scene);
+  board.position.set(x, 1.023, z);
   const tex = new DynamicTexture("chessTex", { width: 256, height: 256 }, scene, false);
   const ctx = tex.getContext();
   for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
@@ -126,18 +123,31 @@ function chessTable(scene, x, z, walls) {
   tex.update();
   const m = new StandardMaterial("chessMat", scene);
   m.diffuseTexture = tex;
-  top.material = m;
-  walls.push({ minX: x - 0.9, maxX: x + 0.9, minZ: z - 0.9, maxZ: z + 0.9 });
+  board.material = m;
 }
 
-function plainTable(scene, x, z, color, walls) {
-  const leg = MeshBuilder.CreateCylinder("leg", { height: 0.8, diameter: 0.3, tessellation: 8 }, scene);
-  leg.position.set(x, 0.4, z);
-  leg.material = mat(scene, "#6d5036");
-  const top = MeshBuilder.CreateCylinder("tableTop", { height: 0.12, diameter: 1.9, tessellation: 16 }, scene);
-  top.position.set(x, 0.86, z);
-  top.material = mat(scene, color);
-  walls.push({ minX: x - 0.95, maxX: x + 0.95, minZ: z - 0.95, maxZ: z + 0.95 });
+function mejaPertandingan(scene, { id, x, z, warna, pemain }, walls) {
+  const rangka = "#344057";
+  box(scene, "mejaPertandingan", { w: 1.95, h: 0.13, d: 1.75, x, y: 0.955, z, color: rangka, walls });
+  box(scene, "permukaanMeja", { w: 1.81, h: 0.035, d: 1.61, x, y: 1.004, z, color: warna });
+  for (const dx of [-0.79, 0.79]) for (const dz of [-0.69, 0.69]) {
+    box(scene, "kakiMejaGame", { w: 0.13, h: 0.8, d: 0.13, x: x + dx, y: 0.5, z: z + dz, color: rangka });
+  }
+  if (id === "catur") papanCatur(scene, x, z);
+
+  const sisi = [[-1, 0], [1, 0]];
+  if (pemain === 4) sisi.push([0, -1], [0, 1]);
+  for (const [dx, dz] of sisi) {
+    const cx = x + dx * 1.57;
+    const cz = z + dz * 1.46;
+    box(scene, "dudukanGame", { w: 0.64, h: 0.1, d: 0.64, x: cx, y: 0.51, z: cz, color: warna, walls });
+    // Sandaran di sisi luar agar semua kursi menghadap meja.
+    box(scene, "sandaranGame", { w: dx ? 0.09 : 0.64, h: 0.54, d: dz ? 0.09 : 0.64,
+      x: cx + dx * 0.275, y: 0.81, z: cz + dz * 0.275, color: warna });
+    for (const kx of [-0.24, 0.24]) for (const kz of [-0.24, 0.24]) {
+      box(scene, "kakiKursiGame", { w: 0.08, h: 0.36, d: 0.08, x: cx + kx, y: 0.28, z: cz + kz, color: rangka });
+    }
+  }
 }
 
 // ---------- Ruang kelas (Ruang Bimbel) ----------
@@ -315,7 +325,7 @@ export function createArena(canvas) {
   const plaza = MeshBuilder.CreateCylinder("plaza", { diameter: 16, height: 0.06, tessellation: 48 }, scene);
   plaza.position.y = 0.03;
   plaza.material = mat(scene, "#e8dcc2");
-  const plazaSign = makeSign(scene, ["Alun-alun", "Bimbel ke utara · Game ke timur"], { width: 5, height: 1.5 });
+  const plazaSign = makeSign(scene, ["Alun-alun", "Bimbel utara · Game timur · Kantor barat"], { width: 6, height: 1.5 });
   plazaSign.position.set(0, 3, 0);
   // Kios Toko Avatar di sisi barat laut alun-alun (terlihat dari tempat muncul).
   const kios = kiosToko(scene, -5, 4.6, walls);
@@ -334,29 +344,62 @@ export function createArena(canvas) {
   const studyDesk = ruangKelas(scene, walls);
 
   // Ruang Game (timur)
-  room(scene, walls, { cx: 25, cz: 0, w: 14, d: 18, door: "w", floor: "#e3efff", wall: "#4f9cf0" });
+  room(scene, walls, { cx: 25, cz: 0, w: 14, d: 32, door: "w", floor: "#e3efff", wall: "#4f9cf0" });
   const gameSign = makeSign(scene, ["Ruang Game"], { width: 4.5, height: 1.2, bg: "#4f9cf0", fg: "#ffffff" });
   gameSign.position.set(17.6, 3.2, 0);
 
-  const tables = [
-    { id: "catur", x: 27, z: -5, label: "Catur", ready: true },
-    { id: "scramble", x: 27, z: 0, label: "Scramble", ready: true },
-    { id: "kartu", x: 27, z: 5, label: "Kartu Kilat", ready: true },
+  const jenisGame = [
+    { id: "catur", label: "Catur", warna: "#c99563", pemain: 2, baris: [-12.5, -7.5] },
+    { id: "scramble", label: "Scramble Words", warna: "#9b7bd8", pemain: 4, baris: [-2.5, 2.5] },
+    { id: "kartu", label: "Kartu Kilat", warna: "#ef6f5e", pemain: 4, baris: [7.5] },
+    { id: "otello", label: "Otello", warna: "#31877f", pemain: 2, baris: [12.5] },
   ];
-  chessTable(scene, tables[0].x, tables[0].z, walls);
-  plainTable(scene, tables[1].x, tables[1].z, "#9b7bd8", walls);
-  plainTable(scene, tables[2].x, tables[2].z, "#ef6f5e", walls);
+  const tables = jenisGame.flatMap(({ baris, ...game }) =>
+    baris.flatMap((z) => [21.8, 28.2].map((x) => ({ ...game, x, z, ready: true }))));
   for (const t of tables) {
-    const s = makeSign(scene, t.ready ? [t.label] : [t.label, "Segera hadir"], { width: 2.6, height: t.ready ? 0.7 : 1 });
+    mejaPertandingan(scene, t, walls);
+    const s = makeSign(scene, t.ready ? [t.label] : [t.label, "Segera hadir"], { width: t.id === "scramble" ? 3.2 : 2.6, height: t.ready ? 0.7 : 1 });
     s.position.set(t.x, 2.3, t.z);
   }
 
-  // Lahan cadangan (barat dan selatan)
-  for (const [x, z] of [[-24, 0], [0, -24]]) {
-    box(scene, "plot", { w: 12, h: 0.05, d: 12, x, y: 0.025, z, color: "#d9c7a0" });
-    const s = makeSign(scene, ["Lahan cadangan"], { width: 3.6, height: 0.9, bg: "#f7f1e3" });
-    s.position.set(x, 1.6, z);
+  // Kantor di lahan barat. Pintu timur menghadap jalan dari alun-alun.
+  room(scene, walls, { cx: -24.5, cz: 0, w: 16, d: 16, door: "e", floor: "#e8f4ed", wall: "#387b70" });
+  const kantorSign = makeSign(scene, ["Kantor", "Ayah dan Ibu"], { width: 4.5, height: 1.35, bg: "#245d56", fg: "#ffffff" });
+  kantorSign.position.set(-16.5, 3.1, 0);
+  // Partisi menyisakan pintu selebar 2,4 meter di tengah lorong.
+  for (const z of [-4.6, 4.6]) {
+    box(scene, "partisiManajer", { w: 0.24, h: 1.45, d: 6.8, x: -27.4, z, color: "#538980", walls });
   }
+  const papanManajer = makeSign(scene, ["Ruang Manajer"], { width: 2.8, height: 0.7, bg: "#245d56", fg: "#ffffff" });
+  papanManajer.position.set(-27.4, 2.3, 0);
+  const mejaKantor = [-4.6, 2, 5.6].flatMap(z => [-25.3, -22.2, -19.1].map(x => ({ x, z })));
+  mejaKantor.push({ x: -30, z: 1.5, manajer: true });
+  for (const meja of mejaKantor) {
+    const { x, z, manajer } = meja;
+    mejaMurid(scene, x, z, manajer ? "#324664" : "#387b70", walls);
+    box(scene, "monitorKantor", { w: 0.55, h: 0.36, d: 0.075, x, y: 1.08, z: z + 0.23, color: "#293c4c" });
+    box(scene, "layarKantor", { w: 0.47, h: 0.28, d: 0.02, x, y: 1.08, z: z + 0.185, color: "#80c9c1" });
+    box(scene, "dudukanMonitor", { w: 0.19, h: 0.12, d: 0.12, x, y: 0.84, z: z + 0.23, color: "#293c4c" });
+    meja.id = "kantor";
+    meja.action = manajer ? "Bekerja di meja manajer" : "Bekerja di meja kantor";
+  }
+
+  const sawah = { id: "sawah", x: -19.7, z: -13, action: "Bekerja di sawah" };
+  box(scene, "sawah-tanah", { w: 12, h: 0.09, d: 8, x: -24, y: 0.045, z: -14, color: "#a18051" });
+  const papanSawah = makeSign(scene, ["Sawah", "Pertanian"], { width: 3.1, height: 1.05, bg: "#345e36", fg: "#fff8d9" });
+  papanSawah.position.set(-18, 2.2, -13);
+  for (const z of [-16.5, -14, -11.5]) {
+    box(scene, "petak-sawah", { w: 8.2, h: 0.035, d: 1.65, x: -24.7, y: 0.09, z, color: "#609b87" });
+    for (let i = 0; i < 10; i++) {
+      for (const sisi of [-1, 1]) {
+        box(scene, "bibit-padi", { w: 0.09, h: 0.33, d: 0.09, x: -28.1 + i * 0.75, y: 0.24, z: z + sisi * 0.42, color: sisi === 1 ? "#76ad3f" : "#a1c951" });
+      }
+    }
+  }
+
+  box(scene, "plot", { w: 12, h: 0.05, d: 12, x: 0, y: 0.025, z: -24, color: "#d9c7a0" });
+  const cadangan = makeSign(scene, ["Lahan cadangan"], { width: 3.6, height: 0.9, bg: "#f7f1e3" });
+  cadangan.position.set(0, 1.6, -24);
 
   // Pepohonan di pinggir arena
   for (let i = 0; i < 28; i++) {
@@ -368,7 +411,11 @@ export function createArena(canvas) {
   for (const [x, z] of [[-9, 9], [9, 9], [-9, -9], [9, -9]]) walls.push({ minX: x - 0.3, maxX: x + 0.3, minZ: z - 0.3, maxZ: z + 0.3 });
 
   window.addEventListener("resize", () => engine.resize());
-  return { engine, scene, camera, walls, tables: [...tables, studyDesk, kios] };
+  const mentor = { id: "mentor", x: -5, z: -3, action: "Bicara dengan Elon Musk (bot)" };
+  const bot = createAvatar(scene, { name: "Elon Musk", jenjang: "Bot simulasi", avatar: "manusia-ayah", color: "#39465f" });
+  bot.root.position.set(mentor.x, 0, mentor.z);
+  bot.root.rotation.y = Math.PI / 3;
+  return { engine, scene, camera, walls, tables: [...tables, studyDesk, kios, mentor, ...mejaKantor, sawah] };
 }
 
 // Gelembung chat di atas kepala avatar (hilang setelah 5 detik).
@@ -376,10 +423,16 @@ export function showBubble(scene, avatar, text) {
   avatar.bubble?.dispose(false, true);
   const lines = [];
   let cur = "";
-  for (const w of text.split(" ")) {
-    if ((cur + " " + w).trim().length > 22) { lines.push(cur.trim()); cur = w; } else cur += " " + w;
+  for (const w of text.trim().split(/\s+/)) {
+    const joined = cur ? `${cur} ${w}` : w;
+    if (cur && joined.length > 22) {
+      lines.push(cur);
+      cur = w;
+    } else {
+      cur = joined;
+    }
   }
-  if (cur.trim()) lines.push(cur.trim());
+  if (cur) lines.push(cur);
   const shown = lines.slice(0, 3);
   const b = makeSign(scene, shown, { width: 2.6, height: 0.42 * shown.length + 0.25, bg: "#fffbe6", fg: "#1f2a37" });
   b.position.y = (avatar.height ?? 2.2) + 0.65 + shown.length * 0.2;
@@ -394,20 +447,38 @@ export function showBubble(scene, avatar, text) {
 // sid (opsional) disimpan di mesh supaya avatar bisa diketuk untuk membuka profil.
 // body = simpul yang dinaikturunkan saat berjalan (posisi dasar y = 0).
 // Baris kedua papan nama: bendera negara + "Kelas N" (anak), atau jenjang bila kelas belum diisi.
-export function createAvatar(scene, { color, avatar, aksesori = "", aura = "", name, jenjang, negara = "", kelas = 0, kurikulum = "merdeka", sid }) {
+export function createAvatar(scene, { color, avatar, aksesori = "", aura = "", name, jenjang, negara = "", kelas = 0, kurikulum = "merdeka", sid, role }) {
   const root = new TransformNode("avatar", scene);
-  const { bob, meshes, height, kaki } = buildAvatar3d(scene, root, avatar, color, aksesori, aura);
+  const ortu = role === "ortu";
+  const { bob, meshes, height, kaki, laptop, cangkul } = buildAvatar3d(scene, root, avatar, color, aksesori, aura, ortu);
   const sub = kelas ? namaKelas(kelas, kurikulum, true) : jenjang;
   const tag = makeSign(scene, [name, sub], { width: 1.8, height: 0.6, bg: "rgba(255,255,255,0.9)", flag: negara });
   tag.position.y = height + 0.3;
   tag.parent = root;
   tag.billboardMode = Mesh.BILLBOARDMODE_ALL;
   if (sid) for (const m of meshes) m.metadata = { sid };
-  const statusBelajar = makeSign(scene, ["Sedang belajar"], { width: 1.8, height: 0.34, bg: "#dff6e8", fg: "#205d39" });
-  statusBelajar.parent = tag;
-  statusBelajar.position.y = 0.48;
-  statusBelajar.setEnabled(false);
-  return { root, body: bob, height, kaki, statusBelajar, duduk: false };
+  const statusAktivitas = makeSign(scene, [ortu ? "Sedang bekerja" : "Sedang belajar"], {
+    width: 1.8, height: 0.34, bg: ortu ? "#e4efff" : "#dff6e8", fg: ortu ? "#204e8a" : "#205d39",
+  });
+  statusAktivitas.parent = tag;
+  statusAktivitas.position.y = 0.48;
+  statusAktivitas.setEnabled(false);
+  const statusSawah = ortu ? makeSign(scene, ["Bekerja di sawah"], { width: 1.8, height: 0.34, bg: "#e5f4da", fg: "#345e36" }) : null;
+  if (statusSawah) {
+    statusSawah.parent = tag;
+    statusSawah.position.y = 0.48;
+    statusSawah.setEnabled(false);
+  }
+  return { root, body: bob, height, kaki, laptop, cangkul, statusAktivitas, statusSawah, duduk: false, pekerjaan: "" };
+}
+
+export function aturStatusKerja(av, pekerjaan) {
+  if (av.pekerjaan === pekerjaan) return;
+  av.pekerjaan = pekerjaan;
+  av.statusAktivitas.setEnabled(pekerjaan === "kantor");
+  av.statusSawah?.setEnabled(pekerjaan === "sawah");
+  av.laptop?.setEnabled(pekerjaan === "kantor");
+  av.cangkul?.setEnabled(pekerjaan === "sawah");
 }
 
 export function aturPoseBelajar(av, duduk) {
@@ -418,7 +489,7 @@ export function aturPoseBelajar(av, duduk) {
     kaki.position.z = duduk ? 0.47 : 0.12;
     kaki.position.y = duduk ? 0.14 : 0.06;
   }
-  av.statusBelajar.setEnabled(duduk);
+  av.statusAktivitas.setEnabled(duduk);
 }
 
 // Buang avatar (figur, papan nama, gelembung chat) tanpa menghapus material warna bersama

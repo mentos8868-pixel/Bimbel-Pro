@@ -2,7 +2,8 @@
 import { api } from "./api.js";
 import { pasangSuara } from "./chat-suara.js";
 import { gelembungChat, kotakPesanChat } from "./chat-tampilan.js";
-import { avatarPicker } from "./avatar-picker.js";
+import { avatarPicker, anggotaDari } from "./avatar-picker.js";
+import { katalogAvatar } from "./katalog-avatar.js";
 import { AVATAR_AWAL_ANAK, DEFAULT_ORTU_AVATAR } from "../../shared/avatars.js";
 import { avatarSvg } from "./avatar-svg.js";
 import { AKSESORI, SLOT } from "../../shared/aksesori.js";
@@ -36,7 +37,7 @@ function fillKelasNegara(root, kelas, negara, kurikulum = "") {
 }
 const kelasText = (c) => `${kurikulumName(c.kurikulum)} · ${c.kelas ? namaKelas(c.kelas, c.kurikulum) : c.jenjang} · ${negaraName(c.negara)}`;
 const COLORS = ["#4f9cf0", "#ef6f5e", "#f2b134", "#3e9b4f", "#9b7bd8", "#ec7fb5"];
-const GAME_NAME = { catur: "Catur", scramble: "Scramble", kartu: "Kartu Kilat" };
+const GAME_NAME = { catur: "Catur", scramble: "Scramble Words", kartu: "Kartu Kilat" };
 const OUTCOME = { menang: "menang", kalah: "kalah", seri: "seri" };
 const HARI = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 
@@ -130,7 +131,11 @@ $("form-atur").addEventListener("submit", async (e) => {
     showAuth("masuk");
     await load();
 // Tanda pesan baru di menu Chat diperbarui tiap 30 detik.
-setInterval(() => { if (!$("dash").hidden && !document.hidden) segarkanBelum().then(() => { if (hal === "home") gambarHome(); }); }, 30000);
+setInterval(() => {
+  if ($("dash").hidden || document.hidden) return;
+  segarkanBelum().then(() => { if (hal === "home") gambarHome(); });
+  if (hal === "home") muatKerja();
+}, 30000);
   } catch (x) { setErr(f, x.message); } finally { busy(f, false); }
 });
 
@@ -170,6 +175,22 @@ const PILIH_PERAN = [
 ];
 const peranDaftar = pilihKartu($("peran-daftar"), PILIH_PERAN, "");
 
+// Datang dari layar depan arena dengan kode undangan keluarga: orangtua.html#daftar=KODE&peran=ibu.
+// Formulir Daftar langsung dibuka dengan kode dan peran yang masih kosong sudah terisi.
+let kodeUndangan = "";
+{
+  const m = location.hash.match(/^#daftar=([A-Za-z0-9]{4,8})(?:&peran=(ayah|ibu))?$/);
+  if (m) {
+    kodeUndangan = m[1].toUpperCase();
+    history.replaceState(null, "", location.pathname);
+    showAuth("daftar");
+    const f = $("form-daftar");
+    f.kode.value = kodeUndangan;
+    f.querySelector(".kode-undangan").open = true;
+    if (m[2]) peranDaftar.set(m[2]);
+  }
+}
+
 $("form-daftar").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
@@ -180,6 +201,7 @@ $("form-daftar").addEventListener("submit", async (e) => {
   try {
     await api("POST", "daftar", { name: f.name.value, email: f.email.value, password: f.password.value, consent: true, peran: peranDaftar.get(), kode: f.kode.value });
     peranDaftar.set("");
+    kodeUndangan = "";
     f.reset();
     await load();
   } catch (x) { setErr(f, x.message); } finally { busy(f, false); }
@@ -319,7 +341,7 @@ function renderKid(c, soc) {
   dot.classList.add("av-face");
   dot.innerHTML = avatarSvg(c.avatar, c.color, { aksesori: c.aksesori, aura: c.aura });
   avatarPicker(el.querySelector(".av-edit-picker"), {
-    dimiliki: c.avatarPunya,
+    dimiliki: c.avatarPunya, anggota: anggotaDari(c.avatar),   // laki-laki/perempuan otomatis
     value: c.avatar, accent: c.color,
     onPick: async (avatar) => {
       setErr(el, "");
@@ -468,6 +490,7 @@ const HAL = {
   chat: ["Chat", "Pesan keluarga dan riwayat chat arena."],
   report: ["Report", "Waktu bermain dan kemajuan belajar."],
   avatar: ["Avatar", "Avatar Anda sendiri, dipakai saat bermain di arena."],
+  toko: ["Toko Avatar", "Beli karakter dan aksesori dengan bintang, sama seperti anak."],
   setting: ["Setting", "Data anak, batas waktu, PIN, dan akun Anda."],
 };
 // Menu yang isinya per anak (menampilkan pilihan anak di atas).
@@ -491,13 +514,67 @@ function terapkanHal() {
   if (hal === "tugas") gambarTugas();
   if (hal === "keuangan") gambarKeuangan();
   if (hal === "avatar") gambarAvatarOrtu();
-  if (hal === "home") gambarHome();
+  if (hal === "toko") gambarTokoOrtu();
+  if (hal === "home") { gambarHome(); muatKerja(); }
   if (hal === "chat") gambarChat();
   else { clearInterval(chatTimer); bersihkanSuara?.(); bersihkanSuara = null; }
   tandaChat();
 }
 // Kartu Home digambar ulang setiap kali dibuka, supaya angka tugas yang baru disetujui ikut berubah.
 let dataHome = { children: [], byId: {} };
+let kerja = null;
+let kerjaSelesai = 0;
+let kerjaMemuat = false;
+
+function tampilKerja() {
+  const tombol = $("kerja-aksi");
+  const sisa = Math.max(0, Math.ceil((kerjaSelesai - performance.now()) / 1000));
+  const batas = kerja && kerja.hariIni + kerja.hadiah > kerja.batasHarian;
+  const siap = kerja && kerja.sisaMs !== null;
+  const waktu = [Math.floor(sisa / 3600), Math.floor(sisa / 60) % 60, sisa % 60].map((n) => String(n).padStart(2, "0")).join(":");
+  $("kerja-status").textContent = !kerja ? (kerjaMemuat ? "Memuat sesi kerja…" : "")
+    : batas ? "Batas hadiah hari ini sudah tercapai."
+    : !siap ? "Siap mulai bekerja."
+    : sisa ? `Sedang bekerja · ${waktu} tersisa` : "Sesi selesai. Bintang siap diambil.";
+  $("kerja-kuota").textContent = kerja ? `★ ${kerja.hariIni}/${kerja.batasHarian} bintang kerja hari ini · Saldo ${kerja.bintang} bintang` : "";
+  tombol.disabled = kerjaMemuat || Boolean(batas) || sisa > 0;
+  tombol.textContent = !kerja ? "Coba lagi" : siap ? `Ambil ${kerja.hadiah} bintang` : "Mulai bekerja";
+}
+
+async function muatKerja(aksi) {
+  if (kerjaMemuat) return;
+  kerjaMemuat = true;
+  const pesan = $("kerja-pesan");
+  if (aksi || !kerja) pesan.hidden = true;
+  tampilKerja();
+  try {
+    kerja = await (aksi ? api("POST", `kantor/${aksi}`) : api("GET", "kantor"));
+    kerjaSelesai = performance.now() + (kerja.sisaMs ?? 0);
+    dataOrtu.bintang = kerja.bintang;
+    if (aksi === "ambil") {
+      tokoOrtu = null;
+      pesan.textContent = `${kerja.hadiah} bintang masuk ke saldo.`;
+      pesan.hidden = false;
+    }
+  } catch (e) {
+    kerja = null;
+    kerjaSelesai = 0;
+    pesan.textContent = e.message;
+    pesan.hidden = false;
+  } finally {
+    kerjaMemuat = false;
+    tampilKerja();
+  }
+}
+
+$("kerja-aksi").onclick = () => muatKerja(kerja && (kerja.sisaMs === null ? "mulai" : "ambil"));
+setInterval(() => {
+  if (hal === "home" && !$("dash").hidden && !document.hidden && kerja?.sisaMs > 0) tampilKerja();
+}, 1000);
+window.addEventListener("focus", () => {
+  if (hal === "home" && !$("dash").hidden) muatKerja();
+});
+
 function gambarHome() {
   const { children, byId } = dataHome;
   if (children.length) {
@@ -524,6 +601,7 @@ function gambarHome() {
   $("home").replaceChildren(kosong);
 }
 function keHal(h, idAnak) {
+  if (h === "chat") chatFamily = !idAnak;
   hal = h;
   if (idAnak) anakDipilih = idAnak;
   try { sessionStorage.setItem("ortu_anak", String(anakDipilih || "")); } catch { /* abaikan */ }
@@ -632,15 +710,22 @@ $("tugas-isi").addEventListener("click", async (e) => {
 // ---------------- menu Chat ----------------
 // Chat keluarga dan riwayat arena untuk anak yang dipilih.
 let belumDibaca = {};   // { <id anak>: jumlah pesan anak yang belum dibaca }
+let familyBelumDibaca = 0;
 let chatTimer = 0;
 let bersihkanSuara;
+let chatFamily = true;
 const jam = (at) => new Date(at).toLocaleString("id-ID", { weekday: "short", hour: "2-digit", minute: "2-digit" });
 const CHAT_ARENA = { mati: "Chat arena anak sedang dimatikan, jadi tidak ada pesan baru.", siap: "Anak hanya bisa memakai pesan siap pakai di arena.", bebas: "Anak boleh menulis teks bebas (disaring) di arena." };
 
 function tandaChat() {
-  const n = Object.values(belumDibaca).reduce((a, b) => a + b, 0);
+  const n = Object.values(belumDibaca).reduce((a, b) => a + b, familyBelumDibaca);
   $("chat-badge").textContent = n;
   $("chat-badge").hidden = !n;
+  const family = $("family-belum");
+  if (family) {
+    family.textContent = familyBelumDibaca;
+    family.hidden = !familyBelumDibaca;
+  }
   $("pilih-anak").querySelectorAll("button").forEach((b) => {
     const k = belumDibaca[b.dataset.anak] || 0;
     b.textContent = b.dataset.nama + (k && hal === "chat" ? ` (${k})` : "");
@@ -653,7 +738,12 @@ function tandaChat() {
   });
 }
 async function segarkanBelum() {
-  try { belumDibaca = (await api("GET", "chat/belum?sebagai=ortu")).anak; tandaChat(); } catch { /* abaikan */ }
+  try {
+    const belum = await api("GET", "chat/belum?sebagai=ortu");
+    belumDibaca = belum.anak;
+    familyBelumDibaca = belum.family ?? 0;
+    tandaChat();
+  } catch { /* abaikan */ }
 }
 
 async function gambarChat() {
@@ -662,36 +752,39 @@ async function gambarChat() {
   bersihkanSuara?.();
   bersihkanSuara = null;
   const id = anakDipilih;
+  const grup = chatFamily || !id;
+  const query = grup ? "sebagai=ortu&grup=1" : `sebagai=ortu&anak=${id}`;
+  const pengirim = grup ? { sebagai: "ortu", grup: true } : { sebagai: "ortu", anak: id };
   const pilihan = [...$("pilih-anak").querySelectorAll("[data-anak]")];
-  const namaAnak = pilihan.find((b) => Number(b.dataset.anak) === id)?.dataset.nama || "Anak";
+  const namaAnak = grup ? "Family" : pilihan.find((b) => Number(b.dataset.anak) === id)?.dataset.nama || "Anak";
   const nama = esc(namaAnak);
   box.innerHTML = `<div class="chat-jendela">
     <nav class="chat-daftar" aria-label="Percakapan"><h2>Percakapan</h2>
       <ul class="chat-prioritas">
-        <li><span>Family</span><small>Grup belum tersedia</small></li>
+        <li><button type="button" id="buka-family" aria-pressed="${grup}">Family <span class="chat-belum" id="family-belum" aria-label="Pesan Family belum dibaca" hidden></span></button></li>
         <li><span>Papa</span><small>Belum terhubung</small></li>
         <li><span>Mama</span><small>Belum terhubung</small></li>
         <li class="chat-grup-anak"><span>Anak</span>
-          ${pilihan.length ? pilihan.map((b) => `<button type="button" data-chat-anak="${b.dataset.anak}" aria-pressed="${Number(b.dataset.anak) === id}">
+          ${pilihan.length ? pilihan.map((b) => `<button type="button" data-chat-anak="${b.dataset.anak}" aria-pressed="${!grup && Number(b.dataset.anak) === id}">
         <span class="chat-inisial" aria-hidden="true">${esc(b.dataset.nama.slice(0, 1).toUpperCase())}</span><span>${esc(b.dataset.nama)}</span><span class="chat-belum" hidden></span>
           </button>`).join("") : '<small>Belum ada akun anak</small>'}
         </li>
         <li><span>Teman</span><small>Chat teman di arena</small></li>
       </ul>
     </nav>
-    ${id ? `<section class="chat-keluarga" aria-labelledby="judul-chat">
+    <section class="chat-keluarga" aria-labelledby="judul-chat">
       <header class="chat-kepala"><h2 id="judul-chat">${nama}</h2>
-        <button type="button" id="btn-chat-arena" aria-controls="chat-arena" aria-expanded="false">Riwayat arena</button>
+        ${grup ? "" : '<button type="button" id="btn-chat-arena" aria-controls="chat-arena" aria-expanded="false">Riwayat arena</button>'}
       </header>
       <section class="chat-arena" id="chat-arena" hidden aria-label="Riwayat chat arena ${nama}"><p class="muted kecil" id="arena-ket"></p><ul class="arena-log" id="arena-log"></ul></section>
       ${kotakPesanChat(namaAnak)}
       <p class="error" role="status" hidden></p>
-    </section>` : '<p class="muted chat-kosong">Tambahkan akun anak di menu Setting untuk memulai percakapan.</p>'}
+    </section>
   </div>`;
-  if (!id) return;
+  $("buka-family").onclick = () => { if (!grup) keHal("chat"); };
   tandaChat();
   box.querySelectorAll("[data-chat-anak]").forEach((b) => {
-    b.onclick = () => { if (Number(b.dataset.chatAnak) !== id) keHal("chat", Number(b.dataset.chatAnak)); };
+    b.onclick = () => { if (grup || Number(b.dataset.chatAnak) !== id) keHal("chat", Number(b.dataset.chatAnak)); };
   });
   const f = $("form-chat");
   const g = $("gelembung");
@@ -703,16 +796,17 @@ async function gambarChat() {
     if (!aktif()) return;
     const versi = ++versiMuat;
     try {
-      const { pesan } = await api("GET", `chat/keluarga?sebagai=ortu&anak=${id}`);
+      const { pesan } = await api("GET", `chat/keluarga?${query}`);
       if (!aktif() || versi !== versiMuat) return;
-      const isi = pesan.length ? pesan.map((p) => gelembungChat(p, "ortu", `sebagai=ortu&anak=${id}`, jam, { saya: dataOrtu.id })).join("") : `<p class="muted chat-kosong">Belum ada pesan dengan ${nama}.</p>`;
+      const isi = pesan.length ? pesan.map((p) => gelembungChat(p, "ortu", query, jam, { saya: dataOrtu.id })).join("") : `<p class="muted chat-kosong">Belum ada pesan di percakapan ${nama}.</p>`;
       if (isi !== isiTerakhir && ![...g.querySelectorAll("audio")].some((audio) => !audio.paused)) {
         const bawah = g.scrollTop + g.clientHeight >= g.scrollHeight - 20;
         g.innerHTML = isi;
         if (bawah || isiTerakhir === undefined) g.scrollTop = g.scrollHeight;
         isiTerakhir = isi;
       }
-      belumDibaca[id] = 0;
+      if (grup) familyBelumDibaca = 0;
+      else belumDibaca[id] = 0;
       tandaChat();
     } catch (x) { if (aktif() && versi === versiMuat) setErr(sec, x.message); }
   };
@@ -723,7 +817,7 @@ async function gambarChat() {
     if (kirimTeks.disabled || !f.isi.value.trim()) return;
     kirimTeks.disabled = true;
     try {
-      await api("POST", "chat/keluarga", { sebagai: "ortu", anak: id, isi: f.isi.value });
+      await api("POST", "chat/keluarga", { ...pengirim, isi: f.isi.value });
       f.isi.value = "";
       await muatPesan();
       g.scrollTop = g.scrollHeight;
@@ -731,12 +825,13 @@ async function gambarChat() {
   };
   // Enter mengirim, Shift+Enter membuat baris baru (nyaman di laptop).
   f.isi.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); f.requestSubmit(); } });
-  bersihkanSuara = pasangSuara(f, { sebagai: "ortu", anak: id }, async () => {
+  bersihkanSuara = pasangSuara(f, pengirim, async () => {
     await muatPesan();
     g.scrollTop = g.scrollHeight;
   }, (pesan) => setErr(sec, pesan));
   chatTimer = setInterval(muatPesan, 5000);
   muatPesan();
+  if (grup) return;
   const tombolArena = $("btn-chat-arena");
   const arena = $("chat-arena");
   const ket = $("arena-ket");
@@ -922,8 +1017,8 @@ function kartuHome(c, soc) {
 }
 
 // ---------------- menu Avatar: avatar orang tua ----------------
-// Dibuat seperti menu Avatar anak: kartu besar di atas, lalu tab Karakter dan Aksesori.
-// Aksesori gratis untuk orang tua (tidak memakai bintang). Aura tetap khusus hadiah belajar anak.
+// Dibuat seperti menu Avatar anak: kartu besar di atas, lalu tab Karakter dan Aksesori (yang sudah dimiliki).
+// Karakter dan aksesori baru dibeli dengan bintang di menu Toko Avatar, sama seperti anak. Aura khusus anak.
 const WARNA_ORTU = "#5b6b7c";
 let dataOrtu = { name: "", email: "", avatar: DEFAULT_ORTU_AVATAR, aksesori: [] };
 let tabAvatarOrtu = "karakter";
@@ -932,20 +1027,23 @@ const gambarOrtu = (coba) => avatarSvg(dataOrtu.avatar, WARNA_ORTU, { aksesori: 
 function gambarAvatarOrtu() {
   const box = $("avatar-ortu-isi");
   const dipakai = dataOrtu.aksesori.map((id) => AKSESORI.find((a) => a.id === id)?.name).filter(Boolean);
-  const isiAksesori = SLOT.map((sl) => {
-    const items = AKSESORI.filter((a) => a.slot === sl.id);
+  const milik = AKSESORI.filter((a) => (dataOrtu.aksesoriPunya || []).includes(a.id));
+  const isiAksesori = !milik.length
+    ? `<p class="muted">Anda belum punya aksesori. <button class="link-btn" data-ke-toko>Beli di Toko Avatar</button></p>`
+    : SLOT.map((sl) => {
+    const items = milik.filter((a) => a.slot === sl.id);
     if (!items.length) return "";
     return `<h3>${esc(sl.name)}</h3><div class="toko-grid">${items.map((a) => {
       const pakai = dataOrtu.aksesori.includes(a.id);
       return `<div class="toko-item ${pakai ? "pakai" : ""}"><span class="av-face" style="width:80px;height:80px">${gambarOrtu(a.id)}</span><b>${esc(a.name)}</b>
-        <span class="muted kecil">${pakai ? "Sedang dipakai" : "Gratis untuk orang tua"}</span>
+        <span class="muted kecil">${pakai ? "Sedang dipakai" : "Disimpan"}</span>
         <button data-aks-ortu="${a.id}" data-on="${pakai ? 0 : 1}" class="${pakai ? "" : "primary"}">${pakai ? "Lepas" : "Pakai"}</button></div>`;
     }).join("")}</div>`;
   }).join("");
   box.innerHTML = `
     <section class="panel kepala-ortu">
       <span class="ava-besar av-face" style="width:110px;height:110px">${gambarOrtu()}</span>
-      <div><h2>${esc(dataOrtu.name)}</h2><span class="muted">Orang tua · dipakai saat Anda bermain di arena bersama anak</span>
+      <div><h2>${esc(dataOrtu.name)} <span class="saldo-ortu">★ ${dataOrtu.bintang || 0} bintang</span></h2><span class="muted">Orang tua · dipakai saat Anda bermain di arena bersama anak</span>
         <p class="muted kecil">${dipakai.length ? `Aksesori: ${dipakai.map(esc).join(", ")}` : "Belum memakai aksesori"}</p></div>
     </section>
     <div class="tab-avatar" role="tablist">
@@ -953,12 +1051,14 @@ function gambarAvatarOrtu() {
       <button role="tab" data-tab-ortu="aksesori" class="${tabAvatarOrtu === "aksesori" ? "on" : ""}" aria-selected="${tabAvatarOrtu === "aksesori"}">🎀 Aksesori</button>
     </div>
     ${tabAvatarOrtu === "aksesori"
-      ? `<section class="panel"><h2>🎀 Aksesori</h2><p class="muted">Semua aksesori gratis untuk orang tua. Satu aksesori untuk setiap tempat (kepala, wajah, leher).</p>${isiAksesori}</section>`
-      : `<section class="panel"><h2>🐻 Pilih karakter</h2><div id="ortu-avatar-picker"></div><span id="ortu-av-ok" class="muted" hidden>Avatar tersimpan ✓</span></section>`}`;
+      ? `<section class="panel"><h2>🎀 Aksesoriku</h2><p class="muted">Pakai atau lepas aksesori yang sudah Anda miliki. Aksesori baru dibeli di <button class="link-btn" data-ke-toko>Toko Avatar</button>.</p>${isiAksesori}</section>`
+      : `<section class="panel"><h2>🐻 Pilih karakter</h2><div id="ortu-avatar-picker"></div><span id="ortu-av-ok" class="muted" hidden>Avatar tersimpan ✓</span>
+        <p class="muted kecil">Karakter lain bisa dibeli di <button class="link-btn" data-ke-toko>Toko Avatar</button>.</p></section>`}`;
   if (tabAvatarOrtu !== "karakter") return;
   let okTimer = 0;
   avatarPicker($("ortu-avatar-picker"), {
     value: dataOrtu.avatar, accent: WARNA_ORTU, dimiliki: dataOrtu.avatarPunya,
+    anggota: dataOrtu.peran === "ibu" ? "ibu" : "ayah",   // Ayah/Ibu otomatis mengikuti peran
     onPick: async (pilih) => {
       try {
         await api("POST", "avatar", { avatar: pilih, sebagai: "ortu" });
@@ -974,13 +1074,80 @@ function gambarAvatarOrtu() {
 $("avatar-ortu-isi").addEventListener("click", async (e) => {
   const tab = e.target.closest("[data-tab-ortu]");
   if (tab) { tabAvatarOrtu = tab.dataset.tabOrtu; gambarAvatarOrtu(); return; }
+  if (e.target.closest("[data-ke-toko]")) return keHal("toko");
   const b = e.target.closest("button[data-aks-ortu]");
   if (!b) return;
   b.disabled = true;
   try {
     dataOrtu.aksesori = (await api("POST", "avatar/aksesori", { id: b.dataset.aksOrtu, pakai: b.dataset.on === "1" })).aksesori;
+    if (tokoOrtu) tokoOrtu.pakai = dataOrtu.aksesori;
     gambarAvatarOrtu();
   } catch (x) { alert(x.message); b.disabled = false; }
+});
+
+// ---------------- menu Toko Avatar orang tua ----------------
+// Aturan sama dengan toko anak: karakter (sesuai peran Ayah/Ibu) dan aksesori dibeli dengan bintang
+// milik orang tua sendiri. Klik pertama pada "Beli" meminta konfirmasi di tombol itu sendiri.
+let tokoOrtu = null, yakinOrtu = null;
+function salinToko(k) {
+  tokoOrtu = { ...tokoOrtu, ...k };
+  Object.assign(dataOrtu, { avatar: k.avatar, avatarPunya: k.avatarPunya, aksesori: k.pakai, aksesoriPunya: k.punya, bintang: k.bintang });
+}
+async function gambarTokoOrtu() {
+  const box = $("toko-ortu-isi");
+  if (!tokoOrtu) {
+    box.innerHTML = '<section class="panel"><p class="muted">Memuat toko…</p></section>';
+    try { salinToko(await api("GET", "toko-ortu")); } catch (x) { box.innerHTML = `<section class="panel"><p class="error">${esc(x.message)}</p></section>`; return; }
+  }
+  const t = tokoOrtu;
+  const aksesori = SLOT.map((sl) => {
+    const items = t.items.filter((a) => a.slot === sl.id);
+    if (!items.length) return "";
+    return `<h3>${esc(sl.name)}</h3><div class="toko-grid">${items.map((a) => {
+      const punya = t.punya.includes(a.id), pakai = t.pakai.includes(a.id), cukup = t.bintang >= a.harga;
+      const tombol = punya ? `<button data-pakai="${a.id}" data-on="${pakai ? 0 : 1}" class="${pakai ? "" : "primary"}">${pakai ? "Lepas" : "Pakai"}</button>`
+        : yakinOrtu === a.id ? `<button data-beli="${a.id}" class="yakin">Yakin? ★ ${a.harga}</button>`
+        : `<button data-beli="${a.id}" ${cukup ? "" : "disabled"}>${cukup ? "Beli" : "Bintang kurang"}</button>`;
+      return `<div class="toko-item ${pakai ? "pakai" : ""}"><span class="av-face" style="width:80px;height:80px">${gambarOrtu(a.id)}</span><b>${esc(a.name)}</b>
+        <span class="muted kecil">${punya ? (pakai ? "Sedang dipakai" : "Sudah dimiliki") : `★ ${a.harga}`}</span>${tombol}</div>`;
+    }).join("")}</div>`;
+  }).join("");
+  box.innerHTML = `
+    <section class="panel kepala-ortu">
+      <span class="ava-besar av-face" style="width:110px;height:110px">${gambarOrtu()}</span>
+      <div><h2>${esc(dataOrtu.name)} <span class="saldo-ortu">★ ${t.bintang} bintang</span></h2>
+        <span class="muted">Tukar bintang dengan karakter dan aksesori, sama seperti anak. Yang dipakai juga terlihat di arena.</span></div>
+    </section>
+    <section class="panel"><h2>🐻 Karakter</h2>${katalogAvatar(t, WARNA_ORTU, yakinOrtu, true, t.katalog)}</section>
+    <section class="panel"><h2>🎀 Aksesori</h2>${aksesori}</section>
+    <p class="error" id="toko-ortu-galat" hidden></p>`;
+}
+$("toko-ortu-isi").addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-beli], button[data-pakai], button[data-beli-avatar], button[data-pakai-avatar]");
+  if (!b || b.disabled) return;
+  const galat = (x) => { const g = $("toko-ortu-galat"); if (g) { g.textContent = x || ""; g.hidden = !x; } };
+  galat("");
+  try {
+    if (b.dataset.beliAvatar || b.dataset.beli) {
+      const id = b.dataset.beliAvatar || b.dataset.beli;
+      if (yakinOrtu !== id) { yakinOrtu = id; return gambarTokoOrtu(); }   // klik kedua untuk yakin
+      yakinOrtu = null;
+      b.disabled = true;
+      if (b.dataset.beliAvatar) salinToko(await api("POST", "toko-ortu/beli-avatar", { id }));
+      else {
+        salinToko(await api("POST", "toko-ortu/beli", { id }));
+        salinToko(await api("POST", "toko-ortu/pakai", { id, pakai: true }));
+      }
+    } else if (b.dataset.pakaiAvatar) {
+      b.disabled = true;
+      await api("POST", "avatar", { avatar: b.dataset.pakaiAvatar, sebagai: "ortu" });
+      salinToko({ ...tokoOrtu, avatar: b.dataset.pakaiAvatar });
+    } else {
+      b.disabled = true;
+      salinToko(await api("POST", "toko-ortu/pakai", { id: b.dataset.pakai, pakai: b.dataset.on === "1" }));
+    }
+  } catch (x) { yakinOrtu = null; await gambarTokoOrtu(); return galat(x.message); }
+  gambarTokoOrtu();
 });
 
 // ---------------- Keluarga (menu Setting) ----------------
@@ -1017,7 +1184,7 @@ function gambarKeluarga() {
 }
 async function kirimKeluarga(metode, alamat, isi) {
   setErr($("keluarga-box"), "");
-  try { dataKeluarga = await api(metode, alamat, isi); }
+  try { dataKeluarga = await api(metode, alamat, isi); if (alamat === "keluarga/peran") { tokoOrtu = null; dataOrtu = { ...dataOrtu, ...(await api("GET", "saya")).ortu }; } }
   catch (x) { gambarKeluarga(); return setErr($("keluarga-box"), x.message); }
   gambarKeluarga();
 }
@@ -1034,28 +1201,46 @@ $("keluarga-box").addEventListener("click", (e) => {
 });
 
 // ---------------- muat ----------------
+let versiMuat = 0;
 async function load() {
-  $("memuat").hidden = false;
+  const versi = ++versiMuat;
+  const memuat = $("memuat");
+  memuat.textContent = "Memuat…";
+  memuat.hidden = false;
   let me;
   try {
     me = await api("GET", "saya");
   } catch (x) {
-    $("memuat").textContent = x.message;
+    if (versi === versiMuat) memuat.textContent = x.message;
     return;
   }
-  $("memuat").hidden = true;
+  if (versi !== versiMuat) return;
   // Tautan atur ulang kata sandi tetap ditampilkan walaupun perangkat ini masih masuk.
-  const masuk = !!me.ortu && !resetToken;
+  // Tautan atur sandi atau kode undangan: tampilkan formulirnya walaupun perangkat ini masih masuk.
+  const masuk = !!me.ortu && !resetToken && !kodeUndangan;
   $("auth").hidden = masuk;
-  $("dash").hidden = !masuk;
   $("top-nav").hidden = !masuk;
-  if (!masuk) { clearInterval(chatTimer); bersihkanSuara?.(); bersihkanSuara = null; return; }
+  if (!masuk) {
+    $("dash").hidden = true;
+    memuat.hidden = true;
+    clearInterval(chatTimer);
+    bersihkanSuara?.();
+    bersihkanSuara = null;
+    return;
+  }
+  const data = await Promise.all([api("GET", "laporan"), api("GET", "teman"), api("GET", "tugas"), api("GET", "chat/belum?sebagai=ortu"), api("GET", "keuangan"), api("GET", "hadiah"), api("GET", "keluarga")]).catch((x) => {
+    if (versi === versiMuat) memuat.textContent = `Dasbor gagal dimuat. ${x.message}`;
+    return null;
+  });
+  if (!data || versi !== versiMuat) return;
   namaOrtu = me.ortu.name;
   dataOrtu = { ...me.ortu, aksesori: me.ortu.aksesori || [] };
-  const [{ children }, social, tugas, belum, uang, hadiah, keluarga] = await Promise.all([api("GET", "laporan"), api("GET", "teman"), api("GET", "tugas"), api("GET", "chat/belum?sebagai=ortu"), api("GET", "keuangan"), api("GET", "hadiah"), api("GET", "keluarga")]);
+  tokoOrtu = null;   // dimuat ulang saat menu Toko Avatar dibuka
+  const [{ children }, social, tugas, belum, uang, hadiah, keluarga] = data;
   dataTugas = tugas.anak;
   kuotaBintangTugas = tugas.kuotaBintang;
   belumDibaca = belum.anak;
+  familyBelumDibaca = belum.family ?? 0;
   dataUang = uang.anak;
   dataHadiah = hadiah;
   dataKeluarga = keluarga;
@@ -1075,6 +1260,8 @@ async function load() {
   }));
   dataHome = { children, byId };
   $("form-anak").querySelector("h2").textContent = children.length ? "Tambah akun anak" : "Mulai dengan menambah akun anak";
+  $("dash").hidden = false;
+  memuat.hidden = true;
   terapkanHal();
 }
 
