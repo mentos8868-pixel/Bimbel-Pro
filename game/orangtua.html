@@ -167,8 +167,15 @@
         <form id="form-anak" hidden class="panel" data-hal="setting">
           <h2 data-terjemah>Tambah akun anak</h2>
           <div class="grid2">
-            <label><span data-terjemah>Nama game</span> <input name="name" maxlength="16" required data-placeholder="Contoh: Budi" placeholder="Contoh: Budi" /></label>
-            <label><span data-terjemah>Kurikulum sekolah (pilih dulu)</span> 
+            <label><span data-terjemah>ID masuk</span>
+              <input name="loginAnak" required minlength="3" maxlength="24" autocomplete="off" />
+            </label>
+            <label><span data-terjemah>Kata sandi anak</span>
+              <input name="sandiAnak" required type="password" minlength="8" maxlength="128" autocomplete="new-password" autocapitalize="none" spellcheck="false" />
+            </label>
+            <label><span data-terjemah>Email</span> <input name="email" type="email" maxlength="120" required /></label>
+            <label><span data-terjemah>ID game</span> <input name="name" maxlength="16" required data-placeholder="Contoh: Budi" placeholder="Contoh: Budi" /></label>
+            <label><span data-terjemah>Kurikulum</span>
               <select name="kurikulum" class="pilih-kurikulum"></select>
             </label>
             <label><span data-terjemah>Kelas</span> 
@@ -176,13 +183,6 @@
             </label>
             <label><span data-terjemah>Negara</span> 
               <select name="negara" class="pilih-negara"></select>
-            </label>
-            <label><span data-terjemah>ID masuk</span>
-              <input name="loginAnak" required minlength="3" maxlength="24" autocomplete="off" />
-            </label>
-            <label><span data-terjemah>Email</span> <input name="email" type="email" maxlength="120" required /></label>
-            <label><span data-terjemah>Kata sandi anak</span> 
-              <input name="sandiAnak" required type="password" minlength="8" maxlength="128" autocomplete="new-password" autocapitalize="none" spellcheck="false" />
             </label>
             <div>
               <div class="label" data-terjemah>Warna aksesori (pita, topi, dasi, bunga)</div>
@@ -345,6 +345,14 @@
         </div>
       </article>
     </template>
+
+    <dialog id="daftar-sukses" class="panel" aria-labelledby="judul-daftar-sukses" aria-describedby="pesan-daftar-sukses">
+      <h2 id="judul-daftar-sukses">Akun berhasil dibuat!</h2>
+      <p id="pesan-daftar-sukses">Pendaftaran akun Bimbel Pro sudah selesai.</p>
+      <form method="dialog">
+        <button class="primary" autofocus>OK</button>
+      </form>
+    </dialog>
 
     <script type="module" src="/src/orangtua.js"></script>
   </body>

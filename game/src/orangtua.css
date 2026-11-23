@@ -42,6 +42,9 @@ input, select { width: 100%; }
   background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 18px;
   display: flex; flex-direction: column; gap: 12px;
 }
+#daftar-sukses:not([open]) { display: none; }
+#daftar-sukses::backdrop { background: rgb(31 42 55 / 50%); }
+#pesan-daftar-sukses { margin: 0; }
 label { display: flex; flex-direction: column; gap: 4px; font-weight: 700; }
 .label { font-weight: 700; margin-bottom: 4px; }
 label.check { flex-direction: row; align-items: flex-start; gap: 10px; font-weight: 400; }

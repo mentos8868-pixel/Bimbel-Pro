@@ -1,6 +1,8 @@
 const teks = {
   "Email pemulihan": ["Email pemulihan","Recovery email","找回密码邮箱"],
   "ID masuk": ["ID masuk","Login ID","登录用户名"],
+  "ID game": ["ID game","Game ID","游戏 ID"],
+  "Kurikulum": ["Kurikulum","Curriculum","课程体系"],
   "Avatar yang dimiliki": ["Avatar yang dimiliki","Owned avatars","已拥有的虚拟形象"],
   "Jadikan kepala keluarga": ["Jadikan kepala keluarga","Make head of family","设为家庭管理员"],
   "Jadikan {nama} kepala keluarga? Anda akan menjadi anggota keluarga.": ["Jadikan {nama} kepala keluarga? Anda akan menjadi anggota keluarga.","Make {nama} the head of the family? You will become a family member.","将{nama}设为家庭管理员吗？你将成为普通家庭成员。"],

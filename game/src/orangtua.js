@@ -219,6 +219,7 @@ $("form-daftar").addEventListener("submit", async (e) => {
     await api("POST", "daftar", { name: f.name.value, login: f.login.value, email: f.email.value, password: f.password.value, consent: true, negara: f.elements.negara.value, peran: peranDaftar.get() });
     peranDaftar.set("");
     f.reset();
+    $("daftar-sukses").showModal();
     await load();
   } catch (x) { setErr(f, x.message); } finally { busy(f, false); }
 });
