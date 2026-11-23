@@ -728,9 +728,14 @@ export async function handleApi(req, res) {
       const pid = needOrtu();
       const c = ownChild(pid, path[1]);
       if (path.length === 3 && path[2] === "login" && m === "PATCH") {
-        const login = kredensialAnak(body, c.id);
         db.exec("BEGIN IMMEDIATE");
+        let login;
         try {
+          const idMasuk = childRow(c.id).login_anak;
+          if (idMasuk && body.loginAnak !== undefined && loginAnak(body.loginAnak) !== idMasuk) {
+            throw new ApiError(409, "ID masuk anak sudah ditetapkan dan tidak bisa diubah.");
+          }
+          login = kredensialAnak({ ...body, loginAnak: idMasuk || body.loginAnak }, c.id);
           db.prepare("UPDATE children SET login_anak = ?, sandi_anak_hash = ? WHERE id = ?").run(...login, c.id);
           db.prepare("DELETE FROM sessions WHERE child_id = ? AND role = 'anak'").run(c.id);
           db.prepare("DELETE FROM login_codes WHERE child_id = ?").run(c.id);

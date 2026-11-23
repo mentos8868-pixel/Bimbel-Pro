@@ -55,7 +55,7 @@ const bacaLog = (chunk) => {
   const teks = chunk.toString();
   if (server) return;
   buffer += teks;
-  const m = buffer.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
+  const m = buffer.match(/https:\/\/(?!api\.)[a-z0-9-]+\.trycloudflare\.com\b/);
   if (m) mulaiServer(m[0]);
 };
 tunnel.stdout.on("data", bacaLog);

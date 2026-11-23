@@ -481,7 +481,15 @@ function renderKid(c, soc) {
   });
 
   const formLogin = el.querySelector(".form-login-anak");
-  formLogin.loginAnak.value = c.loginAnak || "";
+  const idMasuk = formLogin.querySelector(".login-anak-id");
+  const labelIdBaru = formLogin.querySelector(".login-anak-baru");
+  function tampilkanIdMasuk(login) {
+    idMasuk.querySelector("strong").textContent = login || "";
+    idMasuk.hidden = !login;
+    labelIdBaru.hidden = Boolean(login);
+    formLogin.loginAnak.disabled = Boolean(login);
+  }
+  tampilkanIdMasuk(c.loginAnak);
   formLogin.onsubmit = async (e) => {
     e.preventDefault();
     const status = formLogin.querySelector("[role=status]");
@@ -489,8 +497,11 @@ function renderKid(c, soc) {
     setErr(el, "");
     busy(formLogin, true);
     try {
-      const hasil = await api("PATCH", `anak/${c.id}/login`, { loginAnak: formLogin.loginAnak.value, sandiAnak: formLogin.sandiAnak.value });
-      formLogin.loginAnak.value = hasil.loginAnak;
+      const hasil = await api("PATCH", `anak/${c.id}/login`, {
+        loginAnak: idMasuk.hidden ? formLogin.loginAnak.value : undefined,
+        sandiAnak: formLogin.sandiAnak.value,
+      });
+      tampilkanIdMasuk(hasil.loginAnak);
       formLogin.sandiAnak.value = "";
       status.textContent = terjemah("Login anak tersimpan.");
     } catch (x) {
@@ -561,8 +572,12 @@ function terapkanHal() {
       if (ringkasan) ringkasan.textContent = kelasText(c);
     }
     gambarKeluarga();
-    lokalPengaturan($("form-id-masuk"));
-    $("form-id-masuk").elements.login.value = dataOrtu.login || "";
+    const formAkun = $("form-id-masuk");
+    lokalPengaturan(formAkun);
+    formAkun.elements.login.value = dataOrtu.login || "";
+    formAkun.elements.email.value = dataOrtu.email || "";
+    formAkun.elements.nama.value = dataOrtu.name || "";
+    formAkun.elements.negara.value = dataOrtu.negara ? negaraName(dataOrtu.negara) : "";
     $("pengaturan-bahasa").innerHTML = pilihanBahasa();
     $("btn-keluar").textContent = terjemah("Keluar");
     bahasaDashboard("ortu:" + dataOrtu.id, terapkanHal);

@@ -70,15 +70,15 @@
 
         <form id="form-daftar" class="panel" hidden>
           <h2>Buat akun orang tua</h2>
-          <label>Kewarganegaraan <select name="negara" required></select></label>
-          <div class="label">Saya adalah</div>
-          <div class="pilih-peran" id="peran-daftar"></div>
-          <label>Nama game <input name="name" maxlength="40" required /></label>
           <label>ID masuk <input name="login" minlength="3" maxlength="24" autocomplete="username" required /></label>
-          <label>Email <input type="email" name="email" autocomplete="email" required /></label>
           <label>Kata sandi (minimal 8 karakter)
             <span class="pw"><input type="password" name="password" minlength="8" autocomplete="new-password" required /><button type="button" class="pw-eye" aria-label="Tampilkan kata sandi">Lihat</button></span>
           </label>
+          <label>Email <input type="email" name="email" autocomplete="email" required /></label>
+          <label>Nama <input name="name" maxlength="40" required /></label>
+          <label>Negara <select name="negara" required></select></label>
+          <div class="label">Saya adalah</div>
+          <div class="pilih-peran" id="peran-daftar"></div>
           <details class="privacy">
             <summary>Data apa yang disimpan?</summary>
             <ul>
@@ -206,6 +206,10 @@
         </details>
         <form class="panel" id="form-id-masuk" data-hal="setting">
           <label><span data-terjemah>ID masuk</span> <input name="login" minlength="3" maxlength="24" required autocapitalize="none" spellcheck="false" /></label>
+          <label><span data-terjemah>Kata sandi</span> <input type="password" value="********" readonly autocomplete="off" /></label>
+          <label><span data-terjemah>Email</span> <input name="email" type="email" readonly /></label>
+          <label><span data-terjemah>Nama</span> <input name="nama" readonly /></label>
+          <label><span data-terjemah>Negara</span> <input name="negara" readonly /></label>
           <button type="submit" data-terjemah>Simpan</button>
           <p class="error" hidden></p>
           <p role="status"></p>
@@ -334,7 +338,8 @@
         <form class="form-login-anak" data-hal="setting">
           <h3 data-terjemah>Login anak</h3>
           <div class="grid2">
-            <label><span data-terjemah>Nama pengguna</span> <input name="loginAnak" minlength="3" maxlength="24" autocomplete="off" required /></label>
+            <p class="login-anak-id" hidden><span data-terjemah>ID masuk</span> · <strong></strong></p>
+            <label class="login-anak-baru"><span data-terjemah>ID masuk</span> <input name="loginAnak" minlength="3" maxlength="24" autocomplete="off" required /></label>
             <label><span data-terjemah>Kata sandi baru</span> <input name="sandiAnak" type="text" minlength="8" maxlength="128" autocomplete="new-password" autocapitalize="none" spellcheck="false" required /></label>
           </div>
           <div><button type="submit" data-terjemah>Simpan login anak</button></div>
