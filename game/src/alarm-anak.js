@@ -1,6 +1,29 @@
 const el = id => document.getElementById(id);
 const jamValid = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+function bunyiWeker(audio) {
+  const awal = audio.currentTime + 0.02;
+  // Dua bel logam dipukul bergantian. Dering kedua bertahan lebih lama.
+  for (const [jeda, pukulan] of [[0, 8], [1.12, 14]]) {
+    for (let i = 0; i < pukulan; i++) {
+      const mulai = awal + jeda + i * 0.067;
+      const dasar = i % 2 ? 1380 : 1160;
+      for (const [rasio, kuat, ekor] of [[1, 0.085, 0.19], [2.37, 0.042, 0.12], [3.81, 0.018, 0.065]]) {
+        const nada = audio.createOscillator();
+        const volume = audio.createGain();
+        nada.frequency.value = dasar * rasio;
+        volume.gain.setValueAtTime(0, mulai);
+        volume.gain.linearRampToValueAtTime(kuat, mulai + 0.003);
+        volume.gain.exponentialRampToValueAtTime(0.0001, mulai + ekor);
+        nada.connect(volume).connect(audio.destination);
+        nada.onended = () => { nada.disconnect(); volume.disconnect(); };
+        nada.start(mulai);
+        nada.stop(mulai + ekor);
+      }
+    }
+  }
+}
+
 function berikutnya(jam) {
   const [h, m] = jam.split(":").map(Number);
   const waktu = new Date();
@@ -43,13 +66,7 @@ export function buatAlarm(idAnak) {
       simpan();
       el("alarm-rincian").textContent = jatuhTempo.map(a => a.jam + " · " + a.nama).join(", ");
       if (!el("alarm-pesan").open) el("alarm-pesan").showModal();
-      if (audio?.state === "running") {
-        const nada = audio.createOscillator(), volume = audio.createGain();
-        volume.gain.value = 0.1;
-        nada.connect(volume).connect(audio.destination);
-        nada.start();
-        nada.stop(audio.currentTime + 0.8);
-      }
+      if (audio?.state === "running") bunyiWeker(audio);
     }, Math.max(0, Math.min(...aktif.map(a => a.target)) - Date.now()));
   }
   function buka(a) {

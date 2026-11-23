@@ -15,7 +15,6 @@ import { ChessUI } from "./chess-ui.js";
 import { ScrambleUI } from "./scramble-ui.js";
 import { pasangPapanKata } from "./papan-kata.js";
 import { pasangOtello } from "./otello-ui.js";
-import { pasangBedaGambar } from "./beda-gambar.js";
 import { TokoUI } from "./toko-ui.js";
 import { pasangChatKeluarga } from "./chat-keluarga-arena.js";
 import { KUALITAS, NAMA_KUALITAS } from "./grafis.js";
@@ -171,44 +170,44 @@ async function start(profile, playingAs) {
     ry: +me.root.rotation.y.toFixed(2),
   });
   const others = new Map();
-  const pekerjaKeluarga = new Map();
-  let hasilKerjaKeluarga = [];
-  let memuatKerjaKeluarga = false;
+  const pekerjaArena = new Map();
+  let hasilKerjaArena = [];
+  let memuatKerjaArena = false;
 
-  function gambarPekerjaKeluarga() {
-    const online = new Set(room ? [...others.values()].map(({ p }) => p.uid) : []);
-    const tampil = hasilKerjaKeluarga.filter((p) => !online.has(p.uid));
-    for (const [uid, av] of pekerjaKeluarga) {
-      if (tampil.some((p) => p.uid === uid && p.pekerjaan === av.pekerjaan)) continue;
+  function gambarPekerjaArena() {
+    const indeks = { kantor: 0, sawah: 0 };
+    const tampil = hasilKerjaArena.map((p) => ({ ...p, slot: indeks[p.pekerjaan]++ }));
+    for (const { av, p } of others.values()) av.root.setEnabled(!tampil.some((kerja) => kerja.uid === p.uid));
+    for (const [uid, av] of pekerjaArena) {
+      if (tampil.some((p) => p.uid === uid && p.pekerjaan === av.pekerjaan && p.slot === av.slot && p.avatar === av.avatar && p.aksesori === av.aksesori && p.negara === av.negara)) continue;
       disposeAvatar(av);
-      pekerjaKeluarga.delete(uid);
+      pekerjaArena.delete(uid);
     }
     for (const p of tampil) {
-      if (pekerjaKeluarga.has(p.uid)) continue;
+      if (pekerjaArena.has(p.uid)) continue;
       const av = createAvatar(scene, { ...p, role: "ortu", jenjang: "Orang tua", color: "#5b6b7c" });
-      const ibu = p.peran === "ibu";
-      if (p.pekerjaan === "sawah") av.root.position.set(ibu ? -22 : -25, 0, -12.7);
+      if (p.pekerjaan === "sawah") av.root.position.set(-28 + (p.slot % 5) * 2, 0, -17 + Math.floor(p.slot / 5) * 1.6);
       else {
-        const meja = tables.filter((t) => t.id === "kantor" && !t.manajer).slice(-4)[ibu ? 1 : 0];
+        const meja = tables.filter((t) => t.id === "kantor")[p.slot];
         av.root.position.set(meja.x, 0, meja.z - 0.7);
       }
       aturStatusKerja(av, p.pekerjaan);
-      pekerjaKeluarga.set(p.uid, av);
+      Object.assign(av, { slot: p.slot, avatar: p.avatar, aksesori: p.aksesori, negara: p.negara });
+      pekerjaArena.set(p.uid, av);
     }
   }
 
-  async function muatPekerjaKeluarga() {
-    if (memuatKerjaKeluarga) return;
-    memuatKerjaKeluarga = true;
+  async function muatPekerjaArena() {
+    if (memuatKerjaArena) return;
+    memuatKerjaArena = true;
     try {
-      const { bekerja } = await api("GET", `kantor/keluarga?sebagai=${playingAs}`);
-      hasilKerjaKeluarga = bekerja;
-      gambarPekerjaKeluarga();
+      const { bekerja } = await api("GET", `kantor/arena?sebagai=${playingAs}`);
+      hasilKerjaArena = bekerja;
+      gambarPekerjaArena();
     } catch {
-      hasilKerjaKeluarga = [];
-      gambarPekerjaKeluarga();
+      // Pertahankan tampilan terakhir sampai polling berikutnya.
     } finally {
-      memuatKerjaKeluarga = false;
+      memuatKerjaArena = false;
     }
   }
   try {
@@ -251,7 +250,7 @@ async function start(profile, playingAs) {
       o.av.root.position.set(p.x, 0, p.z);
       aturStatusKerja(o.av, p.pekerjaan || "");
       others.set(id, o);
-      gambarPekerjaKeluarga();
+      gambarPekerjaArena();
       // Pemain lain mengganti aksesori di Toko atau naik ke aura baru: buat ulang avatarnya.
       const ganti = () => { if (others.get(id) === o) o.av = gantiAvatar(o.av, opsi()); };
       p.listen("aksesori", (v, lama) => { if (lama !== undefined) ganti(); });
@@ -262,7 +261,7 @@ async function start(profile, playingAs) {
     room.state.players.onRemove((_, id) => {
       const o = others.get(id);
       if (o) { disposeAvatar(o.av); others.delete(id); }
-      gambarPekerjaKeluarga();
+      gambarPekerjaArena();
     });
     if (playingAs === "anak") {
       let terakhir = 0;
@@ -279,7 +278,7 @@ async function start(profile, playingAs) {
       mejaMenunggu = null;
       for (const { av } of others.values()) disposeAvatar(av);
       others.clear();
-      gambarPekerjaKeluarga();
+      gambarPekerjaArena();
       selesaiMenungguKursi();
       aturPoseBelajar(me, false);
       aturStatusKerja(me, "");
@@ -297,9 +296,9 @@ async function start(profile, playingAs) {
   };
   setInterval(updateCount, 1000);
   if (playingAs === "anak" || playingAs === "ortu") {
-    muatPekerjaKeluarga();
-    setInterval(muatPekerjaKeluarga, 5000);
-    window.addEventListener("focus", muatPekerjaKeluarga);
+    muatPekerjaArena();
+    setInterval(muatPekerjaArena, 5000);
+    window.addEventListener("focus", muatPekerjaArena);
   }
 
   // ---------- Catur ----------
@@ -471,7 +470,6 @@ async function start(profile, playingAs) {
 
   const bukaMentor = siapkanMentor(() => { uiOpen = false; keys.clear(); });
   const bukaOtello = pasangOtello($("otello-panel"), tutupGame);
-  const bukaBedaGambar = pasangBedaGambar($("beda-gambar-panel"), tutupGame, room);
   function useTable(t) {
     if (t.nomor && mejaGame !== t) {
       if (mejaGame || menungguKursi) return;
@@ -496,12 +494,6 @@ async function start(profile, playingAs) {
       }, 4000);
       return;
     }
-    if (t.id === "beda-gambar") {
-      uiOpen = true;
-      keys.clear();
-      bukaBedaGambar(t);
-      return;
-    }
     if (t.id === "otello") {
       uiOpen = true;
       keys.clear();
@@ -520,10 +512,10 @@ async function start(profile, playingAs) {
       return;
     }
     if (t.id === "toko") {
-      if (playingAs !== "anak") return toast("Toko Avatar khusus untuk akun anak.");
+      if (playingAs !== "anak" && playingAs !== "ortu") return toast("Masuk dulu untuk membuka Toko Avatar.");
       uiOpen = true;
       keys.clear();
-      toko.open(profile);
+      toko.open(profile, playingAs);
       return;
     }
     if (t.id === "bimbel") {
@@ -610,35 +602,31 @@ async function start(profile, playingAs) {
   const kantorAksi = $("kantor-aksi");
   const kantorPesan = $("kantor-pesan");
   let kantorStatus = null;
-  let kantorSelesai = 0;
   let kantorTimer;
   let kantorSlotTimer;
   let kantorMemuat = false;
   let tempatKerja = "kantor";
 
   function tampilKantor() {
-    const sisa = Math.max(0, Math.ceil((kantorSelesai - performance.now()) / 1000));
-    const batas = kantorStatus && kantorStatus.hariIni + kantorStatus.hadiah > kantorStatus.batasHarian;
+    const detik = Math.max(0, Math.floor((Date.now() - (kantorStatus?.mulaiAt ?? Date.now())) / 1000));
     const slot = kantorStatus?.slot?.[tempatKerja];
-    const penuh = kantorStatus?.sisaMs === null && slot?.tersedia === 0;
+    const penuh = kantorStatus?.mulaiAt === null && slot?.tersedia === 0;
     $("kantor-slot").textContent = slot ? `Slot tersedia ${slot.tersedia}/${slot.kapasitas}` : "";
-    kantorAksi.disabled = kantorMemuat || sisa > 0 || Boolean(batas) || penuh;
+    kantorAksi.disabled = kantorMemuat || penuh;
     $("kantor-saldo").textContent = kantorStatus ? `★ ${kantorStatus.bintang} bintang` : "";
     if (!kantorStatus) {
       $("kantor-status").textContent = kantorMemuat ? "Memuat sesi kerja…" : "";
       kantorAksi.textContent = "Coba lagi";
-    } else if (batas) {
-      $("kantor-status").textContent = `Batas ${kantorStatus.batasHarian} bintang kerja hari ini sudah tercapai.`;
     } else if (penuh) {
       $("kantor-status").textContent = "Slot sedang penuh. Kamu bisa mulai saat ada sesi yang selesai.";
       kantorAksi.textContent = "Mulai bekerja";
-    } else if (kantorStatus.sisaMs === null) {
+    } else if (kantorStatus.mulaiAt === null) {
       $("kantor-status").textContent = `Bekerja selama ${kantorStatus.durasi / 3600} jam untuk mendapat ${kantorStatus.hadiah} bintang.`;
       kantorAksi.textContent = tempatKerja === "sawah" ? "Mulai bertani" : "Mulai bekerja";
     } else {
-      const waktu = [Math.floor(sisa / 3600), Math.floor(sisa / 60) % 60, sisa % 60].map((n) => String(n).padStart(2, "0")).join(":");
-      $("kantor-status").textContent = sisa ? `Sedang bekerja · ${waktu} tersisa` : "Sesi kerja selesai.";
-      kantorAksi.textContent = `Ambil ${kantorStatus.hadiah} bintang`;
+      const waktu = [Math.floor(detik / 3600), Math.floor(detik / 60) % 60, detik % 60].map((n) => String(n).padStart(2, "0")).join(":");
+      $("kantor-status").textContent = `Sedang bekerja · ${waktu}`;
+      kantorAksi.textContent = "Berhenti bekerja";
     }
   }
 
@@ -649,16 +637,14 @@ async function start(profile, playingAs) {
     tampilKantor();
     try {
       kantorStatus = await (aksi ? api("POST", `kantor/${aksi}`, aksi === "mulai" ? { pekerjaan: tempatKerja } : {}) : api("GET", "kantor"));
-      kantorSelesai = performance.now() + (kantorStatus.sisaMs ?? 0);
       // Mulai bekerja = keluar dari arena; layar masuk menampilkan "Sedang bekerja" dengan tombol Stop kerja.
-      if (aksi === "mulai" && kantorStatus.sisaMs > 0) { location.replace("/?arena=ortu"); return; }
-      if (aksi === "ambil") {
-        kantorPesan.textContent = `${kantorStatus.hadiah} bintang masuk ke saldo.`;
+      if (aksi === "mulai" && kantorStatus.mulaiAt > 0) { location.replace("/?arena=ortu"); return; }
+      if (aksi === "stop") {
+        kantorPesan.textContent = `Kerja selesai · ${kantorStatus.diperoleh} bintang masuk ke saldo.`;
         kantorPesan.hidden = false;
       }
     } catch (err) {
       kantorStatus = null;
-      kantorSelesai = 0;
       kantorPesan.textContent = err.message;
       kantorPesan.hidden = false;
     } finally {
@@ -678,7 +664,7 @@ async function start(profile, playingAs) {
     kantorSlotTimer = setInterval(() => muatKantor(), 10000);
     muatKantor();
   }
-  kantorAksi.onclick = () => muatKantor(kantorStatus && (kantorStatus.sisaMs === null ? "mulai" : "ambil"));
+  kantorAksi.onclick = () => muatKantor(kantorStatus && (kantorStatus.mulaiAt === null ? "mulai" : "stop"));
   $("kantor-tutup").onclick = () => {
     clearInterval(kantorTimer);
     clearInterval(kantorSlotTimer);

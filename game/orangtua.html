@@ -9,10 +9,9 @@
   </head>
   <body>
     <header class="top">
-      <strong>Bimbel Pro · Orang tua</strong>
+      <strong>Bimbel Pro · <span data-terjemah>Orang tua</span></strong>
       <nav id="top-nav" hidden>
-        <a href="/?arena=ortu" class="btn">Masuk Arena</a>
-        <button id="btn-keluar" class="ghost">Keluar</button>
+        <a href="/?arena=ortu" class="btn" data-terjemah>Masuk Arena</a>
       </nav>
     </header>
 
@@ -38,8 +37,8 @@
           </div>
 
         <form id="form-masuk" class="panel">
-          <h2>Masuk sebagai orang tua</h2>
-          <label>Email <input type="email" name="email" autocomplete="email" required /></label>
+          <h2>Masuk ke Bimbel Pro</h2>
+          <label>ID masuk <input name="login" autocomplete="username" autocapitalize="none" spellcheck="false" required /></label>
           <label>Kata sandi
             <span class="pw"><input type="password" name="password" autocomplete="current-password" required /><button type="button" class="pw-eye" aria-label="Tampilkan kata sandi">Lihat</button></span>
           </label>
@@ -71,6 +70,7 @@
 
         <form id="form-daftar" class="panel" hidden>
           <h2>Buat akun orang tua</h2>
+          <label>Kewarganegaraan <select name="negara" required></select></label>
           <div class="label">Saya adalah</div>
           <div class="pilih-peran" id="peran-daftar"></div>
           <label>Nama (ditampilkan ke anak, misalnya "Bunda Sari") <input name="name" maxlength="40" required /></label>
@@ -99,7 +99,6 @@
           <button class="primary" type="submit">Buat akun</button>
         </form>
 
-          <p class="kid-link">Kamu anak? <a href="/">Masuk ke arena di sini</a></p>
         </div>
       </section>
 
@@ -113,8 +112,6 @@
           <button data-ke="keuangan">💰 Keuangan</button>
           <button data-ke="chat">💬 Chat <span id="chat-badge" class="badge" hidden></span></button>
           <button data-ke="report">📊 Report</button>
-          <button data-ke="avatar">🐻 Avatar</button>
-          <button data-ke="toko">🛍️ Toko Avatar</button>
           <button data-ke="setting">⚙️ Setting</button>
         </nav>
 
@@ -124,12 +121,28 @@
               <h1 id="halo">Halo!</h1>
               <p id="sub-hal" class="muted"></p>
             </div>
+          </div>
+
+          <section class="panel" data-hal="setting">
+            <div id="avatar-ortu-utama" class="kepala-ortu"></div>
+            <details id="menu-avatar-ortu">
+              <summary data-terjemah>Pengaturan avatar</summary>
+              <div id="avatar-ortu-isi" class="tugas-isi"></div>
+            </details>
+          </section>
+          <div class="pilih-profil">
+            <button id="pilih-pasangan" type="button" data-hal="setting" hidden></button>
             <div id="pilih-anak" class="pilih-anak" role="tablist" aria-label="Pilih anak"></div>
           </div>
+          <div class="pilih-profil" data-hal="setting">
+            <button id="tambah-pasangan" type="button" aria-controls="profil-pasangan"></button>
+            <button id="tambah-anak" type="button" aria-controls="form-anak">Tambah akun anak</button>
+          </div>
+          <section id="profil-pasangan" class="panel" data-hal="setting" hidden></section>
 
           <section class="panel" data-hal="home">
             <h2>Mode Bekerja</h2>
-            <p class="muted">Satu sesi kerja berlangsung 1 jam dan memberi 2 bintang. Maksimal 10 bintang per hari WIB.</p>
+            <p class="muted">Kerja berlangsung sampai Anda menekan Berhenti. Dapatkan 2 bintang per jam penuh, maksimal 10 bintang per hari WIB.</p>
             <p id="kerja-status"></p>
             <p id="kerja-kuota" class="muted"></p>
             <p id="kerja-slot" class="muted"></p>
@@ -138,10 +151,6 @@
           </section>
           <div id="home" class="home-grid" data-hal="home"></div>
 
-          <!-- Avatar orang tua sendiri (dipakai saat bermain di arena). Avatar anak ada di kartu anak di bawah. -->
-          <div id="avatar-ortu-isi" class="tugas-isi" data-hal="avatar"></div>
-          <div data-hal="avatar"><button type="button" id="avatar-ortu-keluar" class="ghost">Keluar</button></div>
-          <div id="toko-ortu-isi" class="tugas-isi" data-hal="toko"></div>
 
           <section class="panel" data-hal="arena">
             <h2>Main di Arena</h2>
@@ -153,48 +162,54 @@
           <div id="keuangan-isi" class="tugas-isi" data-hal="keuangan"></div>
           <div id="chat-isi" class="chat-isi" data-hal="chat"></div>
 
-        <!-- Keluarga: kepala keluarga, orang tua kedua dan peran Ayah/Ibu -->
-        <section id="keluarga-box" class="panel" data-hal="setting"></section>
 
-        <form id="form-anak" class="panel" data-hal="setting">
-          <h2>Tambah akun anak</h2>
+        <form id="form-anak" hidden class="panel" data-hal="setting">
+          <h2 data-terjemah>Tambah akun anak</h2>
           <div class="grid2">
-            <label>Nama panggilan <input name="name" maxlength="16" required placeholder="Contoh: Budi" /></label>
-            <label>Kurikulum sekolah (pilih dulu)
+            <label><span data-terjemah>Nama panggilan</span> <input name="name" maxlength="16" required data-placeholder="Contoh: Budi" placeholder="Contoh: Budi" /></label>
+            <label><span data-terjemah>Kurikulum sekolah (pilih dulu)</span> 
               <select name="kurikulum" class="pilih-kurikulum"></select>
             </label>
-            <label>Kelas
+            <label><span data-terjemah>Kelas</span> 
               <select name="kelas" class="pilih-kelas"></select>
             </label>
-            <label>Negara
+            <label><span data-terjemah>Negara</span> 
               <select name="negara" class="pilih-negara"></select>
             </label>
-            <label>Nama pengguna anak
+            <label><span data-terjemah>Nama pengguna anak</span> 
               <input name="loginAnak" required minlength="3" maxlength="24" autocomplete="off" />
             </label>
-            <label>Kata sandi anak
+            <label><span data-terjemah>Kata sandi anak</span> 
               <input name="sandiAnak" required type="text" minlength="8" maxlength="128" autocomplete="new-password" autocapitalize="none" spellcheck="false" />
             </label>
             <div>
-              <div class="label">Warna aksesori (pita, topi, dasi, bunga)</div>
+              <div class="label" data-terjemah>Warna aksesori (pita, topi, dasi, bunga)</div>
               <div class="colors" id="warna-baru"></div>
             </div>
           </div>
-          <div class="label">Anak ini</div>
+          <div class="label" data-terjemah>Anak ini</div>
           <div class="pilih-peran" id="avatar-baru"></div>
           <p class="error" hidden></p>
-          <button class="primary" type="submit">Tambah anak</button>
+          <button class="primary" type="submit" data-terjemah>Tambah anak</button>
         </form>
 
         <details class="panel danger" data-hal="setting">
-          <summary>Hapus akun saya</summary>
+          <summary data-terjemah>Hapus akun saya</summary>
           <p id="hapus-akun-teks">Semua akun anak, laporan, dan riwayat permainan akan terhapus permanen dan tidak bisa dikembalikan.</p>
           <form id="form-hapus-akun" class="row">
-            <input type="password" name="password" placeholder="Kata sandi" autocomplete="current-password" required />
-            <button class="danger-btn" type="submit">Hapus permanen</button>
+            <input type="password" name="password" data-placeholder="Kata sandi" placeholder="Kata sandi" autocomplete="current-password" required />
+            <button class="danger-btn" type="submit" data-terjemah>Hapus permanen</button>
           </form>
           <p class="error" hidden></p>
         </details>
+        <form class="panel" id="form-id-masuk" data-hal="setting">
+          <label><span data-terjemah>ID masuk</span> <input name="login" minlength="3" maxlength="24" required autocapitalize="none" spellcheck="false" /></label>
+          <button type="submit" data-terjemah>Simpan</button>
+          <p class="error" hidden></p>
+          <p role="status"></p>
+        </form>
+        <div data-hal="setting" id="pengaturan-bahasa"></div>
+        <div data-hal="setting"><button type="button" id="btn-keluar" class="ghost">Keluar</button></div>
         </div>
       </section>
     </main>
@@ -207,9 +222,9 @@
         </header>
 
         <details class="av-edit" data-hal="setting">
-          <summary>Ganti avatar anak</summary>
+          <summary data-terjemah>Ganti avatar anak</summary>
           <div class="av-edit-picker"></div>
-          <span class="av-saved muted" hidden>Avatar tersimpan ✓</span>
+          <span class="av-saved muted" hidden data-terjemah>Avatar tersimpan ✓</span>
         </details>
 
         <div class="today" data-hal="report">
@@ -244,26 +259,26 @@
         </div>
 
         <form class="settings">
-          <h3 data-hal="setting">Pengaturan anak</h3>
+          <h3 data-hal="setting" data-terjemah>Pengaturan anak</h3>
           <h3 data-hal="arena">Izin di arena</h3>
-          <label data-hal="setting">Kurikulum sekolah (dipakai di Ruang Pintar)
+          <label data-hal="setting"><span data-terjemah>Kurikulum sekolah (dipakai di Ruang Pintar)</span> 
             <select name="kurikulum" class="pilih-kurikulum"></select>
           </label>
-          <label data-hal="setting">Kelas (tampil di papan nama avatar dan dipakai di Ruang Pintar)
+          <label data-hal="setting"><span data-terjemah>Kelas (tampil di papan nama avatar dan dipakai di Ruang Pintar)</span> 
             <select name="kelas" class="pilih-kelas"></select>
           </label>
-          <label data-hal="setting">Negara (benderanya tampil di papan nama avatar)
+          <label data-hal="setting"><span data-terjemah>Negara (benderanya tampil di papan nama avatar)</span> 
             <select name="negara" class="pilih-negara"></select>
           </label>
-          <label data-hal="setting">Batas waktu bermain per hari
+          <label data-hal="setting"><span data-terjemah>Batas waktu bermain per hari</span> 
             <select name="limitMin">
-              <option value="15">15 menit</option>
-              <option value="30">30 menit</option>
-              <option value="45">45 menit</option>
-              <option value="60">1 jam</option>
-              <option value="90">1,5 jam</option>
-              <option value="120">2 jam</option>
-              <option value="0">Tanpa batas</option>
+              <option value="15" data-terjemah>15 menit</option>
+              <option value="30" data-terjemah>30 menit</option>
+              <option value="45" data-terjemah>45 menit</option>
+              <option value="60" data-terjemah>1 jam</option>
+              <option value="90" data-terjemah>1,5 jam</option>
+              <option value="120" data-terjemah>2 jam</option>
+              <option value="0" data-terjemah>Tanpa batas</option>
             </select>
           </label>
           <label class="check" data-hal="arena">
@@ -283,8 +298,8 @@
             <span>Pertemanan baru perlu persetujuan saya</span>
           </label>
           <div class="row" data-hal="arena setting">
-            <button class="primary" type="submit">Simpan</button>
-            <span class="saved muted" hidden>Tersimpan ✓</span>
+            <button class="primary" type="submit" data-terjemah>Simpan</button>
+            <span class="saved muted" hidden data-terjemah>Tersimpan ✓</span>
           </div>
         </form>
 
@@ -299,15 +314,15 @@
         </div>
 
         <div class="actions" data-hal="setting">
-          <button class="btn-hapus ghost danger-text">Hapus akun anak</button>
+          <button class="btn-hapus ghost danger-text" data-terjemah>Hapus akun anak</button>
         </div>
         <form class="form-login-anak" data-hal="setting">
-          <h3>Login anak</h3>
+          <h3 data-terjemah>Login anak</h3>
           <div class="grid2">
-            <label>Nama pengguna <input name="loginAnak" minlength="3" maxlength="24" autocomplete="off" required /></label>
-            <label>Kata sandi baru <input name="sandiAnak" type="text" minlength="8" maxlength="128" autocomplete="new-password" autocapitalize="none" spellcheck="false" required /></label>
+            <label><span data-terjemah>Nama pengguna</span> <input name="loginAnak" minlength="3" maxlength="24" autocomplete="off" required /></label>
+            <label><span data-terjemah>Kata sandi baru</span> <input name="sandiAnak" type="text" minlength="8" maxlength="128" autocomplete="new-password" autocapitalize="none" spellcheck="false" required /></label>
           </div>
-          <div><button type="submit">Simpan login anak</button></div>
+          <div><button type="submit" data-terjemah>Simpan login anak</button></div>
           <p class="muted kecil" role="status"></p>
         </form>
         <p class="error" hidden></p>

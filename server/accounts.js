@@ -1,7 +1,7 @@
 // Akun orang tua dan anak: pendaftaran, masuk, sesi, sandi anak, tiket game,
 // batas waktu bermain, hasil permainan, dan laporan untuk orang tua.
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from "node:crypto";
-import { db, today, lastDays } from "./db.js";
+import { db, buatIdMasukOrtu, today, lastDays } from "./db.js";
 import { avatarOr, AVATAR_AWAL_ANAK, AVATAR_AWAL_ORTU, DEFAULT_ORTU_AVATAR } from "../shared/avatars.js";
 import { avatarSvg } from "../shared/avatar-svg.js";
 import { rapikanAksesori, aksesoriById } from "../shared/aksesori.js";
@@ -20,7 +20,7 @@ import { handleTokoOrtu, avatarOrtuDimiliki, aksesoriOrtuDimiliki } from "./toko
 import { handleKantor } from "./kantor.js";
 import { tanyaMentor } from "./mentor.js";
 import { negaraOr, isNegara, jenjangDariKelas } from "../shared/negara.js";
-import { parentView, parentDecide, unblock, purgeUid, notify, kick } from "./social.js";
+import { parentView, parentDecide, unblock, purgeUid, notify, kick, isOnline } from "./social.js";
 import { sendMail, APP_URL } from "./mailer.js";
 
 const DAY = 86400000;
@@ -58,9 +58,16 @@ function kredensialAnak(body, childId = null) {
   if (typeof body.sandiAnak !== "string" || body.sandiAnak.length < 8 || body.sandiAnak.length > 128) {
     throw new ApiError(400, "Kata sandi anak harus 8–128 karakter.");
   }
+  if (db.prepare("SELECT 1 FROM login_id_ortu WHERE login = ?").get(login)) throw new ApiError(409, "Nama pengguna sudah dipakai. Pilih nama lain.");
   const ada = db.prepare("SELECT id FROM children WHERE login_anak = ?").get(login);
   if (ada && ada.id !== childId) throw new ApiError(409, "Nama pengguna sudah dipakai. Pilih nama lain.");
   return [login, hashSecret(body.sandiAnak)];
+}
+
+function negaraOrtu(value) {
+  if (value === undefined) return null;
+  if (!isNegara(value)) throw new ApiError(400, "Pilih negara yang tersedia.");
+  return value;
 }
 
 export class ApiError extends Error {
@@ -152,7 +159,7 @@ export function playerFromSession(s) {
   }
   const p = db.prepare("SELECT * FROM parents WHERE id = ?").get(s.parent_id);
   if (!p) return null;
-  return { role: "ortu", parentId: p.id, name: p.name, jenjang: "Ortu", color: "#5b6b7c", avatar: avatarOr(p.avatar, DEFAULT_ORTU_AVATAR), aksesori: rapikanAksesori(p.aksesori_pakai).join(","), limitMin: 0, allowStrangers: false };
+  return { role: "ortu", parentId: p.id, name: p.name, negara: negaraOr(p.negara, ""), jenjang: "Ortu", color: "#5b6b7c", avatar: avatarOr(p.avatar, DEFAULT_ORTU_AVATAR), aksesori: rapikanAksesori(p.aksesori_pakai).join(","), limitMin: 0, allowStrangers: false };
 }
 
 // ---------- tiket untuk masuk ruang game ----------
@@ -251,8 +258,16 @@ export function idKeluarga(parentId) {
   const p = db.prepare("SELECT id, kepala_id FROM parents WHERE id = ?").get(parentId);
   return p ? (p.kepala_id || p.id) : null;
 }
+export function sekeluarga(a, b) {
+  const keluarga = (p) => p.role === "anak"
+    ? db.prepare("SELECT parent_id FROM children WHERE id = ?").get(p.childId)?.parent_id
+    : idKeluarga(p.parentId);
+  const kepala = keluarga(a);
+  return kepala != null && kepala === keluarga(b);
+}
+
 function anggotaKeluarga(kepalaId) {
-  return db.prepare("SELECT id, name, email, peran, kepala_id FROM parents WHERE id = ? OR kepala_id = ? ORDER BY kepala_id IS NOT NULL, id").all(kepalaId, kepalaId);
+  return db.prepare("SELECT id, name, email, peran, negara, kepala_id FROM parents WHERE id = ? OR kepala_id = ? ORDER BY kepala_id IS NOT NULL, id").all(kepalaId, kepalaId);
 }
 
 function ownChild(parentId, childId) {
@@ -377,19 +392,38 @@ export async function handleApi(req, res) {
       const peran = PERAN[body.peran] ? body.peran : null;
       if (!peran) throw new ApiError(400, "Pilih dulu: Ayah atau Ibu.");
       const now = Date.now();
-      const r = db.prepare("INSERT INTO parents (email, pass_hash, name, consent_at, created_at, avatar, peran, kepala_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(email, hashSecret(body.password), name, now, now, AVATAR_PERAN[peran], peran, null);
+      const r = db.prepare("INSERT INTO parents (email, pass_hash, name, consent_at, created_at, avatar, peran, kepala_id, negara) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(email, hashSecret(body.password), name, now, now, AVATAR_PERAN[peran], peran, null, negaraOrtu(body.negara));
+      buatIdMasukOrtu({ id: Number(r.lastInsertRowid), name });
       const token = createSession("ortu", Number(r.lastInsertRowid));
       return send(200, { ok: true }, { "Set-Cookie": cookie(COOKIE.ortu, token, SESSION_MS / 1000) }), true;
     }
     if (m === "POST" && path[0] === "masuk") {
-      const email = str(body.email, 120).toLowerCase();
-      const lim = limited(`masuk:${ip}:${email}`);
-      const p = db.prepare("SELECT * FROM parents WHERE email = ?").get(email);
-      if (!p || !checkSecret(body.password || "", p.pass_hash)) { lim.fail(); throw new ApiError(401, "Email atau kata sandi salah."); }
+      const login = loginAnak(body.login ?? body.email);
+      const lim = limited(`masuk-id:${ip}`, 10);
+      const p = db.prepare("SELECT p.* FROM parents p JOIN login_id_ortu i ON i.parent_id = p.id WHERE i.login = ?").get(login);
+      const c = p ? null : db.prepare("SELECT * FROM children WHERE login_anak = ?").get(login);
+      if (!(p || c?.sandi_anak_hash) || !checkSecret(body.password || "", p?.pass_hash ?? c.sandi_anak_hash)) { lim.fail(); throw new ApiError(401, "ID masuk atau kata sandi salah."); }
+      if (c) {
+        lim.ok();
+        endSession(cookies[COOKIE.anak]);
+        const token = createSession("anak", c.parent_id, c.id);
+        return send(200, { sebagai: "anak" }, { "Set-Cookie": cookie(COOKIE.anak, token, SESSION_MS / 1000) }), true;
+      }
       lim.ok();
       const token = createSession("ortu", p.id);
       return send(200, { ok: true }, { "Set-Cookie": cookie(COOKIE.ortu, token, SESSION_MS / 1000) }), true;
+    }
+    if (m === "PATCH" && path.length === 1 && path[0] === "id-masuk") {
+      const id = needOrtuSaya();
+      const login = loginAnak(body.login);
+      if (!POLA_LOGIN_ANAK.test(login)) throw new ApiError(400, "ID masuk harus 3–24 huruf Latin, angka, titik, garis bawah, atau tanda hubung.");
+      const hasil = db.prepare(`INSERT INTO login_id_ortu (parent_id, login)
+        SELECT ?, ? WHERE NOT EXISTS (SELECT 1 FROM children WHERE login_anak = ?)
+          AND NOT EXISTS (SELECT 1 FROM login_id_ortu WHERE login = ? AND parent_id != ?)
+        ON CONFLICT(parent_id) DO UPDATE SET login = excluded.login`).run(id, login, login, login, id);
+      if (!hasil.changes) throw new ApiError(409, "Nama pengguna sudah dipakai. Pilih nama lain.");
+      return send(200, { login }), true;
     }
     // Lupa kata sandi: jawabannya selalu sama, supaya tidak bisa dipakai untuk menebak email mana yang terdaftar.
     if (m === "POST" && path[0] === "lupa-sandi") {
@@ -428,10 +462,10 @@ export async function handleApi(req, res) {
     if (m === "GET" && path[0] === "saya") {
       const out = { ortu: null, anak: null, children: [] };
       if (ortu) {
-        const p = db.prepare("SELECT id, name, email, avatar, avatar_lama, aksesori_pakai, aksesori_punya, bintang, peran, kepala_id FROM parents WHERE id = ?").get(ortu.parent_id);
+        const p = db.prepare("SELECT id, name, email, avatar, avatar_lama, aksesori_pakai, aksesori_punya, bintang, peran, kepala_id, negara FROM parents WHERE id = ?").get(ortu.parent_id);
         out.ortu = p ? {
           name: p.name, email: p.email, avatar: avatarOr(p.avatar, DEFAULT_ORTU_AVATAR), avatarPunya: avatarOrtuDimiliki(p), aksesori: rapikanAksesori(p.aksesori_pakai),
-          id: p.id, peran: p.peran, kepala: !p.kepala_id, bintang: p.bintang, aksesoriPunya: aksesoriOrtuDimiliki(p),
+          id: p.id, login: db.prepare("SELECT login FROM login_id_ortu WHERE parent_id = ?").get(p.id)?.login, peran: p.peran, negara: p.negara, kepala: !p.kepala_id, bintang: p.bintang, aksesoriPunya: aksesoriOrtuDimiliki(p),
         } : null;
         out.children = keluargaId ? db.prepare("SELECT * FROM children WHERE parent_id = ? ORDER BY id").all(keluargaId).map(publicChild) : [];
       }
@@ -490,11 +524,55 @@ export async function handleApi(req, res) {
     // --- keluarga: anggota dan peran orang tua ---
     if (path[0] === "keluarga") {
       const kepala = needOrtu(), saya = ortuSaya;
-      const ringkas = () => {
-        const anggota = anggotaKeluarga(kepala).map((a) => ({ id: a.id, name: a.name, email: a.email, peran: a.peran, kepala: !a.kepala_id, saya: a.id === saya }));
-        return { anggota, sayaKepala: saya === kepala };
+      const ringkas = (kepalaAktif = kepala) => {
+        const anggota = anggotaKeluarga(kepalaAktif).map((a) => ({ id: a.id, name: a.name, email: a.email, login: db.prepare("SELECT login FROM login_id_ortu WHERE parent_id = ?").get(a.id)?.login, negara: a.negara, peran: a.peran, kepala: !a.kepala_id, saya: a.id === saya }));
+        return { anggota, sayaKepala: saya === kepalaAktif };
       };
       if (m === "GET" && path.length === 1) return send(200, ringkas()), true;
+      if (m === "POST" && path.length === 4 && path[1] === "anggota" && path[3] === "kepala") {
+        if (saya !== kepala) throw new ApiError(403, "Hanya kepala keluarga yang bisa mengalihkan peran ini.");
+        const baru = Number(path[2]);
+        if (!Number.isSafeInteger(baru) || baru <= 0) throw new ApiError(404, "Anggota tidak ditemukan.");
+        db.exec("BEGIN IMMEDIATE");
+        try {
+          const pindah = db.prepare("UPDATE parents SET kepala_id = NULL WHERE id = ? AND kepala_id = ?").run(baru, kepala);
+          if (!pindah.changes) throw new ApiError(404, "Anggota tidak ditemukan.");
+          db.prepare("UPDATE parents SET kepala_id = ? WHERE id = ?").run(baru, kepala);
+          db.prepare("UPDATE children SET parent_id = ? WHERE parent_id = ?").run(baru, kepala);
+          db.prepare("UPDATE sessions SET parent_id = ? WHERE role = 'anak' AND parent_id = ?").run(baru, kepala);
+          db.prepare("UPDATE tugas SET parent_id = ? WHERE parent_id = ?").run(baru, kepala);
+          db.prepare("UPDATE hadiah SET parent_id = ? WHERE parent_id = ?").run(baru, kepala);
+          db.prepare("UPDATE pesan_family SET keluarga_id = ? WHERE keluarga_id = ?").run(baru, kepala);
+          db.prepare("UPDATE family_dibaca SET keluarga_id = ? WHERE keluarga_id = ?").run(baru, kepala);
+          db.exec("COMMIT");
+        } catch (e) { db.exec("ROLLBACK"); throw e; }
+        return send(200, ringkas(baru)), true;
+      }
+      if (m === "PATCH" && path.length === 3 && path[1] === "pasangan") {
+        if (saya !== kepala) throw new ApiError(403, "Hanya kepala keluarga yang bisa mengubah akun pasangan.");
+        const akun = db.prepare("SELECT id, email FROM parents WHERE id = ? AND kepala_id = ?").get(Number(path[2]), kepala);
+        if (!akun) throw new ApiError(404, "Anggota tidak ditemukan.");
+        const email = str(body.email, 120).toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ApiError(400, "Alamat email tidak valid.");
+        if (!isNegara(body.negara)) throw new ApiError(400, "Pilih negara yang tersedia.");
+        if (typeof body.password !== "string" || (body.password && (body.password.length < 8 || body.password.length > 128))) {
+          throw new ApiError(400, "Kata sandi harus 8–128 karakter.");
+        }
+        const ubahLogin = email !== akun.email || Boolean(body.password);
+        db.exec("BEGIN IMMEDIATE");
+        try {
+          if (db.prepare("SELECT 1 FROM parents WHERE email = ? AND id != ?").get(email, akun.id)) throw new ApiError(409, "Email ini sudah terdaftar. Gunakan email lain.");
+          db.prepare("UPDATE parents SET email = ?, negara = ?, pass_hash = COALESCE(?, pass_hash) WHERE id = ? AND kepala_id = ?")
+            .run(email, body.negara, body.password ? hashSecret(body.password) : null, akun.id, kepala);
+          if (ubahLogin) {
+            db.prepare("DELETE FROM sessions WHERE parent_id = ? AND role = 'ortu'").run(akun.id);
+            db.prepare("DELETE FROM password_resets WHERE parent_id = ?").run(akun.id);
+          }
+          db.exec("COMMIT");
+        } catch (e) { db.exec("ROLLBACK"); throw e; }
+        if (ubahLogin) kick(`o${akun.id}`);
+        return send(200, ringkas()), true;
+      }
       if (m === "POST" && path.length === 2 && path[1] === "pasangan") {
         if (saya !== kepala) throw new ApiError(403, "Hanya kepala keluarga yang bisa menambah akun pasangan.");
         const name = str(body.name, 40);
@@ -511,10 +589,16 @@ export async function handleApi(req, res) {
           if (db.prepare("SELECT 1 FROM parents WHERE email = ?").get(email)) throw new ApiError(409, "Email ini sudah terdaftar. Gunakan email lain.");
           const peran = anggota[0].peran === "ayah" ? "ibu" : "ayah";
           const now = Date.now();
-          db.prepare("INSERT INTO parents (email, pass_hash, name, consent_at, created_at, avatar, peran, kepala_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-            .run(email, hashSecret(body.password), name, now, now, AVATAR_PERAN[peran], peran, kepala);
+          const hasil = db.prepare("INSERT INTO parents (email, pass_hash, name, consent_at, created_at, avatar, peran, kepala_id, negara) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            .run(email, hashSecret(body.password), name, now, now, AVATAR_PERAN[peran], peran, kepala, negaraOrtu(body.negara));
+          buatIdMasukOrtu({ id: Number(hasil.lastInsertRowid), name });
           db.exec("COMMIT");
         } catch (e) { db.exec("ROLLBACK"); throw e; }
+        return send(200, ringkas()), true;
+      }
+      if (m === "PATCH" && path.length === 2 && path[1] === "negara") {
+        if (!isNegara(body.negara)) throw new ApiError(400, "Pilih negara yang tersedia.");
+        db.prepare("UPDATE parents SET negara = ? WHERE id = ?").run(body.negara, saya);
         return send(200, ringkas()), true;
       }
       if (m === "PATCH" && path[1] === "peran") {
@@ -724,6 +808,10 @@ export async function handleApi(req, res) {
     if (handleHadiah({ m, path, body, ortuId: ortu ? keluargaId : null, ortuSaya, anak, send, ApiError })) return true;
 
     // --- Toko Avatar orang tua (bintang orang tua sendiri) ---
+    if (m === "POST" && ["toko", "toko-ortu"].includes(path[0]) && ["beli", "beli-avatar"].includes(path[1])) {
+      const uid = path[0] === "toko-ortu" ? (ortuSaya && `o${ortuSaya}`) : (anak && `a${anak.child_id}`);
+      if (uid && !isOnline(uid)) throw new ApiError(403, "Masuk arena untuk membeli avatar atau aksesori.");
+    }
     if (handleTokoOrtu({ m, path, body, ortuSaya: ortu ? ortuSaya : null, send, ApiError })) return true;
     if (handleKantor({ m, path, body, ortuSaya: ortu?.role === "ortu" ? ortuSaya : null, keluargaId, anak, url, send, ApiError })) return true;
 

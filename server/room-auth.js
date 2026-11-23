@@ -1,6 +1,6 @@
 // Pemeriksaan identitas untuk semua ruang game.
 import colyseus from "colyseus";
-import { playerFromTicket, secondsToday, idKeluarga } from "./accounts.js";
+import { playerFromTicket, secondsToday, sekeluarga } from "./accounts.js";
 import { areFriends, blockedEitherWay, uidOf } from "./social.js";
 import { dudukDiMeja } from "./rooms/kursi-game.js";
 
@@ -20,8 +20,7 @@ export function authPlayer(options = {}) {
 // dengan anak keluarga lain, dan pemain yang saling blokir tidak dipasangkan.
 function bolehSemeja(a, b) {
   if (blockedEitherWay(uidOf(a), uidOf(b))) return false;
-  const keluarga = (p) => (p.role === "anak" ? p.parentId : idKeluarga(p.parentId));
-  if (keluarga(a) === keluarga(b)) return true;
+  if (sekeluarga(a, b)) return true;
   if (a.role === "ortu" && b.role === "ortu") return true;
   if (a.role !== "anak" || b.role !== "anak") return false;
   return areFriends(a.childId, b.childId) || (a.allowStrangers && b.allowStrangers && a.jenjang === b.jenjang);

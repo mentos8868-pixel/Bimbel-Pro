@@ -107,6 +107,7 @@ if (!db.prepare("PRAGMA table_info(parents)").all().some((c) => c.name === "akse
 // Aksesori yang sudah dipakai orang tua sebelum toko ini ada dianggap sudah dimiliki.
 {
   const cols = db.prepare("PRAGMA table_info(parents)").all().map((c) => c.name);
+  if (!cols.includes("negara")) db.exec("ALTER TABLE parents ADD COLUMN negara TEXT");
   if (!cols.includes("bintang")) db.exec("ALTER TABLE parents ADD COLUMN bintang INTEGER NOT NULL DEFAULT 0");
   if (!cols.includes("aksesori_punya")) {
     db.exec("ALTER TABLE parents ADD COLUMN aksesori_punya TEXT NOT NULL DEFAULT ''");
@@ -147,3 +148,16 @@ export function today(now = Date.now()) {
 export function lastDays(n, now = Date.now()) {
   return Array.from({ length: n }, (_, i) => today(now - (n - 1 - i) * 86400000));
 }
+
+db.exec("CREATE TABLE IF NOT EXISTS login_id_ortu (parent_id INTEGER PRIMARY KEY REFERENCES parents(id) ON DELETE CASCADE, login TEXT NOT NULL UNIQUE)");
+export function buatIdMasukOrtu(p) {
+  const dasar = p.name.toLowerCase().replace(/[^a-z0-9_.-]/g, "").slice(0, 16);
+  let percobaan = 0;
+  let login = dasar.length >= 3 ? dasar : "ortu" + p.id;
+  while (db.prepare("SELECT login FROM login_id_ortu WHERE login = ? UNION SELECT login_anak FROM children WHERE login_anak = ?").get(login, login)) {
+    login = "ortu" + p.id + "_" + (++percobaan);
+  }
+  db.prepare("INSERT INTO login_id_ortu VALUES (?, ?)").run(p.id, login);
+}
+
+for (const p of db.prepare("SELECT id, name FROM parents WHERE id NOT IN (SELECT parent_id FROM login_id_ortu) ORDER BY id").all()) buatIdMasukOrtu(p);

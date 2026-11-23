@@ -19,21 +19,9 @@
         <!-- Belum masuk -->
         <section data-step="pilih" hidden>
           <h1>Selamat datang!</h1>
-          <p class="muted">Siapa yang mau bermain?</p>
-          <button class="primary" data-go="login-anak">Masuk sebagai anak</button>
-          <a class="btn" href="/orangtua.html">Saya orang tua: masuk / daftar</a>
+          <a class="btn primary" href="/orangtua.html?login">Masuk</a>
           <p class="muted">Belum punya akun? Orang tua mendaftar dulu, lalu membuat akun anak di dashboard orang tua.</p>
         </section>
-
-        <form data-step="login-anak" id="form-login-anak" hidden>
-          <h2>Masuk sebagai anak</h2>
-          <p class="muted">Gunakan nama pengguna dan kata sandi dari orang tua.</p>
-          <label>Nama pengguna <input name="loginAnak" maxlength="24" autocomplete="username" required /></label>
-          <label>Kata sandi <input name="sandiAnak" type="password" maxlength="128" autocomplete="current-password" required /></label>
-          <span class="error" hidden></span>
-          <button type="submit" class="primary">Masuk</button>
-          <button type="button" class="ghost" data-act="kembali-login-anak">Kembali</button>
-        </form>
 
         <!-- Perangkat keluarga: orang tua sudah masuk -->
         <section data-step="keluarga" hidden>
@@ -41,7 +29,7 @@
           <div id="anak-list" class="kids"></div>
           <p id="anak-kosong" class="muted" hidden>Belum ada akun anak. Buat dulu di dashboard orang tua.</p>
           <div class="row">
-            <button data-go="login-anak">Masuk dengan kata sandi</button>
+            <a class="btn" href="/orangtua.html?login">Masuk dengan akun lain</a>
             <button data-go="ortu">Main sebagai orang tua</button>
             <a class="btn" href="/orangtua.html">Dashboard orang tua</a>
           </div>
@@ -290,26 +278,6 @@
         <div class="row">
           <button id="scr-again" class="primary" hidden>Main lagi</button>
           <button id="scr-close" class="ghost">Keluar</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="beda-gambar-panel" class="overlay" hidden>
-      <div class="card kartu-beda-gambar">
-        <h2>Spot the Differences</h2>
-        <h3 data-judul-beda tabindex="-1"></h3>
-        <p data-skor-beda></p>
-        <ul data-lobi-beda hidden></ul>
-        <div class="beda-gambar-grid" data-isi-beda hidden>
-          <section><h4>Gambar A</h4><div class="beda-gambar" data-gambar-beda></div></section>
-          <section><h4>Gambar B</h4><div class="beda-gambar" data-gambar-beda></div></section>
-        </div>
-        <p data-pesan-beda role="status"></p>
-        <div class="row">
-          <button type="button" class="primary" data-lanjut-beda hidden>Adegan berikutnya</button>
-            <button type="button" class="primary" data-berdua-beda hidden>Ready</button>
-          <button type="button" data-ulang-beda>Main ulang</button>
-          <button type="button" data-tutup-beda>Keluar</button>
         </div>
       </div>
     </div>

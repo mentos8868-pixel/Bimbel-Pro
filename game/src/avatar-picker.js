@@ -3,6 +3,7 @@
 // hanya deretan jenis yang tampil, dan memilih jenis langsung memilih "<jenis>-<anggota>".
 // Dipakai untuk orang tua (anggota = peran Ayah/Ibu) dan anak (anggota = laki-laki/perempuan).
 import { FAMILIES, MEMBERS, parseAvatar, avatarOr, isAvatar } from "../../shared/avatars.js";
+import { terjemah } from "./bahasa.js";
 import { avatarSvg } from "./avatar-svg.js";
 
 // wrap: elemen kosong. Mengembalikan { get, set, setAccent, setDimiliki, setAnggota }.
@@ -34,7 +35,8 @@ export function avatarPicker(wrap, { value, accent = "#4f9cf0", onPick = () => {
       b.setAttribute(anggota ? "aria-pressed" : "aria-selected", on);
       b.innerHTML = avatarSvg(id || `${f.id}-${f.hanyaAnggota || "putra"}`, accent);
       const t = document.createElement("span");
-      t.textContent = f.name;
+      t.dataset.terjemah = f.name;
+      t.textContent = terjemah(f.name);
       b.append(t);
       b.onclick = () => {
         family = f.id;

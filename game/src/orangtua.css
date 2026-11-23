@@ -163,9 +163,9 @@ main:has(#dash:not([hidden])) { max-width: 1200px; }
 .isi { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .judul-hal { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
 .judul-hal p { margin: 0; }
-.pilih-anak { display: flex; gap: 6px; }
-.pilih-anak button { padding: 6px 14px; font-size: 15px; }
-.pilih-anak button.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+.pilih-profil, .pilih-anak { display: flex; flex-wrap: wrap; gap: 6px; }
+.pilih-profil > button, .pilih-anak button { padding: 6px 14px; font-size: 15px; }
+.pilih-profil > button.on, .pilih-anak button.on { background: var(--primary); color: #fff; border-color: var(--primary); }
 .luar { display: none !important; }
 .home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
 .home-persetujuan { grid-column: 1 / -1; }

@@ -39,26 +39,17 @@ export function setupLogin(onStart) {
   };
 
   const go = (step) => show(step);
-  // Orang tua yang sedang bekerja tidak bisa masuk arena: tampilkan sisa waktu dan tombol Stop kerja.
+  // Orang tua yang sedang bekerja tidak bisa masuk arena: tampilkan waktu kerja dan tombol Stop kerja.
   let timerKerja = 0;
   const tampilBekerja = (status) => {
     clearInterval(timerKerja);
-    const selesai = Date.now() + status.sisaMs;
     const tempat = status.pekerjaan === "sawah" ? "Sawah" : "Kantor";
     const aksi = $("bekerja-aksi");
     const detak = () => {
-      const sisa = Math.max(0, Math.ceil((selesai - Date.now()) / 1000));
-      if (!sisa) {
-        clearInterval(timerKerja);
-        $("bekerja-info").textContent = `Sesi kerja di ${tempat} sudah selesai. Ambil bintangmu di ${tempat} dalam arena.`;
-        $("bekerja-sisa").textContent = "";
-        aksi.textContent = "Masuk ke arena";
-        aksi.dataset.act = "main-ortu";
-        return;
-      }
-      $("bekerja-sisa").textContent = [Math.floor(sisa / 3600), Math.floor(sisa / 60) % 60, sisa % 60].map((n) => String(n).padStart(2, "0")).join(":") + " lagi";
+      const detik = Math.max(0, Math.floor((Date.now() - status.mulaiAt) / 1000));
+      $("bekerja-sisa").textContent = [Math.floor(detik / 3600), Math.floor(detik / 60) % 60, detik % 60].map((n) => String(n).padStart(2, "0")).join(":");
     };
-    $("bekerja-info").textContent = `Kamu sedang bekerja di ${tempat}. Selama bekerja kamu tidak bisa masuk arena. Tekan Stop kerja untuk berhenti (bintang hanya didapat bila sesi selesai).`;
+    $("bekerja-info").textContent = `Kamu sedang bekerja di ${tempat}. Selama bekerja kamu tidak bisa masuk arena. Tekan Stop kerja untuk berhenti dan menerima bintang untuk setiap jam penuh.`;
     aksi.textContent = "⏹ Stop kerja";
     aksi.dataset.act = "stop-kerja";
     go("bekerja");
@@ -67,10 +58,10 @@ export function setupLogin(onStart) {
   };
   const mainOrtu = async () => {
     const kerja = await api("GET", "kantor").catch(() => null);
-    if (kerja?.sisaMs > 0) return tampilBekerja(kerja);
+    if (kerja?.mulaiAt != null) return tampilBekerja(kerja);
     clearInterval(timerKerja);
     box().hidden = true;
-    onStart({ role: "ortu", name: me.ortu.name, jenjang: "Orang tua", gameJenjang: jenjangOrtu(), color: WARNA_ORTU, avatar: me.ortu.avatar || DEFAULT_ORTU_AVATAR, aksesori: (me.ortu.aksesori || []).join(",") }, "ortu");
+    onStart({ role: "ortu", name: me.ortu.name, negara: me.ortu.negara || "", jenjang: "Orang tua", gameJenjang: jenjangOrtu(), color: WARNA_ORTU, avatar: me.ortu.avatar || DEFAULT_ORTU_AVATAR, aksesori: (me.ortu.aksesori || []).join(",") }, "ortu");
   };
   const refresh = async () => {
     show("muat");
@@ -130,14 +121,7 @@ export function setupLogin(onStart) {
       const s = document.createElement("small");
       s.textContent = c.jenjang;
       b.append(dot, n, s);
-      b.onclick = () => {
-        const form = $("form-login-anak");
-        form.loginAnak.value = c.loginAnak || "";
-        form.sandiAnak.value = "";
-        go("login-anak");
-        if (c.loginAnak) form.sandiAnak.focus();
-        else err("login-anak", "Atur nama pengguna dan kata sandi anak di Setting dashboard orang tua.");
-      };
+      b.onclick = () => { location.href = "/orangtua.html?login"; };
       return b;
     }));
     $("anak-kosong").hidden = me.children.length > 0;
@@ -150,7 +134,6 @@ export function setupLogin(onStart) {
     if (!b) return;
     if (b.dataset.go) return go(b.dataset.go);
     const act = b.dataset.act;
-    if (act === "kembali-login-anak") return go(me?.ortu ? "keluarga" : "pilih");
     if (act === "keluar") {
       await api("POST", "keluar").catch(() => {});
       return refresh();
@@ -184,22 +167,6 @@ export function setupLogin(onStart) {
     }
   });
 
-  $("form-login-anak").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const form = e.currentTarget;
-    err("login-anak", "");
-    busy(form, true);
-    try {
-      await api("POST", "anak/masuk", { loginAnak: form.loginAnak.value, sandiAnak: form.sandiAnak.value });
-      location.replace("/anak.html");
-    } catch (x) {
-      err("login-anak", x.message);
-      form.sandiAnak.value = "";
-      form.sandiAnak.focus();
-    } finally {
-      busy(form, false);
-    }
-  });
 
 
   refresh();

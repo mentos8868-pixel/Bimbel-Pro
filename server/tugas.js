@@ -21,6 +21,15 @@ db.exec(`
     created_at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS tugas_anak ON tugas(child_id, aktif);
+  CREATE TABLE IF NOT EXISTS tugas_dana (
+    tugas_id INTEGER PRIMARY KEY REFERENCES tugas(id) ON DELETE CASCADE,
+    pembuat_id INTEGER REFERENCES parents(id) ON DELETE SET NULL,
+    cadangan INTEGER NOT NULL
+  );
+  CREATE TRIGGER IF NOT EXISTS kembalikan_cadangan_tugas BEFORE DELETE ON tugas_dana
+  WHEN OLD.cadangan > 0 BEGIN
+    UPDATE parents SET bintang = bintang + OLD.cadangan WHERE id = OLD.pembuat_id;
+  END;
   CREATE TABLE IF NOT EXISTS tugas_catatan (
     tugas_id INTEGER NOT NULL REFERENCES tugas(id) ON DELETE CASCADE,
     tanggal TEXT NOT NULL,            -- hari tugas dikerjakan (YYYY-MM-DD, WIB)
@@ -119,7 +128,7 @@ function validTugas(b) {
 
 // Mengembalikan true bila permintaan ditangani.
 // ortuId = id orang tua yang masuk (atau null), anak = sesi anak (atau null), ownChild(pid, id) melempar 404 bila bukan anaknya.
-export function handleTugas({ m, path, body, url, ortuId, anak, ownChild, send, ApiError }) {
+export function handleTugas({ m, path, body, url, ortuId, ortuSaya, anak, ownChild, send, ApiError }) {
   if (path[0] !== "tugas") return false;
   const salah = (fn) => { try { return fn(); } catch (e) { throw e instanceof ApiError ? e : new ApiError(400, e.message); } };
 
@@ -145,6 +154,10 @@ export function handleTugas({ m, path, body, url, ortuId, anak, ownChild, send, 
 
   // ----- orang tua -----
   if (!ortuId) throw new ApiError(401, "Silakan masuk sebagai orang tua.");
+  function potongSaldo(id, jumlah) {
+    const hasil = db.prepare("UPDATE parents SET bintang = bintang - ? WHERE id = ? AND bintang >= ?").run(jumlah, id, jumlah);
+    if (!hasil.changes) throw new ApiError(400, `Saldo pembuat tugas kurang. Hadiah ini membutuhkan ${jumlah} bintang.`);
+  }
   if (path.length === 1 && m === "GET") {
     const kids = db.prepare("SELECT id FROM children WHERE parent_id = ? ORDER BY id").all(ortuId);
     return send(200, { anak: Object.fromEntries(kids.map((k) => [k.id, tugasAnak(k.id)])), kuotaBintang: kuotaBintang(ortuId) }), true;
@@ -154,21 +167,33 @@ export function handleTugas({ m, path, body, url, ortuId, anak, ownChild, send, 
     const n = db.prepare("SELECT COUNT(*) AS n FROM tugas WHERE child_id = ? AND aktif = 1").get(c.id).n;
     if (n >= MAKS_TUGAS_PER_ANAK) throw new ApiError(400, `Maksimal ${MAKS_TUGAS_PER_ANAK} tugas aktif per anak.`);
     const f = salah(() => validTugas(body));
-    db.prepare(`INSERT INTO tugas (parent_id, child_id, judul, jenis, jadwal, hari, bintang, mulai, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      potongSaldo(ortuSaya, f.bintang);
+      const hasil = db.prepare(`INSERT INTO tugas (parent_id, child_id, judul, jenis, jadwal, hari, bintang, mulai, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(ortuId, c.id, f.judul, f.jenis, f.jadwal, f.hari, f.bintang, today(), Date.now());
+      db.prepare("INSERT INTO tugas_dana VALUES (?, ?, ?)").run(hasil.lastInsertRowid, ortuSaya, f.bintang);
+      db.exec("COMMIT");
+    } catch (e) { db.exec("ROLLBACK"); throw e; }
     notify(`a${c.id}`, "info", `Tugas baru dari orang tua: ${f.judul}`);
     return send(200, tugasAnak(c.id)), true;
   }
   const t = db.prepare("SELECT * FROM tugas WHERE id = ? AND parent_id = ?").get(Number(path[1]), ortuId);
   if (!t) throw new ApiError(404, "Tugas tidak ditemukan.");
   if (path.length === 2 && m === "DELETE") {
-    db.prepare("UPDATE tugas SET aktif = 0 WHERE id = ?").run(t.id);   // riwayat tetap ada
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      db.prepare("DELETE FROM tugas_dana WHERE tugas_id = ?").run(t.id);
+      db.prepare("UPDATE tugas SET aktif = 0 WHERE id = ?").run(t.id);
+      db.exec("COMMIT");
+    } catch (e) { db.exec("ROLLBACK"); throw e; }
     return send(200, tugasAnak(t.child_id)), true;
   }
   if ((path[2] === "setujui" || path[2] === "belum") && m === "POST") {
     const tgl = String(body.tanggal || "");
     if (!TGL.test(tgl)) throw new ApiError(400, "Tanggal tidak valid.");
     const setuju = path[2] === "setujui";
+    if (!t.aktif) throw new ApiError(400, "Tugas sudah dihapus.");
     db.exec("BEGIN IMMEDIATE");
     try {
       const row = db.prepare("SELECT status FROM tugas_catatan WHERE tugas_id = ? AND tanggal = ?").get(t.id, tgl);
@@ -179,7 +204,12 @@ export function handleTugas({ m, path, body, url, ortuId, anak, ownChild, send, 
         throw new ApiError(400, `Batas pemberian ${batas} bintang per hari. Sisa hari ini ${sisa} bintang. Tugas ini masih bisa disetujui besok.`);
       }
       db.prepare("UPDATE tugas_catatan SET status = ?, diubah_at = ? WHERE tugas_id = ? AND tanggal = ?").run(setuju ? "disetujui" : "belum", sekarang, t.id, tgl);
-      if (setuju && t.bintang) db.prepare("UPDATE children SET bintang = bintang + ? WHERE id = ?").run(t.bintang, t.child_id);
+      if (setuju && t.bintang) {
+        const dana = db.prepare("SELECT * FROM tugas_dana WHERE tugas_id = ?").get(t.id);
+        if (dana?.cadangan) db.prepare("UPDATE tugas_dana SET cadangan = 0 WHERE tugas_id = ?").run(t.id);
+        else potongSaldo(dana?.pembuat_id ?? ortuSaya, t.bintang);
+        db.prepare("UPDATE children SET bintang = bintang + ? WHERE id = ?").run(t.bintang, t.child_id);
+      }
       db.exec("COMMIT");
     } catch (e) { db.exec("ROLLBACK"); throw e; }
     notify(`a${t.child_id}`, "info", setuju

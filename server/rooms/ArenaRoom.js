@@ -6,7 +6,6 @@ import { uidOf } from "../social.js";
 import { avatarOr } from "../../shared/avatars.js";
 import { db } from "../db.js";
 import { sedangBekerja } from "../kantor.js";
-import { siapkanBedaGambar } from "./arena-beda-gambar.js";
 import { siapkanKursiGame } from "./kursi-game.js";
 import { rapikanAksesori } from "../../shared/aksesori.js";
 import { levelDariXp, auraUntukLevel } from "../../shared/aura.js";
@@ -27,7 +26,7 @@ defineTypes(Player, {
   jenjang: "string",
   color: "string",
   avatar: "string",
-  negara: "string",   // kode negara anak ("" untuk orang tua)
+  negara: "string",   // kode negara, atau kosong bila belum diatur
   kelas: "number",    // 1–12, 0 = belum diisi / orang tua
   aksesori: "string",  // aksesori Toko yang dipakai, dipisah koma
   aura: "string",      // aura avatar menurut level ("" = belum ada, lihat shared/aura.js)
@@ -64,7 +63,6 @@ export class ArenaRoom extends Room {
     this.clock.setInterval(() => this.segarkanStatusKerja(), 1000);
 
     setupSocial(this);
-    this.keluarBedaGambar = siapkanBedaGambar(this);
     this.lepasKursiGame = siapkanKursiGame(this);
     this.posisiSebelumBelajar = new Map();
 
@@ -148,7 +146,7 @@ export class ArenaRoom extends Room {
     p.jenjang = a.role === "ortu" ? "Orang tua" : a.jenjang;
     p.color = WARNA.test(a.color || "") ? a.color : "#4f9cf0";
     p.avatar = avatarOr(a.avatar);
-    p.negara = a.role === "anak" ? a.negara || "" : "";
+    p.negara = a.negara || "";
     p.kelas = a.role === "anak" ? a.kelas || 0 : 0;
     p.kurikulum = a.role === "anak" ? a.kurikulum || "merdeka" : "";
     p.aksesori = a.aksesori || "";   // anak: dari Toko; orang tua: dipilih di dashboard (gratis)
@@ -172,7 +170,6 @@ export class ArenaRoom extends Room {
   }
 
   onLeave(client) {
-    this.keluarBedaGambar(client);
     if (client.auth) this.lepasKursiGame(client);
     this.posisiSebelumBelajar.delete(client.sessionId);
     this.state.players.delete(client.sessionId);

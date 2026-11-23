@@ -50,6 +50,10 @@ export function makeSign(scene, lines, { width = 4, height = 1.4, bg = "#ffffff"
     if (flag && i === 1) {
       // Bendera + teks, ditengahkan bersama.
       const fh = Math.round(size * 0.9), fw = Math.round(fh * 1.5), gap = Math.round(size * 0.35);
+      if (!t) {
+        drawFlag(ctx, flag, (texW - fw) / 2, y - fh / 2, fw, fh);
+        return;
+      }
       const tw = Math.min(ctx.measureText(t).width, texW - 60 - fw - gap);
       const x0 = (texW - (fw + gap + tw)) / 2;
       drawFlag(ctx, flag, x0, y - fh / 2, fw, fh);
@@ -353,7 +357,6 @@ export function createArena(canvas) {
   const gayaMeja = {
     catur: ["Catur", "#c99563"], scramble: ["Scramble Words", "#9b7bd8"],
     kartu: ["Kartu Kilat", "#ef6f5e"], otello: ["Otello", "#31877f"],
-    "beda-gambar": ["Spot the Differences", "#3d8b70"],
   };
   const tables = MEJA_GAME.map((meja) => {
     const [label, warna] = gayaMeja[meja.id];
@@ -459,8 +462,8 @@ export function createAvatar(scene, { color, avatar, aksesori = "", aura = "", n
   const root = new TransformNode("avatar", scene);
   const ortu = role === "ortu";
   const { bob, meshes, height, kaki, laptop, cangkul } = buildAvatar3d(scene, root, avatar, color, aksesori, aura, ortu);
-  const sub = kelas ? namaKelas(kelas, kurikulum, true) : jenjang;
-  const tag = makeSign(scene, [name, sub], { width: 1.8, height: 0.6, bg: "rgba(255,255,255,0.9)", flag: negara });
+  const sub = ortu ? "" : kelas ? namaKelas(kelas, kurikulum, true) : jenjang;
+  const tag = makeSign(scene, sub || negara ? [name, sub] : [name], { width: 1.8, height: 0.6, bg: "rgba(255,255,255,0.9)", flag: negara });
   tag.position.y = height + 0.3;
   tag.parent = root;
   tag.billboardMode = Mesh.BILLBOARDMODE_ALL;

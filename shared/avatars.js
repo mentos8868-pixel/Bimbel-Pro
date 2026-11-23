@@ -50,7 +50,8 @@ export const avatarOr = (id, fallback = DEFAULT_AVATAR) => (isAvatar(id) ? id : 
 export const avatarName = (id) => {
   const a = parseAvatar(id);
   if (!a) return "";
-  return a.family.hanyaAnggota ? a.family.name : `${a.family.name} ${a.member.name.toLowerCase()}`;
+  if (a.family.hanyaAnggota || a.member.id === "ayah" || a.member.id === "ibu") return a.family.name;
+  return `${a.family.name} ${a.member.name.toLowerCase()}`;
 };
 
 export const KATALOG_AVATAR = FAMILIES.filter((f) => f.id !== "manusia").flatMap((f) =>

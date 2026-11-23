@@ -1,3 +1,4 @@
+import { bahasaDashboard, pilihanBahasa, terjemah } from "./bahasa.js";
 import { buatAlarm } from "./alarm-anak.js";
 // Dashboard anak: halaman pertama setelah anak masuk. Menu: Home, Tugas, Arena, Bimbel, Report, Chat, Avatar, Toko Avatar.
 // Hanya data milik anak itu sendiri (dari /api/saya, /api/kamarku, /api/toko). Pengaturan tetap di tangan orang tua.
@@ -5,12 +6,10 @@ import { api } from "./api.js";
 import { pasangSuara } from "./chat-suara.js";
 import { gelembungChat, kotakPesanChat } from "./chat-tampilan.js";
 import { avatarPicker, anggotaDari } from "./avatar-picker.js";
-import { katalogAvatar } from "./katalog-avatar.js";
 import { avatarSvg } from "./avatar-svg.js";
 import { namaKelas, kurikulumName, negaraName } from "../../shared/negara.js";
 import { SLOT } from "../../shared/aksesori.js";
 import { AURA } from "../../shared/aura.js";
-import { KATALOG_AVATAR, parseAvatar } from "../../shared/avatars.js";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -28,7 +27,6 @@ const HAL = {
   report: ["Report", "Catatan bermain dan belajarmu."],
   chat: ["Chat", "Pesan dengan orang tua."],
   avatar: ["Avatar", "Pilih avatar kesukaanmu."],
-  toko: ["Toko Avatar", "Tukar bintang dengan aksesori untuk avatarmu."],
 };
 let hal = HAL[location.hash.slice(1)] ? location.hash.slice(1) : "home";
 let anak = null;   // profil dari /api/saya
@@ -43,7 +41,6 @@ let chatTimer = 0;
 let bersihkanSuara;
 let uang = null;   // uang saku (diberi orang tua) dan belanja/tabungan (dicatat anak): /api/keuangan/saya
 let hd = null;     // hadiah tukar bintang dari orang tua: /api/hadiah/saya
-let yakinBeli = null;
 // Menu Avatar dibagi tiga tab: Karakter, Aksesori (yang sudah dimiliki), Aura (terbuka sesuai level).
 const TAB_AVATAR = [["karakter", "🐻 Karakter"], ["aksesori", "🎀 Aksesori"], ["aura", "✨ Aura"]];
 let tabAvatar = "karakter";
@@ -237,46 +234,21 @@ const ISI = {
   avatar: () => {
     const memuat = `<p class="muted">Memuat…</p>`;
     const isi = tabAvatar === "aksesori"
-      ? `<section class="panel"><h3>🎀 Aksesoriku</h3><p class="muted kecil">Pakai atau lepas aksesori yang sudah kamu punya. Aksesori baru bisa dibeli di <button class="link" data-ke-hal="toko">Toko Avatar</button>.</p>${toko ? isiAksesoriku() : memuat}</section>`
+      ? `<section class="panel"><h3>${terjemah("🎀 Aksesoriku")}</h3><p class="muted kecil">Pakai atau lepas aksesori yang sudah kamu punya. Aksesori baru bisa dibeli di <a href="/?arena=1">Toko Avatar di arena</a>.</p>${toko ? isiAksesoriku() : memuat}</section>`
       : tabAvatar === "aura"
-      ? `<section class="panel"><h3>✨ Aura</h3><p class="muted kecil">Aura terbuka saat levelmu naik. Kumpulkan XP di Ruang Pintar untuk membuka aura baru.</p>${toko ? isiAura() : memuat}</section>`
-      : `<section class="panel"><h3>🐻 Pilih karakter</h3><div id="pilih-avatar"></div><span id="avatar-ok" class="muted" hidden>Avatar tersimpan ✓</span></section>`;
+      ? `<section class="panel"><h3>${terjemah("✨ Aura")}</h3><p class="muted kecil">Aura terbuka saat levelmu naik. Kumpulkan XP di Ruang Pintar untuk membuka aura baru.</p>${toko ? isiAura() : memuat}</section>`
+      : `<section class="panel"><h3>${terjemah("Avatar yang dimiliki")}</h3><div id="pilih-avatar"></div><span id="avatar-ok" class="muted" hidden>Avatar tersimpan ✓</span></section>`;
     return `${kepala(true)}
-      <div class="tab-avatar" role="tablist">${TAB_AVATAR.map(([id, t]) => `<button role="tab" aria-selected="${tabAvatar === id}" class="${tabAvatar === id ? "on" : ""}" data-tab-avatar="${id}">${t}</button>`).join("")}</div>
+      ${pilihanBahasa()}
+      <div class="tab-avatar" role="tablist">${TAB_AVATAR.map(([id, t]) => `<button role="tab" aria-selected="${tabAvatar === id}" class="${tabAvatar === id ? "on" : ""}" data-tab-avatar="${id}">${terjemah(t)}</button>`).join("")}</div>
       ${isi}
-      <div><button type="button" class="ghost" id="btn-keluar" ${sedangKeluar ? "disabled" : ""}>Keluar</button></div>`;
+      <div><button type="button" class="ghost" id="btn-keluar" ${sedangKeluar ? "disabled" : ""}>${terjemah("Keluar")}</button></div>`;
   },
-  toko: () => `${kepala()}
-    <section class="panel"><h3>🛍️ Toko Avatar <span class="saldo">★ ${toko ? toko.bintang : k.bintang} bintang</span></h3>
-      <p class="muted">Tukar bintang dengan avatar dan aksesori untuk dipakai di arena.</p><div id="toko-isi">${toko ? isiToko() : "<p class=\"muted\">Memuat toko…</p>"}</div></section>`,
 };
 
-function isiToko() {
-  // Avatar binatang langsung terlihat saat toko dibuka; anak tetap bisa menutupnya.
-  // Satu kartu per karakter (Ulat, Robo, ...), dalam versi anak itu sendiri (laki-laki/perempuan),
-  // jadi tidak perlu menulis ayah/ibu/anak.
-  const milik = parseAvatar(anak.avatar)?.member.id;
-  const anggota = milik === "putri" ? "putri" : "putra";
-  const daftar = KATALOG_AVATAR.filter((a) => a.id.endsWith(`-${anggota}`)).map((a) => ({ ...a, nama: parseAvatar(a.id).family.name }));
-  const katalog = katalogAvatar(toko, anak.color, yakinBeli, document.querySelector("[data-katalog-avatar]")?.open ?? true, daftar);
-  return katalog + SLOT.map((sl) => {
-    const items = toko.items.filter((a) => a.slot === sl.id);
-    if (!items.length) return "";
-    return `<h4>${esc(sl.name)}</h4><div class="toko-grid">${items.map((a) => {
-      const punya = toko.punya.includes(a.id), pakai = toko.pakai.includes(a.id), cukup = toko.bintang >= a.harga;
-      const tombol = punya ? `<button data-pakai="${a.id}" data-on="${pakai ? 0 : 1}" class="${pakai ? "" : "primary"}">${pakai ? "Lepas" : "Pakai"}</button>`
-        : yakinBeli === a.id ? `<button data-beli="${a.id}" class="yakin">Yakin? ★ ${a.harga}</button>`
-        : `<button data-beli="${a.id}" ${cukup ? "" : "disabled"}>${cukup ? "Beli" : "Bintang kurang"}</button>`;
-      return `<div class="toko-item ${pakai ? "pakai" : ""}"><span class="av-face">${gambarAvatar(a.id)}</span><b>${esc(a.name)}</b>
-        <span class="muted">${punya ? (pakai ? "Sedang dipakai" : "Sudah dimiliki") : `★ ${a.harga}`}</span>${tombol}</div>`;
-    }).join("")}</div>`;
-  }).join("");
-}
-
-// Tab Aksesori: hanya yang sudah dimiliki, dikelompokkan per tempat.
 function isiAksesoriku() {
   const milik = toko.items.filter((a) => toko.punya.includes(a.id));
-  if (!milik.length) return `<p class="muted">Kamu belum punya aksesori. <button class="link" data-ke-hal="toko">Beli di Toko Avatar</button></p>`;
+  if (!milik.length) return `<p class="muted">Kamu belum punya aksesori. <a href="/?arena=1">Beli di Toko Avatar di arena</a></p>`;
   return SLOT.map((sl) => {
     const items = milik.filter((a) => a.slot === sl.id);
     if (!items.length) return "";
@@ -306,17 +278,19 @@ function isiAura() {
 
 // ---------- menggambar menu ----------
 function gambar() {
+  bahasaDashboard("anak:" + anak.id, gambar);
   const [judul, sub] = HAL[hal];
-  $("judul").textContent = hal === "home" ? `Halo, ${anak.name}!` : judul;
-  $("sub").textContent = sub;
+  $("judul").textContent = hal === "home" ? `${terjemah("Halo")}, ${anak.name}!` : terjemah(judul);
+  $("sub").textContent = terjemah(sub);
   $("menu").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.ke === hal));
   clearInterval(chatTimer);
   bersihkanSuara?.();
   bersihkanSuara = null;
   $("halaman").innerHTML = ISI[hal]();
+  if (hal === "avatar") bahasaDashboard("anak:" + anak.id, gambar);
   if (hal === "home") alarmAnak.tampilkan();
   if (hal === "avatar" && $("pilih-avatar")) pasangAvatar();
-  if ((hal === "toko" || hal === "avatar") && !toko) {
+  if ((hal === "avatar") && !toko) {
     api("GET", "toko").then((j) => { toko = j; if (hal === "toko" || hal === "avatar") gambar(); }).catch((x) => galat(x.message));
   }
   if (hal === "chat") pasangChat();
@@ -547,33 +521,15 @@ $("halaman").addEventListener("click", async (e) => {
   } catch (x) { galat(x.message); }
   gambar();
 });
-// Beli (klik kedua untuk yakin) dan pakai/lepas aksesori di menu Toko Avatar dan tab Aksesori.
+// Pakai atau lepas aksesori di tab Avatar.
 $("halaman").addEventListener("click", async (e) => {
-  const b = e.target.closest("button[data-beli], button[data-pakai], button[data-beli-avatar], button[data-pakai-avatar]");
+  const b = e.target.closest("button[data-pakai]");
   if (!b || b.disabled || !toko) return;
   galat("");
   try {
-    if (b.dataset.beliAvatar) {
-      const id = b.dataset.beliAvatar;
-      if (yakinBeli !== id) { yakinBeli = id; $("toko-isi").innerHTML = isiToko(); return; }
-      yakinBeli = null;
-      b.disabled = true;
-      toko = { ...toko, ...(await api("POST", "toko/beli-avatar", { id })) };
-    } else if (b.dataset.pakaiAvatar) {
-      b.disabled = true;
-      const { avatar } = await api("POST", "avatar", { avatar: b.dataset.pakaiAvatar, sebagai: "anak" });
-      toko.avatar = avatar;
-    } else if (b.dataset.beli) {
-      const id = b.dataset.beli;
-      if (yakinBeli !== id) { yakinBeli = id; $("toko-isi").innerHTML = isiToko(); return; }
-      yakinBeli = null;
-      b.disabled = true;
-      toko = { ...toko, ...(await api("POST", "toko/beli", { id })) };
-      toko = { ...toko, ...(await api("POST", "toko/pakai", { id, pakai: true })) };
-    } else {
-      b.disabled = true;
-      toko = { ...toko, ...(await api("POST", "toko/pakai", { id: b.dataset.pakai, pakai: b.dataset.on === "1" })) };
-    }
+    b.disabled = true;
+    toko = { ...toko, ...(await api("POST", "toko/pakai", { id: b.dataset.pakai, pakai: b.dataset.on === "1" })) };
+
     k.bintang = toko.bintang;
     anak.avatar = toko.avatar;
     anak.avatarPunya = toko.avatarPunya;
@@ -624,7 +580,7 @@ async function muat() {
     const h2 = await api("GET", "hadiah/saya").catch(() => null);
     if (h2) { if (JSON.stringify(h2) !== JSON.stringify(hd)) beda = true; hd = h2; }
     if (ch2) ch = ch2;
-    if (beda && !["avatar", "toko", "chat", "keuangan"].includes(hal)) gambar(); else tandaChat();
+    if (beda && !["avatar", "chat", "keuangan"].includes(hal)) gambar(); else tandaChat();
   }, 30000);
   $("dash").hidden = false;
   document.title = `Dashboard ${anak.name}`;

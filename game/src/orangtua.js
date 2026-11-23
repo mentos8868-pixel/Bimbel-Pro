@@ -1,3 +1,4 @@
+import { bahasaDashboard, pilihanBahasa, terjemah } from "./bahasa.js";
 // Dashboard orang tua: masuk/daftar, laporan per anak, pengaturan, dan hapus data.
 import { api } from "./api.js";
 import { pasangSuara } from "./chat-suara.js";
@@ -7,17 +8,27 @@ import { katalogAvatar } from "./katalog-avatar.js";
 import { AVATAR_AWAL_ANAK, DEFAULT_ORTU_AVATAR } from "../../shared/avatars.js";
 import { avatarSvg } from "./avatar-svg.js";
 import { AKSESORI, SLOT } from "../../shared/aksesori.js";
-import { NEGARA, DEFAULT_NEGARA, negaraName, KURIKULUM, kurikulumName, namaKelas } from "../../shared/negara.js";
+import { NEGARA, DEFAULT_NEGARA, drawFlag, negaraName, KURIKULUM, kurikulumName, namaKelas } from "../../shared/negara.js";
 import { renderLaporanRP } from "./laporan-rp.js";
 
 const $ = (id) => document.getElementById(id);
 // Pilihan kelas mengikuti kurikulum: Merdeka "Kelas 1 SD" … "Kelas 12 SMA", Cambridge/Singapore "Primary 1 (P1)" ….
+function lokalPengaturan(root) {
+  for (const el of root.querySelectorAll("[data-terjemah], select option")) {
+    const kunci = el.dataset.terjemah || el.textContent;
+    el.dataset.terjemah = kunci;
+    el.textContent = terjemah(kunci);
+  }
+  for (const el of root.querySelectorAll("[data-placeholder]")) el.placeholder = terjemah(el.dataset.placeholder);
+}
+
 function fillKelasOptions(sel, kur, kelas) {
   sel.replaceChildren();
-  if (!kur) { sel.add(new Option("Pilih kurikulum dulu", "", true, true)); sel.disabled = true; return; }
+  if (!kur) { sel.add(new Option("Pilih kurikulum dulu", "", true, true)); sel.disabled = true; lokalPengaturan(sel.parentElement); return; }
   sel.disabled = false;
   sel.add(new Option("Pilih kelas", "", !kelas, !kelas));
   for (let k = 1; k <= 12; k++) sel.add(new Option(namaKelas(k, kur), String(k)));
+  lokalPengaturan(sel.parentElement);
   sel.value = kelas ? String(kelas) : "";
 }
 // Isi pilihan kurikulum (dipilih dulu), kelas, dan negara pada sebuah formulir.
@@ -36,7 +47,7 @@ function fillKelasNegara(root, kelas, negara, kurikulum = "") {
     s.value = negara || DEFAULT_NEGARA;
   });
 }
-const kelasText = (c) => `${kurikulumName(c.kurikulum)} · ${c.kelas ? namaKelas(c.kelas, c.kurikulum) : c.jenjang} · ${negaraName(c.negara)}`;
+const kelasText = (c) => [kurikulumName(c.kurikulum), c.kelas ? namaKelas(c.kelas, c.kurikulum) : c.jenjang, negaraName(c.negara)].map(terjemah).join(" · ");
 const COLORS = ["#4f9cf0", "#ef6f5e", "#f2b134", "#3e9b4f", "#9b7bd8", "#ec7fb5"];
 const GAME_NAME = { catur: "Catur", scramble: "Scramble Words", kartu: "Kartu Kilat" };
 const OUTCOME = { menang: "menang", kalah: "kalah", seri: "seri" };
@@ -44,7 +55,7 @@ const HARI = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 
 const setErr = (root, text) => {
   const e = root.querySelector(".error");
-  e.textContent = text || "";
+  e.textContent = terjemah(text || "");
   e.hidden = !text;
 };
 const busy = (form, on) => form.querySelectorAll("button").forEach((b) => (b.disabled = on));
@@ -55,6 +66,7 @@ function colorPicker(wrap, initial, onPick) {
     const b = document.createElement("button");
     b.type = "button";
     b.style.background = c;
+    b.dataset.warna = c;
     b.setAttribute("aria-label", "Warna " + c);
     b.className = c === chosen ? "on" : "";
     b.onclick = () => {
@@ -89,7 +101,7 @@ function showAuth(which) {
 document.querySelectorAll(".tabs button").forEach((t) => { t.onclick = () => showAuth(t.dataset.tab); });
 document.querySelectorAll("[data-show]").forEach((b) => {
   b.onclick = () => {
-    if (b.dataset.show === "lupa") $("form-lupa").email.value = $("form-masuk").email.value;
+    if (b.dataset.show === "lupa") $("form-lupa").email.value = $("form-masuk").login.value;
     if (location.hash) history.replaceState(null, "", location.pathname);
     showAuth(b.dataset.show);
   };
@@ -146,7 +158,15 @@ $("form-masuk").addEventListener("submit", async (e) => {
   setErr(f, "");
   busy(f, true);
   try {
-    await api("POST", "masuk", { email: f.email.value, password: f.password.value });
+    const login = f.login.value.trim();
+    const hasil = await api("POST", "masuk", { login, password: f.password.value });
+    if (hasil.sebagai === "anak") {
+      location.replace("/anak.html");
+      return;
+    }
+    const alamat = new URL(location.href);
+    alamat.searchParams.delete("login");
+    history.replaceState(null, "", alamat);
     f.reset();
     await load();
   } catch (x) { setErr(f, x.message); } finally { busy(f, false); }
@@ -162,7 +182,8 @@ function pilihKartu(wrap, opsi, awal, onPick = () => {}) {
       b.className = "kartu-peran" + (o.id === nilai ? " on" : "");
       b.setAttribute("aria-pressed", o.id === nilai);
       b.innerHTML = `<span class="av-face">${avatarSvg(o.avatar, o.warna || "#4f9cf0")}</span><b></b>`;
-      b.querySelector("b").textContent = o.label;
+      b.querySelector("b").dataset.terjemah = o.label;
+      b.querySelector("b").textContent = terjemah(o.label);
       b.onclick = () => { nilai = o.id; gambar(); onPick(o.id); };
       return b;
     }));
@@ -176,6 +197,11 @@ const PILIH_PERAN = [
 ];
 const peranDaftar = pilihKartu($("peran-daftar"), PILIH_PERAN, "");
 
+function opsiNegara(pilihan) {
+  return '<option value="" disabled ' + (!pilihan ? "selected" : "") + '>Pilih negara</option>' +
+    NEGARA.map(n => `<option value="${n.id}" ${pilihan === n.id ? "selected" : ""}>${n.name}</option>`).join("");
+}
+$("form-daftar").elements.negara.innerHTML = opsiNegara();
 $("form-daftar").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
@@ -184,14 +210,14 @@ $("form-daftar").addEventListener("submit", async (e) => {
   if (!f.consent.checked) return setErr(f, "Centang persetujuan orang tua dulu.");
   busy(f, true);
   try {
-    await api("POST", "daftar", { name: f.name.value, email: f.email.value, password: f.password.value, consent: true, peran: peranDaftar.get() });
+    await api("POST", "daftar", { name: f.name.value, email: f.email.value, password: f.password.value, consent: true, negara: f.elements.negara.value, peran: peranDaftar.get() });
     peranDaftar.set("");
     f.reset();
     await load();
   } catch (x) { setErr(f, x.message); } finally { busy(f, false); }
 });
 
-const tombolKeluarOrtu = [$("btn-keluar"), $("avatar-ortu-keluar")];
+const tombolKeluarOrtu = [$("btn-keluar")];
 async function keluarOrtu() {
   tombolKeluarOrtu.forEach((b) => (b.disabled = true));
   try {
@@ -223,9 +249,11 @@ $("form-anak").addEventListener("submit", async (e) => {
   if (!f.kelas.value) return setErr(f, "Pilih kelas anak.");
   busy(f, true);
   try {
-    await api("POST", "anak", { name: f.name.value, kelas: Number(f.kelas.value), kurikulum: f.kurikulum.value, negara: f.negara.value, color: newColor, avatar: newAvatar.get(), loginAnak: f.loginAnak.value, sandiAnak: f.sandiAnak.value });
+    const hasil = await api("POST", "anak", { name: f.name.value, kelas: Number(f.kelas.value), kurikulum: f.kurikulum.value, negara: f.negara.value, color: newColor, avatar: newAvatar.get(), loginAnak: f.loginAnak.value, sandiAnak: f.sandiAnak.value });
     f.reset();
     fillKelasNegara(f, 0, DEFAULT_NEGARA);
+    anakDipilih = hasil.child.id;
+    panelPengaturan = "anak";
     await load();
   } catch (x) { setErr(f, x.message); } finally { busy(f, false); }
 });
@@ -235,7 +263,7 @@ $("form-hapus-akun").addEventListener("submit", async (e) => {
   e.preventDefault();
   const box = e.target.closest("details");
   setErr(box, "");
-  if (!confirm("Hapus akun orang tua beserta semua akun anak dan riwayatnya? Ini tidak bisa dibatalkan.")) return;
+  if (!confirm(terjemah("Hapus akun orang tua beserta semua akun anak dan riwayatnya? Ini tidak bisa dibatalkan."))) return;
   try {
     await api("DELETE", "akun", { password: e.target.password.value });
     load();
@@ -451,7 +479,7 @@ function renderKid(c, soc) {
       const hasil = await api("PATCH", `anak/${c.id}/login`, { loginAnak: formLogin.loginAnak.value, sandiAnak: formLogin.sandiAnak.value });
       formLogin.loginAnak.value = hasil.loginAnak;
       formLogin.sandiAnak.value = "";
-      status.textContent = "Login anak tersimpan.";
+      status.textContent = terjemah("Login anak tersimpan.");
     } catch (x) {
       setErr(el, x.message);
     } finally {
@@ -459,7 +487,7 @@ function renderKid(c, soc) {
     }
   };
   el.querySelector(".btn-hapus").onclick = async () => {
-    if (!confirm(`Hapus akun ${c.name} beserta laporan dan riwayatnya? Ini tidak bisa dibatalkan.`)) return;
+    if (!confirm(terjemah("Hapus akun {nama} beserta laporan dan riwayatnya? Ini tidak bisa dibatalkan.").replace("{nama}", () => c.name))) return;
     try {
       await api("DELETE", `anak/${c.id}`);
       load();
@@ -478,32 +506,57 @@ const HAL = {
   keuangan: ["Keuangan", "Uang saku dan tabungan anak."],
   chat: ["Chat", "Pesan keluarga dan riwayat chat arena."],
   report: ["Report", "Waktu bermain dan kemajuan belajar."],
-  avatar: ["Avatar", "Avatar Anda sendiri, dipakai saat bermain di arena."],
   toko: ["Toko Avatar", "Beli karakter dan aksesori dengan bintang, sama seperti anak."],
   setting: ["Setting", "Data anak, batas waktu, sandi anak, dan akun Anda."],
 };
 // Menu yang isinya per anak (menampilkan pilihan anak di atas).
 const PER_ANAK = new Set(["tugas", "arena", "keuangan", "chat", "report", "setting"]);
-let hal = HAL[location.hash.slice(1)] ? location.hash.slice(1) : "home";
+function halamanDariAlamat() {
+  if (location.hash === "#avatar") {
+    $("menu-avatar-ortu").open = true;
+    history.replaceState(null, "", "#setting");
+  }
+  return location.hash.slice(1) || "home";
+}
+const halamanAwal = halamanDariAlamat();
+let hal = HAL[halamanAwal] ? halamanAwal : "home";
+let panelPengaturan = "anak";
 let anakDipilih = null;
 try { anakDipilih = Number(sessionStorage.getItem("ortu_anak")) || null; } catch { /* abaikan */ }
 let namaOrtu = "";
 
 function terapkanHal() {
+  bahasaDashboard("ortu:" + dataOrtu.id, terapkanHal);
+  lokalPengaturan(document.querySelector("header.top"));
+  document.title = terjemah("Dashboard Orang Tua");
+  $("pilih-anak").setAttribute("aria-label", terjemah("Pilih anak"));
   const [judul, sub] = HAL[hal];
-  $("halo").textContent = hal === "home" ? `Halo, ${namaOrtu}!` : judul;
-  $("sub-hal").textContent = sub;
+  $("halo").textContent = hal === "home" ? `${terjemah("Halo")}, ${namaOrtu}!` : terjemah(judul);
+  $("sub-hal").textContent = terjemah(sub);
   $("menu").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.ke === hal));
   $("dash").querySelectorAll("[data-hal]").forEach((el) => el.classList.toggle("luar", !el.dataset.hal.split(" ").includes(hal)));
   const kids = [...$("kids").children];
   if (kids.length && !kids.some((k) => Number(k.dataset.anak) === anakDipilih)) anakDipilih = Number(kids[0].dataset.anak);
-  for (const k of kids) k.hidden = !PER_ANAK.has(hal) || Number(k.dataset.anak) !== anakDipilih;
-  $("pilih-anak").hidden = hal === "chat" || !PER_ANAK.has(hal) || kids.length < 2;
-  $("pilih-anak").querySelectorAll("button").forEach((b) => b.classList.toggle("on", Number(b.dataset.anak) === anakDipilih));
+  for (const k of kids) k.hidden = (hal === "setting" && panelPengaturan !== "anak") || !PER_ANAK.has(hal) || Number(k.dataset.anak) !== anakDipilih;
+  $("pilih-anak").hidden = hal === "chat" || !PER_ANAK.has(hal) || (hal === "setting" ? kids.length === 0 : kids.length < 2);
+  $("pilih-anak").querySelectorAll("button").forEach((b) => b.classList.toggle("on", !(hal === "setting" && panelPengaturan !== "anak") && Number(b.dataset.anak) === anakDipilih));
+  if (hal === "setting") {
+    for (const root of [$("kids"), $("form-anak"), $("form-hapus-akun").closest("details")]) lokalPengaturan(root);
+    for (const b of $("warna-baru").children) b.setAttribute("aria-label", terjemah("Warna") + " " + b.dataset.warna);
+    for (const c of dataHome.children) {
+      const ringkasan = $("kids").querySelector(`[data-anak="${c.id}"] .jenjang`);
+      if (ringkasan) ringkasan.textContent = kelasText(c);
+    }
+    gambarKeluarga();
+    lokalPengaturan($("form-id-masuk"));
+    $("form-id-masuk").elements.login.value = dataOrtu.login || "";
+    $("pengaturan-bahasa").innerHTML = pilihanBahasa();
+    $("btn-keluar").textContent = terjemah("Keluar");
+    bahasaDashboard("ortu:" + dataOrtu.id, terapkanHal);
+  }
   if (hal === "tugas") gambarTugas();
   if (hal === "keuangan") gambarKeuangan();
-  if (hal === "avatar") gambarAvatarOrtu();
-  if (hal === "toko") gambarTokoOrtu();
+  if (hal === "setting") gambarAvatarOrtu();
   if (hal === "home") { gambarHome(); muatKerja(); }
   if (hal === "chat") gambarChat();
   else { clearInterval(chatTimer); bersihkanSuara?.(); bersihkanSuara = null; }
@@ -550,26 +603,23 @@ function bagianKegiatan(children) {
   return el;
 }
 let kerja = null;
-let kerjaSelesai = 0;
 let kerjaMemuat = false;
 
 function tampilKerja() {
   const tombol = $("kerja-aksi");
-  const sisa = Math.max(0, Math.ceil((kerjaSelesai - performance.now()) / 1000));
-  const batas = kerja && kerja.hariIni + kerja.hadiah > kerja.batasHarian;
-  const siap = kerja && kerja.sisaMs !== null;
+  const detik = Math.max(0, Math.floor((Date.now() - (kerja?.mulaiAt ?? Date.now())) / 1000));
+  const siap = kerja && kerja.mulaiAt !== null;
   const kantor = kerja?.slot?.kantor, sawah = kerja?.slot?.sawah;
   const penuh = !siap && kantor?.tersedia === 0;
-  const waktu = [Math.floor(sisa / 3600), Math.floor(sisa / 60) % 60, sisa % 60].map((n) => String(n).padStart(2, "0")).join(":");
+  const waktu = [Math.floor(detik / 3600), Math.floor(detik / 60) % 60, detik % 60].map((n) => String(n).padStart(2, "0")).join(":");
   $("kerja-status").textContent = !kerja ? (kerjaMemuat ? "Memuat sesi kerja…" : "")
-    : batas ? "Batas hadiah hari ini sudah tercapai."
     : penuh ? "Slot Kantor sedang penuh."
     : !siap ? "Siap mulai bekerja."
-    : sisa ? `Sedang bekerja · ${waktu} tersisa` : "Sesi selesai. Bintang siap diambil.";
+    : `Sedang bekerja · ${waktu}`;
   $("kerja-kuota").textContent = kerja ? `★ ${kerja.hariIni}/${kerja.batasHarian} bintang kerja hari ini · Saldo ${kerja.bintang} bintang` : "";
   $("kerja-slot").textContent = kantor && sawah ? `Slot tersedia · Kantor ${kantor.tersedia}/${kantor.kapasitas} · Sawah ${sawah.tersedia}/${sawah.kapasitas}` : "";
-  tombol.disabled = kerjaMemuat || Boolean(batas) || penuh || sisa > 0;
-  tombol.textContent = !kerja ? "Coba lagi" : siap ? `Ambil ${kerja.hadiah} bintang` : "Mulai bekerja";
+  tombol.disabled = kerjaMemuat || penuh;
+  tombol.textContent = !kerja ? "Coba lagi" : siap ? "Berhenti bekerja" : "Mulai bekerja";
 }
 
 async function muatKerja(aksi) {
@@ -580,16 +630,13 @@ async function muatKerja(aksi) {
   tampilKerja();
   try {
     kerja = await (aksi ? api("POST", `kantor/${aksi}`) : api("GET", "kantor"));
-    kerjaSelesai = performance.now() + (kerja.sisaMs ?? 0);
     dataOrtu.bintang = kerja.bintang;
-    if (aksi === "ambil") {
-      tokoOrtu = null;
-      pesan.textContent = `${kerja.hadiah} bintang masuk ke saldo.`;
+    if (aksi === "stop") {
+      pesan.textContent = `Kerja selesai · ${kerja.diperoleh} bintang masuk ke saldo.`;
       pesan.hidden = false;
     }
   } catch (e) {
     kerja = null;
-    kerjaSelesai = 0;
     pesan.textContent = e.message;
     pesan.hidden = false;
   } finally {
@@ -598,9 +645,9 @@ async function muatKerja(aksi) {
   }
 }
 
-$("kerja-aksi").onclick = () => muatKerja(kerja && (kerja.sisaMs === null ? "mulai" : "ambil"));
+$("kerja-aksi").onclick = () => muatKerja(kerja && (kerja.mulaiAt === null ? "mulai" : "stop"));
 setInterval(() => {
-  if (hal === "home" && !$("dash").hidden && !document.hidden && kerja?.sisaMs > 0) tampilKerja();
+  if (hal === "home" && !$("dash").hidden && !document.hidden && kerja?.mulaiAt != null) tampilKerja();
 }, 1000);
 window.addEventListener("focus", () => {
   if (hal === "home" && !$("dash").hidden) muatKerja();
@@ -642,8 +689,8 @@ function keHal(h, idAnak) {
 }
 $("menu").addEventListener("click", (e) => { const b = e.target.closest("[data-ke]"); if (b) keHal(b.dataset.ke); });
 // Alamat #menu diubah dari luar (tautan, tombol Kembali): pindah menu juga.
-window.addEventListener("hashchange", () => { const h = location.hash.slice(1) || "home"; if (HAL[h] && h !== hal && !$("dash").hidden) keHal(h); });
-$("pilih-anak").addEventListener("click", (e) => { const b = e.target.closest("[data-anak]"); if (b) keHal(hal, Number(b.dataset.anak)); });
+window.addEventListener("hashchange", () => { const h = halamanDariAlamat(); if (HAL[h] && h !== hal && !$("dash").hidden) keHal(h); });
+$("pilih-anak").addEventListener("click", (e) => { const b = e.target.closest("[data-anak]"); if (b) { panelPengaturan = "anak"; keHal(hal, Number(b.dataset.anak)); } });
 
 // ---------------- menu Tugas ----------------
 // Data dari GET /api/tugas: { anak: { <id>: { tugas, menunggu, hariIni, minggu } } }.
@@ -691,6 +738,7 @@ function gambarTugas() {
     <section class="panel"><h2>Tugas ${nama}</h2><ul class="tugas-list">${daftar}</ul></section>
     <form class="panel" id="form-tugas">
       <h2>Tugas baru untuk ${nama}</h2>
+      <p class="muted">Saat tugas dibuat, bintang hadiah dipotong dari saldo Anda. Anak menerimanya setelah tugas disetujui. Untuk tugas berulang, hadiah berikutnya dipotong saat disetujui. Jika tugas dihapus sebelum hadiah dibagikan, bintang dikembalikan.</p>
       <div class="grid2">
         <label>Nama tugas <input name="judul" maxlength="60" required placeholder="Contoh: Salat Subuh, Mencuci piring" /></label>
         <label>Jenis <select name="jenis">${Object.entries(NAMA_JENIS).map(([k, v]) => `<option value="${k}">${IKON_JENIS[k]} ${v}</option>`).join("")}</select></label>
@@ -1100,7 +1148,7 @@ function gambarAvatarOrtu() {
   const dipakai = dataOrtu.aksesori.map((id) => AKSESORI.find((a) => a.id === id)?.name).filter(Boolean);
   const milik = AKSESORI.filter((a) => (dataOrtu.aksesoriPunya || []).includes(a.id));
   const isiAksesori = !milik.length
-    ? `<p class="muted">Anda belum punya aksesori. <button class="link-btn" data-ke-toko>Beli di Toko Avatar</button></p>`
+    ? `<p class="muted">Anda belum punya aksesori. <a href="/?arena=ortu">Beli di Toko Avatar di arena</a></p>`
     : SLOT.map((sl) => {
     const items = milik.filter((a) => a.slot === sl.id);
     if (!items.length) return "";
@@ -1111,20 +1159,24 @@ function gambarAvatarOrtu() {
         <button data-aks-ortu="${a.id}" data-on="${pakai ? 0 : 1}" class="${pakai ? "" : "primary"}">${pakai ? "Lepas" : "Pakai"}</button></div>`;
     }).join("")}</div>`;
   }).join("");
-  box.innerHTML = `
-    <section class="panel kepala-ortu">
+  $("avatar-ortu-utama").innerHTML = `
       <span class="ava-besar av-face" style="width:110px;height:110px">${gambarOrtu()}</span>
-      <div><h2>${esc(dataOrtu.name)} <span class="saldo-ortu">★ ${dataOrtu.bintang || 0} bintang</span></h2><span class="muted">Orang tua · dipakai saat Anda bermain di arena bersama anak</span>
+      <div><h2>${esc(dataOrtu.name)} <span class="saldo-ortu">★ ${dataOrtu.bintang || 0} bintang</span></h2>${dataOrtu.negara ? `<canvas id="bendera-ortu" width="60" height="40" style="width:30px;height:20px" role="img" aria-label="${esc(negaraName(dataOrtu.negara))}"></canvas>` : ""}
+        ${dataOrtu.kepala ? `<span class="lencana">${terjemah("👑 Kepala keluarga")}</span>` : ""}
         <p class="muted kecil">${dipakai.length ? `Aksesori: ${dipakai.map(esc).join(", ")}` : "Belum memakai aksesori"}</p></div>
-    </section>
+    `;
+  box.innerHTML = `
     <div class="tab-avatar" role="tablist">
-      <button role="tab" data-tab-ortu="karakter" class="${tabAvatarOrtu === "karakter" ? "on" : ""}" aria-selected="${tabAvatarOrtu === "karakter"}">🐻 Karakter</button>
-      <button role="tab" data-tab-ortu="aksesori" class="${tabAvatarOrtu === "aksesori" ? "on" : ""}" aria-selected="${tabAvatarOrtu === "aksesori"}">🎀 Aksesori</button>
+      <button role="tab" data-tab-ortu="karakter" class="${tabAvatarOrtu === "karakter" ? "on" : ""}" aria-selected="${tabAvatarOrtu === "karakter"}">${terjemah("🐻 Karakter")}</button>
+      <button role="tab" data-tab-ortu="aksesori" class="${tabAvatarOrtu === "aksesori" ? "on" : ""}" aria-selected="${tabAvatarOrtu === "aksesori"}">${terjemah("🎀 Aksesori")}</button>
     </div>
     ${tabAvatarOrtu === "aksesori"
-      ? `<section class="panel"><h2>🎀 Aksesoriku</h2><p class="muted">Pakai atau lepas aksesori yang sudah Anda miliki. Aksesori baru dibeli di <button class="link-btn" data-ke-toko>Toko Avatar</button>.</p>${isiAksesori}</section>`
-      : `<section class="panel"><h2>🐻 Pilih karakter</h2><div id="ortu-avatar-picker"></div><span id="ortu-av-ok" class="muted" hidden>Avatar tersimpan ✓</span>
-        <p class="muted kecil">Karakter lain bisa dibeli di <button class="link-btn" data-ke-toko>Toko Avatar</button>.</p></section>`}`;
+      ? `<section class="panel"><h2>${terjemah("🎀 Aksesoriku")}</h2><p class="muted">Pakai atau lepas aksesori yang sudah Anda miliki. Aksesori baru dibeli di <a href="/?arena=ortu">Toko Avatar di arena</a>.</p>${isiAksesori}</section>`
+      : `<section class="panel"><h2>${terjemah("Avatar yang dimiliki")}</h2><div id="ortu-avatar-picker"></div><span id="ortu-av-ok" class="muted" hidden>Avatar tersimpan ✓</span>
+        <p class="muted kecil">Karakter lain bisa dibeli di <a href="/?arena=ortu">Toko Avatar di arena</a>.</p></section>`}`;
+  $("menu-avatar-ortu").querySelector("summary").textContent = terjemah("Pengaturan avatar");
+  const bendera = $("bendera-ortu");
+  if (bendera) drawFlag(bendera.getContext("2d"), dataOrtu.negara, 0, 0, 60, 40);
   if (tabAvatarOrtu !== "karakter") return;
   let okTimer = 0;
   avatarPicker($("ortu-avatar-picker"), {
@@ -1134,7 +1186,7 @@ function gambarAvatarOrtu() {
       try {
         await api("POST", "avatar", { avatar: pilih, sebagai: "ortu" });
         dataOrtu.avatar = pilih;
-        box.querySelector(".kepala-ortu .ava-besar").innerHTML = gambarOrtu();
+        $("avatar-ortu-utama").querySelector(".ava-besar").innerHTML = gambarOrtu();
         $("ortu-av-ok").hidden = false;
         clearTimeout(okTimer);
         okTimer = setTimeout(() => ($("ortu-av-ok").hidden = true), 2000);
@@ -1151,74 +1203,8 @@ $("avatar-ortu-isi").addEventListener("click", async (e) => {
   b.disabled = true;
   try {
     dataOrtu.aksesori = (await api("POST", "avatar/aksesori", { id: b.dataset.aksOrtu, pakai: b.dataset.on === "1" })).aksesori;
-    if (tokoOrtu) tokoOrtu.pakai = dataOrtu.aksesori;
     gambarAvatarOrtu();
   } catch (x) { alert(x.message); b.disabled = false; }
-});
-
-// ---------------- menu Toko Avatar orang tua ----------------
-// Aturan sama dengan toko anak: karakter (sesuai peran Ayah/Ibu) dan aksesori dibeli dengan bintang
-// milik orang tua sendiri. Klik pertama pada "Beli" meminta konfirmasi di tombol itu sendiri.
-let tokoOrtu = null, yakinOrtu = null;
-function salinToko(k) {
-  tokoOrtu = { ...tokoOrtu, ...k };
-  Object.assign(dataOrtu, { avatar: k.avatar, avatarPunya: k.avatarPunya, aksesori: k.pakai, aksesoriPunya: k.punya, bintang: k.bintang });
-}
-async function gambarTokoOrtu() {
-  const box = $("toko-ortu-isi");
-  if (!tokoOrtu) {
-    box.innerHTML = '<section class="panel"><p class="muted">Memuat toko…</p></section>';
-    try { salinToko(await api("GET", "toko-ortu")); } catch (x) { box.innerHTML = `<section class="panel"><p class="error">${esc(x.message)}</p></section>`; return; }
-  }
-  const t = tokoOrtu;
-  const aksesori = SLOT.map((sl) => {
-    const items = t.items.filter((a) => a.slot === sl.id);
-    if (!items.length) return "";
-    return `<h3>${esc(sl.name)}</h3><div class="toko-grid">${items.map((a) => {
-      const punya = t.punya.includes(a.id), pakai = t.pakai.includes(a.id), cukup = t.bintang >= a.harga;
-      const tombol = punya ? `<button data-pakai="${a.id}" data-on="${pakai ? 0 : 1}" class="${pakai ? "" : "primary"}">${pakai ? "Lepas" : "Pakai"}</button>`
-        : yakinOrtu === a.id ? `<button data-beli="${a.id}" class="yakin">Yakin? ★ ${a.harga}</button>`
-        : `<button data-beli="${a.id}" ${cukup ? "" : "disabled"}>${cukup ? "Beli" : "Bintang kurang"}</button>`;
-      return `<div class="toko-item ${pakai ? "pakai" : ""}"><span class="av-face" style="width:80px;height:80px">${gambarOrtu(a.id)}</span><b>${esc(a.name)}</b>
-        <span class="muted kecil">${punya ? (pakai ? "Sedang dipakai" : "Sudah dimiliki") : `★ ${a.harga}`}</span>${tombol}</div>`;
-    }).join("")}</div>`;
-  }).join("");
-  box.innerHTML = `
-    <section class="panel kepala-ortu">
-      <span class="ava-besar av-face" style="width:110px;height:110px">${gambarOrtu()}</span>
-      <div><h2>${esc(dataOrtu.name)} <span class="saldo-ortu">★ ${t.bintang} bintang</span></h2>
-        <span class="muted">Tukar bintang dengan karakter dan aksesori, sama seperti anak. Yang dipakai juga terlihat di arena.</span></div>
-    </section>
-    <section class="panel"><h2>🐻 Karakter</h2>${katalogAvatar(t, WARNA_ORTU, yakinOrtu, true, t.katalog)}</section>
-    <section class="panel"><h2>🎀 Aksesori</h2>${aksesori}</section>
-    <p class="error" id="toko-ortu-galat" hidden></p>`;
-}
-$("toko-ortu-isi").addEventListener("click", async (e) => {
-  const b = e.target.closest("button[data-beli], button[data-pakai], button[data-beli-avatar], button[data-pakai-avatar]");
-  if (!b || b.disabled) return;
-  const galat = (x) => { const g = $("toko-ortu-galat"); if (g) { g.textContent = x || ""; g.hidden = !x; } };
-  galat("");
-  try {
-    if (b.dataset.beliAvatar || b.dataset.beli) {
-      const id = b.dataset.beliAvatar || b.dataset.beli;
-      if (yakinOrtu !== id) { yakinOrtu = id; return gambarTokoOrtu(); }   // klik kedua untuk yakin
-      yakinOrtu = null;
-      b.disabled = true;
-      if (b.dataset.beliAvatar) salinToko(await api("POST", "toko-ortu/beli-avatar", { id }));
-      else {
-        salinToko(await api("POST", "toko-ortu/beli", { id }));
-        salinToko(await api("POST", "toko-ortu/pakai", { id, pakai: true }));
-      }
-    } else if (b.dataset.pakaiAvatar) {
-      b.disabled = true;
-      await api("POST", "avatar", { avatar: b.dataset.pakaiAvatar, sebagai: "ortu" });
-      salinToko({ ...tokoOrtu, avatar: b.dataset.pakaiAvatar });
-    } else {
-      b.disabled = true;
-      salinToko(await api("POST", "toko-ortu/pakai", { id: b.dataset.pakai, pakai: b.dataset.on === "1" }));
-    }
-  } catch (x) { yakinOrtu = null; await gambarTokoOrtu(); return galat(x.message); }
-  gambarTokoOrtu();
 });
 
 // ---------------- Keluarga (menu Setting) ----------------
@@ -1230,59 +1216,111 @@ function gambarKeluarga() {
   const k = dataKeluarga;
   const saya = k.anggota.find((a) => a.saya);
   const pasangan = saya?.peran === "ayah" ? "Ibu" : "Ayah";
-  const baris = k.anggota.map((a) => `<li><span class="av-face kecil-ava">${avatarSvg(a.peran === "ibu" ? "manusia-ibu" : "manusia-ayah", WARNA_ORTU)}</span>
-    <span class="tugas-judul"><b>${esc(a.name)}${a.saya ? " (Anda)" : ""}</b><span class="muted kecil">${NAMA_PERAN[a.peran] || a.peran} · ${esc(a.email)}</span></span>
-    ${a.kepala ? '<span class="lencana">👑 Kepala keluarga</span>' : ""}
-    ${k.sayaKepala && !a.kepala ? `<button class="ghost danger-text" data-keluarkan="${a.id}">Keluarkan</button>` : ""}</li>`).join("");
-  const buatPasangan = k.sayaKepala && k.anggota.length === 1 ? `
+  const anggotaPasangan = k.anggota.find((a) => !a.saya);
+  const baris = k.anggota.filter((a) => !a.saya).map((a) => `<li><span class="av-face kecil-ava">${avatarSvg(a.peran === "ibu" ? "manusia-ibu" : "manusia-ayah", WARNA_ORTU)}</span>
+    <span class="tugas-judul"><b>${esc(a.name)}${a.saya ? ` (${terjemah("Anda")})` : ""}</b><span class="muted kecil">${terjemah(NAMA_PERAN[a.peran] || a.peran)} · ${esc(a.email)}</span></span>
+    ${a.kepala ? `<span class="lencana">${terjemah("👑 Kepala keluarga")}</span>` : ""}
+    ${k.sayaKepala && !a.kepala ? `<button type="button" data-jadikan-kepala="${a.id}">${terjemah("Jadikan kepala keluarga")}</button><button class="ghost danger-text" data-keluarkan="${a.id}">${terjemah("Keluarkan")}</button>` : ""}</li>`).join("");
+  const buatPasangan = k.sayaKepala ? `
     <form id="form-pasangan">
-      <h3>Buat akun ${pasangan}</h3>
+      ${anggotaPasangan ? "" : `<h3>${terjemah(`Buat akun ${pasangan}`)}</h3>`}
+      ${anggotaPasangan ? `<p>${terjemah("ID masuk")} · <strong>${esc(anggotaPasangan.login)}</strong></p>` : ""}
       <div class="grid2">
-        <label>Nama ${pasangan} <input name="name" maxlength="40" required /></label>
-        <label>ID masuk (email) <input type="email" name="email" maxlength="120" autocomplete="off" required /></label>
-        <label>Kata sandi <input type="password" name="password" minlength="8" maxlength="128" autocomplete="new-password" required /></label>
+        ${anggotaPasangan ? "" : `<label>${terjemah(`Nama ${pasangan}`)} <input name="name" maxlength="40" required /></label>`}
+        <label>${terjemah("Email pemulihan")} <input type="email" name="email" value="${esc(anggotaPasangan?.email || "")}" maxlength="120" autocomplete="off" required /></label>
+        <label>${terjemah(anggotaPasangan ? "Kata sandi baru" : "Kata sandi")} <input type="password" name="password" minlength="8" maxlength="128" autocomplete="new-password" ${anggotaPasangan ? "" : "required"} />
+          ${anggotaPasangan ? `<small>${terjemah("Kosongkan untuk memakai kata sandi saat ini.")}</small>` : ""}</label>
+        <label>${terjemah("Kewarganegaraan")} <select name="negara" required>${opsiNegara(anggotaPasangan?.negara)}</select></label>
       </div>
-      <div><button type="submit" class="primary">Buat akun ${pasangan}</button></div>
+      <div><button type="submit" class="primary">${terjemah(anggotaPasangan ? "Simpan" : `Buat akun ${pasangan}`)}</button></div>
     </form>` : "";
-  $("keluarga-box").innerHTML = `<h2>👪 Keluarga</h2>
-    <ul class="tugas-list">${baris}</ul>
-    ${buatPasangan}
-    <label class="peran-saya">Peran saya
-      <select id="peran-saya">${Object.entries(NAMA_PERAN).map(([id, n]) => `<option value="${id}" ${saya?.peran === id ? "selected" : ""}>${n}</option>`).join("")}</select>
-    </label>
-    <p class="error" hidden></p>`;
-  $("hapus-akun-teks").textContent = k.sayaKepala
+  const tombol = $("pilih-pasangan");
+  tombol.hidden = !anggotaPasangan;
+  const tambah = $("tambah-pasangan");
+  tambah.hidden = !k.sayaKepala;
+  tambah.disabled = Boolean(anggotaPasangan);
+  tambah.textContent = terjemah(`Tambah akun ${pasangan}`);
+  tambah.title = anggotaPasangan ? terjemah("Akun sudah tersedia") + " · " + anggotaPasangan.name : "";
+  const lihatPasangan = panelPengaturan === "pasangan";
+  tambah.setAttribute("aria-expanded", String(lihatPasangan && !anggotaPasangan));
+  const tambahAnak = $("tambah-anak");
+  tambahAnak.textContent = terjemah("Tambah akun anak");
+  tambahAnak.disabled = dataHome.children.length >= 6;
+  tambahAnak.setAttribute("aria-expanded", String(panelPengaturan === "tambah-anak"));
+  $("form-anak").hidden = panelPengaturan !== "tambah-anak";
+  tombol.textContent = anggotaPasangan?.name ?? terjemah(`Buat akun ${pasangan}`);
+  tombol.classList.toggle("on", lihatPasangan);
+  tombol.setAttribute("aria-pressed", String(lihatPasangan));
+  const panel = $("profil-pasangan");
+  panel.hidden = !lihatPasangan || (!anggotaPasangan && !buatPasangan);
+  panel.innerHTML = (anggotaPasangan ? `<ul class="tugas-list">${baris}</ul>` : "") + buatPasangan + '<p class="error" hidden></p>';
+  lokalPengaturan(panel);
+  $("hapus-akun-teks").textContent = terjemah(k.sayaKepala
     ? "Anda kepala keluarga: seluruh keluarga ikut terhapus, termasuk akun anak, laporan, riwayat permainan, dan akun pasangan Anda. Ini permanen dan tidak bisa dikembalikan."
-    : "Hanya akun Anda yang terhapus. Anak-anak dan data keluarga tetap ada dan diurus kepala keluarga.";
-  $("peran-saya").onchange = (e) => kirimKeluarga("PATCH", "keluarga/peran", { peran: e.target.value });
+    : "Hanya akun Anda yang terhapus. Anak-anak dan data keluarga tetap ada dan diurus kepala keluarga.");
   const form = $("form-pasangan");
   if (form) form.onsubmit = async (e) => {
     e.preventDefault();
-    setErr($("keluarga-box"), "");
+    setErr(panel, "");
     busy(form, true);
     try {
-      dataKeluarga = await api("POST", "keluarga/pasangan", { name: form.elements.name.value, email: form.email.value, password: form.password.value });
+      const data = { negara: form.elements.negara.value, email: form.email.value, password: form.password.value };
+      dataKeluarga = anggotaPasangan
+        ? await api("PATCH", `keluarga/pasangan/${anggotaPasangan.id}`, data)
+        : await api("POST", "keluarga/pasangan", { ...data, name: form.elements.name.value });
       gambarKeluarga();
     } catch (x) {
-      setErr($("keluarga-box"), x.message);
+      setErr(panel, x.message);
       busy(form, false);
     }
   };
 }
-async function kirimKeluarga(metode, alamat, isi) {
-  setErr($("keluarga-box"), "");
-  try { dataKeluarga = await api(metode, alamat, isi); if (alamat === "keluarga/peran") { tokoOrtu = null; dataOrtu = { ...dataOrtu, ...(await api("GET", "saya")).ortu }; } }
-  catch (x) { gambarKeluarga(); return setErr($("keluarga-box"), x.message); }
-  gambarKeluarga();
+function pilihPanelPengaturan(panel) {
+  panelPengaturan = panel;
+  terapkanHal();
 }
-$("keluarga-box").addEventListener("click", (e) => {
+$("pilih-pasangan").onclick = () => pilihPanelPengaturan("pasangan");
+$("tambah-pasangan").onclick = () => pilihPanelPengaturan("pasangan");
+$("tambah-anak").onclick = () => pilihPanelPengaturan("tambah-anak");
+$("profil-pasangan").addEventListener("click", async (e) => {
   const b = e.target.closest("button");
   if (!b) return;
+  if (b.dataset.jadikanKepala) {
+    const nama = b.closest("li").querySelector("b").textContent;
+    if (!confirm(terjemah("Jadikan {nama} kepala keluarga? Anda akan menjadi anggota keluarga.").replace("{nama}", () => nama))) return;
+    b.disabled = true;
+    try {
+      dataKeluarga = await api("POST", `keluarga/anggota/${b.dataset.jadikanKepala}/kepala`);
+      dataOrtu.kepala = dataKeluarga.sayaKepala;
+      gambarAvatarOrtu();
+      gambarKeluarga();
+    } catch (x) { setErr($("profil-pasangan"), x.message); b.disabled = false; }
+    return;
+  }
   if (b.dataset.keluarkan) {
     const nama = b.closest("li").querySelector("b").textContent;
-    if (!confirm(`Keluarkan ${nama} dari keluarga? Akunnya tetap ada, tetapi tidak bisa lagi mengurus anak-anak.`)) return;
-    return kirimKeluarga("POST", `keluarga/anggota/${b.dataset.keluarkan}/keluarkan`);
+    if (!confirm(terjemah("Keluarkan {nama} dari keluarga? Akunnya tetap ada, tetapi tidak bisa lagi mengurus anak-anak.").replace("{nama}", () => nama))) return;
+    try {
+      dataKeluarga = await api("POST", `keluarga/anggota/${b.dataset.keluarkan}/keluarkan`);
+      gambarKeluarga();
+    } catch (x) { setErr($("profil-pasangan"), x.message); }
   }
+});
+
+$("form-id-masuk").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.currentTarget;
+  const status = form.querySelector("[role=status]");
+  status.textContent = "";
+  setErr(form, "");
+  busy(form, true);
+  try {
+    const hasil = await api("PATCH", "id-masuk", { login: form.elements.login.value });
+    dataOrtu.login = hasil.login;
+    form.elements.login.value = hasil.login;
+    status.textContent = terjemah("Tersimpan ✓");
+  } catch (x) { setErr(form, x.message); }
+  finally { busy(form, false); }
 });
 
 // ---------------- muat ----------------
@@ -1301,7 +1339,7 @@ async function load() {
   }
   if (versi !== versiMuat) return;
   // Tautan atur ulang kata sandi tetap ditampilkan walaupun perangkat ini masih masuk.
-  const masuk = !!me.ortu && !resetToken;
+  const masuk = !!me.ortu && !resetToken && !new URLSearchParams(location.search).has("login");
   $("auth").hidden = masuk;
   $("top-nav").hidden = !masuk;
   if (!masuk) {
@@ -1320,7 +1358,6 @@ async function load() {
   if (!data || versi !== versiMuat) return;
   namaOrtu = me.ortu.name;
   dataOrtu = { ...me.ortu, aksesori: me.ortu.aksesori || [] };
-  tokoOrtu = null;   // dimuat ulang saat menu Toko Avatar dibuka
   const [{ children }, social, tugas, belum, uang, hadiah, keluarga, kegiatan] = data;
   dataKegiatan = kegiatan.anak || {};
   dataTugas = tugas.anak;
@@ -1345,7 +1382,7 @@ async function load() {
     return b;
   }));
   dataHome = { children, byId };
-  $("form-anak").querySelector("h2").textContent = children.length ? "Tambah akun anak" : "Mulai dengan menambah akun anak";
+  $("form-anak").querySelector("h2").dataset.terjemah = children.length ? "Tambah akun anak" : "Mulai dengan menambah akun anak";
   $("dash").hidden = false;
   memuat.hidden = true;
   terapkanHal();

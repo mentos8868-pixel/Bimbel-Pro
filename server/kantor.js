@@ -30,12 +30,12 @@ if (!db.prepare("PRAGMA table_info(kerja_ortu)").all().some((c) => c.name === "p
 }
 
 const diterima = (id, hari) => db.prepare("SELECT bintang FROM hadiah_kerja_ortu WHERE parent_id = ? AND hari = ?").get(id, hari)?.bintang ?? 0;
-const sesiKerja = db.prepare("SELECT selesai_at, pekerjaan FROM kerja_ortu WHERE parent_id = ?");
-const hitungAktif = db.prepare("SELECT COUNT(*) AS n FROM kerja_ortu WHERE pekerjaan = ? AND selesai_at > ?");
+const sesiKerja = db.prepare("SELECT selesai_at - durasi_ms AS mulai_at, pekerjaan FROM kerja_ortu WHERE parent_id = ?");
+const hitungAktif = db.prepare("SELECT COUNT(*) AS n FROM kerja_ortu WHERE pekerjaan = ?");
 
-export function sedangBekerja(id, sekarang = Date.now()) {
+export function sedangBekerja(id) {
   const sesi = sesiKerja.get(id);
-  return sesi?.selesai_at > sekarang ? sesi.pekerjaan : "";
+  return sesi?.pekerjaan ?? "";
 }
 
 function status(id) {
@@ -46,25 +46,24 @@ function status(id) {
     bintang, hadiah: HADIAH, durasi: DURASI_MS / 1000,
     batasHarian: BATAS_HARIAN, hariIni: diterima(id, today(sekarang)),
     slot: Object.fromEntries(["kantor", "sawah"].map((jenis) => [
-      jenis, { kapasitas: KAPASITAS, tersedia: Math.max(0, KAPASITAS - hitungAktif.get(jenis, sekarang).n) },
+      jenis, { kapasitas: KAPASITAS, tersedia: Math.max(0, KAPASITAS - hitungAktif.get(jenis).n) },
     ])),
     pekerjaan: kerja?.pekerjaan ?? null,
-    sisaMs: kerja ? Math.max(0, kerja.selesai_at - sekarang) : null,
+    mulaiAt: kerja?.mulai_at ?? null,
   };
 }
 
 export function handleKantor({ m, path, body, ortuSaya, keluargaId, anak, url, send, ApiError }) {
   if (path[0] !== "kantor") return false;
-  if (m === "GET" && path.length === 2 && path[1] === "keluarga") {
+  if (m === "GET" && path.length === 2 && path[1] === "arena") {
     const sebagaiAnak = url.searchParams.get("sebagai") === "anak";
-    const keluarga = sebagaiAnak ? anak?.parent_id : keluargaId;
-    if (!keluarga) throw new ApiError(401, "Silakan masuk untuk melihat Kantor keluarga.");
+    if (sebagaiAnak ? !anak : !ortuSaya) throw new ApiError(401, "Masuk untuk melihat pekerja di arena.");
     const bekerja = db.prepare(`
-      SELECT p.id, p.peran, p.avatar, p.aksesori_pakai, k.pekerjaan FROM kerja_ortu k
+      SELECT p.id, p.peran, p.negara, p.avatar, p.aksesori_pakai, k.pekerjaan FROM kerja_ortu k
       JOIN parents p ON p.id = k.parent_id
-      WHERE (p.id = ? OR p.kepala_id = ?) AND k.selesai_at > ? AND p.id != ?
-    `).all(keluarga, keluarga, Date.now(), sebagaiAnak ? 0 : ortuSaya).map((p) => ({
-      uid: `o${p.id}`, name: p.peran === "ibu" ? "Mama" : "Papa", peran: p.peran, pekerjaan: p.pekerjaan,
+      ORDER BY k.pekerjaan, k.selesai_at - k.durasi_ms, p.id
+    `).all().map((p) => ({
+      uid: `o${p.id}`, name: p.peran === "ibu" ? "Mama" : "Papa", peran: p.peran, negara: p.negara || "", pekerjaan: p.pekerjaan,
       avatar: avatarOr(p.avatar, DEFAULT_ORTU_AVATAR), aksesori: rapikanAksesori(p.aksesori_pakai).join(","),
     }));
     return send(200, { bekerja }), true;
@@ -81,8 +80,8 @@ export function handleKantor({ m, path, body, ortuSaya, keluargaId, anak, url, s
     db.exec("BEGIN IMMEDIATE");
     try {
       const sekarang = Date.now();
-      if (!sesiKerja.get(ortuSaya) && diterima(ortuSaya, today(sekarang)) + HADIAH <= BATAS_HARIAN) {
-        if (hitungAktif.get(pekerjaan, sekarang).n >= KAPASITAS) {
+      if (!sesiKerja.get(ortuSaya)) {
+        if (hitungAktif.get(pekerjaan).n >= KAPASITAS) {
           throw new ApiError(409, `Slot ${pekerjaan === "kantor" ? "Kantor" : "Sawah"} penuh. Coba lagi saat ada sesi yang selesai.`);
         }
         db.prepare("INSERT INTO kerja_ortu (parent_id, selesai_at, durasi_ms, pekerjaan) VALUES (?, ?, ?, ?)")
@@ -93,33 +92,33 @@ export function handleKantor({ m, path, body, ortuSaya, keluargaId, anak, url, s
     send(200, status(ortuSaya));
     return true;
   }
-  // Stop kerja: menghentikan sesi yang belum selesai, tanpa bintang. Setelah itu boleh masuk arena lagi.
   if (m === "POST" && path.length === 2 && path[1] === "stop") {
-    db.prepare("DELETE FROM kerja_ortu WHERE parent_id = ? AND selesai_at > ?").run(ortuSaya, Date.now());
-    send(200, status(ortuSaya));
-    return true;
-  }
-  if (m === "POST" && path.length === 2 && path[1] === "ambil") {
+    let diperoleh = 0;
     db.exec("BEGIN IMMEDIATE");
     try {
-      const sekarang = Date.now();
-      const hari = today(sekarang);
-      if (diterima(ortuSaya, hari) + HADIAH > BATAS_HARIAN) {
-        throw new ApiError(409, "Batas hadiah kerja hari ini sudah tercapai.");
+      const sesi = sesiKerja.get(ortuSaya);
+      if (sesi) {
+        const sekarang = Date.now();
+        let jam = sesi.mulai_at + DURASI_MS;
+        // Setiap jam penuh masuk kuota hari WIB saat jam tersebut selesai.
+        while (jam <= sekarang) {
+          const hari = today(jam);
+          const besok = Date.parse(hari + "T00:00:00+07:00") + 24 * DURASI_MS;
+          const jumlahJam = 1 + Math.floor((Math.min(sekarang, besok - 1) - jam) / DURASI_MS);
+          const bintang = Math.min(jumlahJam * HADIAH, Math.max(0, BATAS_HARIAN - diterima(ortuSaya, hari)));
+          if (bintang) {
+            db.prepare(`INSERT INTO hadiah_kerja_ortu (parent_id, hari, bintang) VALUES (?, ?, ?)
+              ON CONFLICT(parent_id, hari) DO UPDATE SET bintang = bintang + excluded.bintang`).run(ortuSaya, hari, bintang);
+            diperoleh += bintang;
+          }
+          jam += jumlahJam * DURASI_MS;
+        }
+        if (diperoleh) tambahBintangOrtu(ortuSaya, diperoleh);
+        db.prepare("DELETE FROM kerja_ortu WHERE parent_id = ?").run(ortuSaya);
       }
-      const hasil = db.prepare("DELETE FROM kerja_ortu WHERE parent_id = ? AND selesai_at <= ?")
-        .run(ortuSaya, sekarang);
-      if (!hasil.changes) throw new ApiError(409, "Belum ada sesi kerja yang siap diambil.");
-      tambahBintangOrtu(ortuSaya, HADIAH);
-      db.prepare(`INSERT INTO hadiah_kerja_ortu (parent_id, hari, bintang) VALUES (?, ?, ?)
-        ON CONFLICT(parent_id, hari) DO UPDATE SET bintang = bintang + excluded.bintang`).run(ortuSaya, hari, HADIAH);
       db.exec("COMMIT");
-    } catch (err) {
-      db.exec("ROLLBACK");
-      throw err;
-    }
-    send(200, status(ortuSaya));
-    return true;
+    } catch (e) { db.exec("ROLLBACK"); throw e; }
+    return send(200, { ...status(ortuSaya), diperoleh }), true;
   }
   throw new ApiError(404, "Alamat tidak ditemukan.");
 }

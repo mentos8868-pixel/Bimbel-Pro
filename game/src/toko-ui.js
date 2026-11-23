@@ -3,6 +3,7 @@
 import { api } from "./api.js";
 import { avatarSvg } from "./avatar-svg.js";
 import { SLOT } from "../../shared/aksesori.js";
+import { KATALOG_AVATAR, parseAvatar } from "../../shared/avatars.js";
 import { katalogAvatar } from "./katalog-avatar.js";
 
 const $ = (id) => document.getElementById(id);
@@ -21,14 +22,16 @@ export class TokoUI {
     $("toko-isi").addEventListener("click", (e) => this.klik(e));
   }
 
-  async open(profile) {
+  async open(profile, sebagai) {
+    this.sebagai = sebagai;
+    this.alamat = sebagai === "ortu" ? "toko-ortu" : "toko";
     this.profile = profile;
     this.yakin = null;
     this.err("");
     $("toko-panel").hidden = false;
     $("toko-isi").innerHTML = '<p class="muted">Memuat toko…</p>';
     try {
-      this.k = await api("GET", "toko");
+      this.k = await api("GET", this.alamat);
       this.render();
     } catch (x) {
       $("toko-isi").innerHTML = "";
@@ -48,7 +51,7 @@ export class TokoUI {
 
   gambar(coba) {
     const p = this.profile, k = this.k;
-    return svgSrc(avatarSvg(p.avatar, p.color, { aksesori: coba ? [...k.pakai, coba] : k.pakai, aura: k.aura || p.aura || "" }));
+    return svgSrc(avatarSvg(k.avatar, p.color, { aksesori: coba ? [...k.pakai, coba] : k.pakai, aura: k.aura || p.aura || "" }));
   }
 
   render() {
@@ -66,7 +69,10 @@ export class TokoUI {
         <b>${esc(a.name)}</b><span class="harga">${punya ? (pakai ? "Sedang dipakai" : "Sudah dimiliki") : `★ ${a.harga}`}</span>${tombol}</div>`;
     };
     const isi = $("toko-isi");
-    const katalog = katalogAvatar(k, this.profile.color, this.yakin, isi.querySelector("[data-katalog-avatar]")?.open);
+    const anggota = parseAvatar(k.avatar)?.member.id === "putri" ? "putri" : "putra";
+    const daftar = k.katalog ?? KATALOG_AVATAR.filter((a) => a.id.endsWith(`-${anggota}`))
+      .map((a) => ({ ...a, nama: parseAvatar(a.id).family.name }));
+    const katalog = katalogAvatar(k, this.profile.color, this.yakin, isi.querySelector("[data-katalog-avatar]")?.open ?? true, daftar);
     isi.innerHTML = katalog + SLOT.map((s) => {
       const items = k.items.filter((a) => a.slot === s.id);
       return items.length ? `<h3 class="toko-slot">${s.name}</h3><div class="toko-grid">${items.map(kartu).join("")}</div>` : "";
@@ -83,11 +89,11 @@ export class TokoUI {
         if (this.yakin !== id) { this.yakin = id; this.render(); return; }
         this.yakin = null;
         b.disabled = true;
-        this.k = { ...this.k, ...(await api("POST", "toko/beli-avatar", { id })) };
+        this.k = { ...this.k, ...(await api("POST", this.alamat + "/beli-avatar", { id })) };
         this.onBerubah(this.k);
       } else if (b.dataset.pakaiAvatar) {
         b.disabled = true;
-        const { avatar } = await api("POST", "avatar", { avatar: b.dataset.pakaiAvatar, sebagai: "anak" });
+        const { avatar } = await api("POST", "avatar", { avatar: b.dataset.pakaiAvatar, sebagai: this.sebagai });
         this.k.avatar = avatar;
         this.onBerubah(this.k);
       } else if (b.dataset.beli) {
@@ -96,12 +102,12 @@ export class TokoUI {
         if (this.yakin !== id) { this.yakin = id; this.render(); return; }
         this.yakin = null;
         b.disabled = true;
-        this.k = { ...this.k, ...(await api("POST", "toko/beli", { id })) };
-        this.k = { ...this.k, ...(await api("POST", "toko/pakai", { id, pakai: true })) };
+        this.k = { ...this.k, ...(await api("POST", this.alamat + "/beli", { id })) };
+        this.k = { ...this.k, ...(await api("POST", this.alamat + "/pakai", { id, pakai: true })) };
         this.onBerubah(this.k);
       } else if (b.dataset.pakai) {
         b.disabled = true;
-        this.k = { ...this.k, ...(await api("POST", "toko/pakai", { id: b.dataset.pakai, pakai: b.dataset.on === "1" })) };
+        this.k = { ...this.k, ...(await api("POST", this.alamat + "/pakai", { id: b.dataset.pakai, pakai: b.dataset.on === "1" })) };
         this.onBerubah(this.k);
       }
     } catch (x) {
