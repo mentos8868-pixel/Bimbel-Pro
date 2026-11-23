@@ -220,6 +220,7 @@ export function unregisterOnline(uid, client) {
   if (!s.size) online.delete(uid);
 }
 export const isOnline = (uid) => online.has(uid);
+export const akunOnlineArena = () => new Set(online.keys());
 export function notify(uid, type, payload) {
   for (const c of online.get(uid) || []) c.send(type, payload);
 }

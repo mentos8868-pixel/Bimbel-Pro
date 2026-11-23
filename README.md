@@ -22,11 +22,19 @@ Lalu buka:
 - Dashboard anak: http://localhost:5173/anak.html (anak diarahkan ke sini setelah masuk)
 - Di HP/tablet yang tersambung ke Wi-Fi yang sama: http://ALAMAT-IP-LAPTOP:5173 (alamatnya muncul di terminal pada baris "Network")
 
-## Bertanya kepada mentor AI arena
+## Dasbor admin
 
-Dekati Elon Musk (bot simulasi) di alun-alun dan tekan **E** atau tombol **Bicara**. Ketik pertanyaan dan tekan **Kirim**. Mentor mengingat tiga pertukaran terakhir selama panel terbuka.
+Atur kunci admin di lingkungan server sebelum menjalankan Bimbel Pro. Untuk pengembangan lokal, jalankan ini di PowerShell yang sama dengan server.
 
-Server mengirim pertanyaan ke API OpenAI. Atur `OPENAI_API_KEY` di lingkungan server, lalu jalankan ulang server. Model bawaan adalah `gpt-4.1-mini` dan bisa diganti melalui `OPENAI_MODEL`.
+```powershell
+$env:BIMBEL_ADMIN_TOKEN = [guid]::NewGuid().ToString("N")
+$env:BIMBEL_ADMIN_TOKEN
+npm run dev
+```
+
+Buka [dasbor admin lokal](http://localhost:5173/admin.html) dan masukkan kunci yang muncul di terminal. Gunakan kunci yang hanya diketahui pengelola dan akses lewat HTTPS jika dasbor dipublikasikan.
+
+Dasbor menampilkan jumlah akun orang tua dan anak yang tersimpan, jumlah akun terhubung ke Arena, serta jumlah akun unik yang ada di Arena atau terdeteksi aktif di dashboard dalam dua menit terakhir. Statistik aktivitas berlaku untuk satu proses server.
 
 ## Cara memakai akun
 

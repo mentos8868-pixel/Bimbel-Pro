@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin Bimbel Pro</title>
+    <link rel="stylesheet" href="/src/orangtua.css" />
+    <style>
+      .tabel-akun { overflow-x: auto; }
+      .tabel-akun table { width: 100%; border-collapse: collapse; }
+      .tabel-akun th, .tabel-akun td { padding: 10px; text-align: start; border-bottom: 1px solid var(--border); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Admin Bimbel Pro</h1>
+      <form id="akses-admin" class="panel">
+        <label>Kunci admin <input type="password" name="kunci" autocomplete="off" required /></label>
+        <button type="submit" class="primary">Lihat statistik</button>
+      </form>
+      <p id="status-admin" class="muted" role="status"></p>
+      <section id="statistik" class="grid2" aria-label="Statistik pengguna" hidden>
+        <article class="panel"><h2>Akun orang tua</h2><strong id="orangTua"></strong></article>
+        <article class="panel"><h2>Akun anak</h2><strong id="anak"></strong></article>
+        <article class="panel"><h2>Aktif di aplikasi</h2><strong id="aktif"></strong><span class="muted">Arena dan dashboard yang aktif dalam dua menit terakhir.</span></article>
+        <article class="panel"><h2>Online di Arena</h2><strong id="arena"></strong><span class="muted">Akun unik yang sedang terhubung ke Arena.</span></article>
+      </section>
+      <section id="rincian-akun" class="panel" hidden>
+        <h2>Rincian akun</h2>
+        <label>Jenis akun
+          <select id="jenis-akun">
+            <option value="orangTua">Orang tua</option>
+            <option value="anak">Anak</option>
+          </select>
+        </label>
+        <div class="tabel-akun">
+          <table aria-label="Daftar akun">
+            <thead>
+              <tr><th scope="col">ID masuk</th><th scope="col">Nama</th><th scope="col">Negara</th><th scope="col">Tanggal daftar</th><th scope="col">Status</th></tr>
+            </thead>
+            <tbody id="daftar-akun"></tbody>
+          </table>
+        </div>
+        <p id="akun-kosong" class="muted" hidden>Belum ada akun.</p>
+        <nav class="row" aria-label="Halaman daftar akun">
+          <button id="akun-sebelumnya" type="button">Sebelumnya</button>
+          <span id="halaman-akun" role="status"></span>
+          <button id="akun-berikutnya" type="button">Berikutnya</button>
+        </nav>
+      </section>
+    </main>
+    <script type="module" src="/src/admin.js"></script>
+  </body>
+</html>

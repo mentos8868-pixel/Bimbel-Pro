@@ -20,6 +20,7 @@
         <section data-step="pilih" hidden>
           <h1>Selamat datang!</h1>
           <a class="btn primary" href="/orangtua.html?login">Masuk</a>
+          <button type="button" data-act="lihat-kelas">Lihat ruang belajar</button>
           <p class="muted">Belum punya akun? Orang tua mendaftar dulu, lalu membuat akun anak di dashboard orang tua.</p>
         </section>
 
@@ -349,20 +350,6 @@
       </div>
     </div>
 
-    <div id="mentor-panel" class="overlay" hidden>
-      <section class="card" role="dialog" aria-modal="true" aria-labelledby="mentor-judul">
-        <h2 id="mentor-judul">Elon Musk · Bot simulasi</h2>
-        <p>Pertanyaan dan percakapan terakhir di panel ini dikirim ke OpenAI. Hindari menulis data pribadi.</p>
-        <p id="mentor-jawaban" aria-live="polite"></p>
-        <div class="row" id="mentor-pilihan"></div>
-        <form id="mentor-form">
-          <label for="mentor-input">Pertanyaan atau jawabanmu</label>
-          <input id="mentor-input" maxlength="600" autocomplete="off" required>
-          <button class="primary" type="submit">Kirim</button>
-        </form>
-        <button class="ghost" id="mentor-tutup">Selesai</button>
-      </section>
-    </div>
     <div id="kantor-panel" class="overlay" hidden>
       <div class="card" role="dialog" aria-modal="true" aria-labelledby="kantor-judul">
         <h2 id="kantor-judul">Kantor Ayah dan Ibu</h2>

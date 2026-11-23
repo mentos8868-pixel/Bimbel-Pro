@@ -20,6 +20,7 @@ export default defineConfig({
         main: resolve(import.meta.dirname, "index.html"),
         orangtua: resolve(import.meta.dirname, "orangtua.html"),
         anak: resolve(import.meta.dirname, "anak.html"),
+        admin: resolve(import.meta.dirname, "admin.html"),
       },
     },
   },

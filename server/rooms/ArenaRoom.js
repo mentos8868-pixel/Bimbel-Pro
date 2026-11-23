@@ -5,11 +5,12 @@ import { setupSocial, socialJoin, socialLeave } from "./arena-social.js";
 import { uidOf } from "../social.js";
 import { avatarOr } from "../../shared/avatars.js";
 import { db } from "../db.js";
+import { daftarMuridBelajar, pantauStatusBelajar } from "../belajar-arena.js";
 import { sedangBekerja } from "../kantor.js";
 import { siapkanKursiGame } from "./kursi-game.js";
 import { rapikanAksesori } from "../../shared/aksesori.js";
-import { levelDariXp, auraUntukLevel } from "../../shared/aura.js";
-import { JARAK_INTERAKSI_BIMBEL, POSISI_KURSI_BIMBEL, TITIK_BIMBEL } from "../../shared/kursi-bimbel.js";
+import { levelDariXp, auraUntukLevel, auraDipakai } from "../../shared/aura.js";
+import { JARAK_INTERAKSI_BIMBEL, POSISI_KURSI_BIMBEL, TITIK_BIMBEL, posisiMuridBelajar } from "../../shared/kursi-bimbel.js";
 
 
 const { Room, ServerError } = colyseus;
@@ -44,9 +45,15 @@ export class ArenaState extends Schema {
   constructor() {
     super();
     this.players = new MapSchema();
+    this.murid = new MapSchema();
   }
 }
-defineTypes(ArenaState, { players: { map: Player } });
+class Murid extends Schema {}
+defineTypes(Murid, {
+  name: "string", avatar: "string", color: "string", aksesori: "string", aura: "string",
+  x: "number", z: "number", ry: "number", duduk: "boolean",
+});
+defineTypes(ArenaState, { players: { map: Player }, murid: { map: Murid } });
 
 const num = (v, fallback = 0) => (Number.isFinite(v) ? v : fallback);
 
@@ -61,6 +68,9 @@ export class ArenaRoom extends Room {
       for (const id of [...this.timers.keys()]) this.checkTime(id, now);
     }, 15000);
     this.clock.setInterval(() => this.segarkanStatusKerja(), 1000);
+    this.segarkanMuridBelajar();
+    this.berhentiPantauBelajar = pantauStatusBelajar(() => this.segarkanMuridBelajar());
+    this.clock.setInterval(() => this.segarkanMuridBelajar(), 3000);
 
     setupSocial(this);
     this.lepasKursiGame = siapkanKursiGame(this);
@@ -74,6 +84,7 @@ export class ArenaRoom extends Room {
         Object.assign(p, this.posisiSebelumBelajar.get(id));
         this.posisiSebelumBelajar.delete(id);
         p.kursiBimbel = 0;
+        this.segarkanMuridBelajar();
       }
       if (mulai !== true || p.kursiBimbel) return;
       if (Math.hypot(p.x - TITIK_BIMBEL.x, p.z - TITIK_BIMBEL.z) > JARAK_INTERAKSI_BIMBEL + 0.02) {
@@ -87,6 +98,7 @@ export class ArenaRoom extends Room {
       this.posisiSebelumBelajar.set(id, { x: p.x, z: p.z, ry: p.ry });
       Object.assign(p, POSISI_KURSI_BIMBEL[indeks]);
       p.kursiBimbel = indeks + 1;
+      this.segarkanMuridBelajar();
     });
 
     this.onMessage("move", (client, data = {}) => {
@@ -138,6 +150,30 @@ export class ArenaRoom extends Room {
     }
   }
 
+  segarkanMuridBelajar() {
+    const belajar = daftarMuridBelajar();
+    const dudukLangsung = [...this.state.players.values()].filter((p) => p.kursiBimbel);
+    const kursiTerisi = new Set(dudukLangsung.map((p) => p.kursiBimbel));
+    for (const p of dudukLangsung) belajar.delete(p.uid);
+    for (const uid of this.state.murid.keys()) {
+      if (!belajar.has(uid)) this.state.murid.delete(uid);
+    }
+
+    const kursiKosong = POSISI_KURSI_BIMBEL.filter((_, i) => !kursiTerisi.has(i + 1));
+    let indeks = 0;
+    for (const [uid, anak] of belajar) {
+      const murid = this.state.murid.get(uid) || new Murid();
+      Object.assign(murid, posisiMuridBelajar(indeks++, kursiKosong), {
+        name: anak.name,
+        avatar: avatarOr(anak.avatar),
+        color: WARNA.test(anak.color) ? anak.color : "#4f9cf0",
+        aksesori: rapikanAksesori(anak.aksesori_pakai).join(","),
+        aura: auraDipakai(levelDariXp(anak.xp), anak.aura_pakai),
+      });
+      if (!this.state.murid.has(uid)) this.state.murid.set(uid, murid);
+    }
+  }
+
   onJoin(client) {
     const a = client.auth;
     const p = new Player();
@@ -171,8 +207,9 @@ export class ArenaRoom extends Room {
 
   onLeave(client) {
     if (client.auth) this.lepasKursiGame(client);
-    this.posisiSebelumBelajar.delete(client.sessionId);
+    const tadiBelajar = this.posisiSebelumBelajar.delete(client.sessionId);
     this.state.players.delete(client.sessionId);
+    if (tadiBelajar) this.segarkanMuridBelajar();
     if (client.auth) socialLeave(this, client);
     const a = client.auth;
     if (a?.role === "anak") {
@@ -207,6 +244,7 @@ export class ArenaRoom extends Room {
   }
 
   onDispose() {
+    this.berhentiPantauBelajar?.();
     const now = Date.now();
     for (const [childId, t] of this.timers) addPlaySeconds(childId, (now - t.last) / 1000);
   }

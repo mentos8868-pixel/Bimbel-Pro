@@ -134,6 +134,11 @@ export function setupLogin(onStart) {
     if (!b) return;
     if (b.dataset.go) return go(b.dataset.go);
     const act = b.dataset.act;
+    if (act === "lihat-kelas") {
+      box().hidden = true;
+      onStart({ name: "Pengunjung", avatar: DEFAULT_ORTU_AVATAR, color: "#5b6b7c", role: "ortu" }, null);
+      return;
+    }
     if (act === "keluar") {
       await api("POST", "keluar").catch(() => { });
       return refresh();

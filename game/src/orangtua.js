@@ -1,6 +1,6 @@
 import { bahasaDashboard, pilihanBahasa, terjemah } from "./bahasa.js";
 // Dashboard orang tua: masuk/daftar, laporan per anak, pengaturan, dan hapus data.
-import { api } from "./api.js";
+import { api, pantauAktivitas } from "./api.js";
 import { pasangSuara } from "./chat-suara.js";
 import { gelembungChat, kotakPesanChat } from "./chat-tampilan.js";
 import { avatarPicker, anggotaDari } from "./avatar-picker.js";
@@ -771,7 +771,7 @@ function gambarTugas() {
         <label>Nama tugas <input name="judul" maxlength="60" required placeholder="Contoh: Salat Subuh, Mencuci piring" /></label>
         <label>Jenis <select name="jenis">${Object.entries(NAMA_JENIS).map(([k, v]) => `<option value="${k}">${IKON_JENIS[k]} ${v}</option>`).join("")}</select></label>
         <label>Jadwal <select name="jadwal"><option value="harian">Setiap hari</option><option value="hari">Hari tertentu</option><option value="sekali">Sekali saja</option></select></label>
-        <label>Bintang hadiah (masuk saat Anda setujui) <select name="bintang">${[1, 2, 3].map((n) => `<option value="${n}">${"★".repeat(n)} (${n})</option>`).join("")}</select></label>
+        <label>Bintang hadiah (masuk saat Anda setujui) <select name="bintang">${[1, 2, 3].map((n) => `<option value="${n}">${"★".repeat(n)}</option>`).join("")}</select></label>
       </div>
       <div class="pilih-hari" hidden>${NAMA_HARI.map((h, i) => `<label class="check"><input type="checkbox" name="hari" value="${i}" /><span>${h}</span></label>`).join("")}</div>
       <p class="error" hidden></p>
@@ -1413,8 +1413,10 @@ async function load() {
   dataHome = { children, byId };
   $("form-anak").querySelector("h2").dataset.terjemah = children.length ? "Tambah akun anak" : "Mulai dengan menambah akun anak";
   $("dash").hidden = false;
+  catatAktivitas();
   memuat.hidden = true;
   terapkanHal();
 }
 
+const catatAktivitas = pantauAktivitas("ortu", $("dash"));
 load();

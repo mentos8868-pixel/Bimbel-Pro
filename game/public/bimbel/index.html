@@ -212,6 +212,7 @@
     <button data-v="medali">Medali</button>
     <button data-v="laporan">Laporan Orang Tua</button>
     <a href="/anak.html" class="ke-dash">🏠 Dashboard</a>
+    <a href="/?arena=1" class="ke-dash" id="kembali-arena" hidden>Kembali ke Arena</a>
   </nav>
 </header>
 <main id="app"></main>
@@ -1374,7 +1375,6 @@ function pakaiAkun(){
 
 /* ============ Masuk: wajib akun anak dari orang tua ============ */
 function gerbang(me){
-  const m=document.createElement('div');m.className='modal';m.id='gerbang';
   const isi=me&&me.anak&&!me.anak.kelas
     ?`<h2>Kelas belum diatur</h2><p>Minta orang tua memilih kelas dan kurikulum sekolahmu di dashboard orang tua (bagian Pengaturan).</p>
       <a class="btn" href="/orangtua.html" style="display:block;text-align:center;text-decoration:none;margin-bottom:10px">Dashboard orang tua</a>
@@ -1382,22 +1382,40 @@ function gerbang(me){
     :me===null
     ?`<h2>Tidak bisa memeriksa akun</h2><p>Ruang Pintar perlu tersambung ke server Bimbel Pro. Periksa koneksi, lalu coba lagi.</p>
       <button class="btn" id="lagi" style="width:100%">Coba lagi</button>`
-    :me.ortu
-    ?`<h2>Pilih akun anak dulu</h2><p>Ruang Pintar dipakai dengan akun anak. Buka halaman masuk, pilih nama anak, lalu masukkan PIN-nya.</p>
-      <a class="btn" href="/" style="display:block;text-align:center;text-decoration:none;margin-bottom:10px">Ke halaman masuk</a>
-      <a class="btn ghost" href="/orangtua.html" style="display:block;text-align:center;text-decoration:none">Dashboard orang tua</a>`
     :`<h2>Masuk dulu, ya</h2><p>Ruang Pintar hanya untuk anak yang sudah punya akun dari orang tua.</p>
       <p style="color:var(--muted)"><b>Anak:</b> masuk dengan kode dari orang tua.<br><b>Orang tua:</b> daftar, lalu buat akun anak di dashboard.</p>
       <a class="btn" href="/" style="display:block;text-align:center;text-decoration:none;margin-bottom:10px">Ke halaman masuk</a>
       <a class="btn ghost" href="/orangtua.html" style="display:block;text-align:center;text-decoration:none">Dashboard orang tua</a>`;
-  m.innerHTML=`<div class="mbox">${isi}</div>`;document.body.appendChild(m);
+  $('#app').innerHTML=`<section class="mbox">${isi}</section>`;
   const l=$('#lagi');if(l)l.onclick=()=>location.reload();
+}
+function pantauBelajarArena(){
+  const tab=Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,'0')).join('');
+  const kirim=mulai=>fetch('/api/belajar/arena',{
+    method:'POST',headers:{'Content-Type':'application/json','X-Bimbel':'1'},
+    body:JSON.stringify({childId:AKUN.id,tab,mulai}),keepalive:true
+  }).catch(()=>{});
+  let detak;
+  const kabari=()=>{if(!document.hidden)kirim(true)};
+  const mulai=()=>{
+    clearInterval(detak);kabari();
+    detak=setInterval(kabari,20000);
+  };
+  window.addEventListener('pagehide',()=>{clearInterval(detak);kirim(false)});
+  window.addEventListener('pageshow',e=>{if(e.persisted)mulai()});
+  document.addEventListener('visibilitychange',kabari);
+  mulai();
 }
 async function mulai(){
   let me=null;
   try{const r=await fetch('/api/saya',{credentials:'same-origin'});if(r.ok)me=await r.json()}catch(e){}
+  if(me?.ortu&&!me.anak){
+    $('#app').innerHTML='<h2>Ruang Pintar khusus akun anak</h2><p><a href="/orangtua.html#report">Lihat laporan belajar di Dashboard Orang Tua</a></p>';
+    return;
+  }
   if(!me||!me.anak||!me.anak.kelas){$('#app').innerHTML='';return gerbang(me)}
   AKUN=me.anak;SKEY=`ruangpintar_a${AKUN.id}`;EXKEY=`ruangpintar_ujian_a${AKUN.id}`;
+  $('#kembali-arena').hidden=new URLSearchParams(location.search).get('dari')!=='arena';
   try{S=Object.assign({},DEF,JSON.parse(localStorage.getItem(SKEY)||'{}'))}catch(e){S=Object.assign({},DEF)}
   pakaiAkun();save();sinkron();   /* ambil kemajuan dari perangkat lain sekarang juga */
   segarkanAvatar();
@@ -1406,6 +1424,7 @@ async function mulai(){
   /* lanjutkan tryout yang belum selesai (mis. setelah halaman di-refresh) */
   try{const sx=JSON.parse(localStorage.getItem(EXKEY)||'null');if(sx&&!sx.done&&sx.qs&&sx.qs.length){ex=sx;view='tryout'}}catch(e){}
   render();
+  pantauBelajarArena();
 }
 mulai();
 </script>

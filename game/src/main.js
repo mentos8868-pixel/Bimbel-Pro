@@ -18,7 +18,6 @@ import { pasangOtello } from "./otello-ui.js";
 import { TokoUI } from "./toko-ui.js";
 import { pasangChatKeluarga } from "./chat-keluarga-arena.js";
 import { KUALITAS, NAMA_KUALITAS } from "./grafis.js";
-import { siapkanMentor } from "./mentor-arena.js";
 import { api, reportResult } from "./api.js";
 
 const $ = (id) => document.getElementById(id);
@@ -93,7 +92,8 @@ async function start(profile, playingAs) {
   };
   labelGrafis();
   const me = createAvatar(scene, profile);
-  me.root.position.set(0, 0, -3);
+  if (playingAs) me.root.position.set(0, 0, -3);
+  else me.root.position.set(0, 0, 20.5);
   // Membuat ulang figur avatar (mis. setelah membeli aksesori) di posisi dan arah yang sama.
   function gantiAvatar(lama, opsi) {
     const baru = createAvatar(scene, opsi);
@@ -111,8 +111,6 @@ async function start(profile, playingAs) {
   // Keyboard
   const keys = new Set();
   let uiOpen = false;
-  let tabBelajar = null;
-  let pantauTabBelajar;
   let menungguKursi = false;
   let batasWaktuKursi;
   let mejaGame = null, mejaMenunggu = null, posisiSebelumGame = null;
@@ -170,6 +168,45 @@ async function start(profile, playingAs) {
     ry: +me.root.rotation.y.toFixed(2),
   });
   const others = new Map();
+  const muridArena = new Map();
+  let memuatMuridPublik = false;
+  function gambarMurid(p, uid) {
+    const profil = { role: "anak", name: p.name || "Murid", avatar: p.avatar, color: p.color, aksesori: p.aksesori, aura: p.aura };
+    const versi = JSON.stringify(profil);
+    let av = muridArena.get(uid);
+    if (av?.versiMurid !== versi) {
+      if (av) disposeAvatar(av);
+      av = createAvatar(scene, profil);
+      av.versiMurid = versi;
+      muridArena.set(uid, av);
+    }
+    av.root.position.set(p.x, 0, p.z);
+    av.root.rotation.y = p.ry;
+    aturPoseBelajar(av, p.duduk);
+    av.statusAktivitas.setEnabled(true);
+  }
+
+  function hapusMurid(uid) {
+    const av = muridArena.get(uid);
+    if (av) disposeAvatar(av);
+    muridArena.delete(uid);
+  }
+
+  async function muatMuridPublik() {
+    if (document.hidden || memuatMuridPublik) return;
+    memuatMuridPublik = true;
+    try {
+      const { murid } = await api("GET", "belajar/arena");
+      murid.forEach(gambarMurid);
+      for (const uid of muridArena.keys()) {
+        if (uid >= murid.length) hapusMurid(uid);
+      }
+    } catch {
+      for (const uid of muridArena.keys()) hapusMurid(uid);
+    } finally {
+      memuatMuridPublik = false;
+    }
+  }
   const pekerjaArena = new Map();
   let hasilKerjaArena = [];
   let memuatKerjaArena = false;
@@ -177,7 +214,6 @@ async function start(profile, playingAs) {
   function gambarPekerjaArena() {
     const indeks = { kantor: 0, sawah: 0 };
     const tampil = hasilKerjaArena.map((p) => ({ ...p, slot: indeks[p.pekerjaan]++ }));
-    for (const { av, p } of others.values()) av.root.setEnabled(!tampil.some((kerja) => kerja.uid === p.uid));
     for (const [uid, av] of pekerjaArena) {
       if (tampil.some((p) => p.uid === uid && p.pekerjaan === av.pekerjaan && p.slot === av.slot && p.avatar === av.avatar && p.aksesori === av.aksesori && p.negara === av.negara)) continue;
       disposeAvatar(av);
@@ -263,6 +299,12 @@ async function start(profile, playingAs) {
       if (o) { disposeAvatar(o.av); others.delete(id); }
       gambarPekerjaArena();
     });
+    room.state.murid.onAdd((p, uid) => {
+      if (playingAs === "anak" && uid === `a${profile.childId}`) return;
+      gambarMurid(p, uid);
+      p.onChange(() => gambarMurid(p, uid));
+    });
+    room.state.murid.onRemove((_, uid) => hapusMurid(uid));
     if (playingAs === "anak") {
       let terakhir = 0;
       const segarkan = () => {
@@ -278,6 +320,8 @@ async function start(profile, playingAs) {
       mejaMenunggu = null;
       for (const { av } of others.values()) disposeAvatar(av);
       others.clear();
+      for (const av of muridArena.values()) disposeAvatar(av);
+      muridArena.clear();
       gambarPekerjaArena();
       selesaiMenungguKursi();
       aturPoseBelajar(me, false);
@@ -289,7 +333,7 @@ async function start(profile, playingAs) {
     if (e?.code === 4403) return timeUp(e.message);
     // Orang tua sedang bekerja: kembali ke layar "Sedang bekerja" (ada tombol Stop kerja).
     if (e?.code === 4409) { location.replace("/?arena=ortu"); return; }
-    $("hud-status").textContent = playingAs ? "Offline (lawan bot tetap bisa)" : "Mode tamu: lawan bot saja";
+    $("hud-status").textContent = playingAs ? "Offline (lawan bot tetap bisa)" : "Pengunjung";
   }
   const updateCount = () => {
     if (room) $("hud-status").textContent = `Online · ${others.size + 1} pemain di arena`;
@@ -299,6 +343,9 @@ async function start(profile, playingAs) {
     muatPekerjaArena();
     setInterval(muatPekerjaArena, 5000);
     window.addEventListener("focus", muatPekerjaArena);
+  } else {
+    muatMuridPublik();
+    setInterval(muatMuridPublik, 5000);
   }
 
   // ---------- Catur ----------
@@ -468,7 +515,6 @@ async function start(profile, playingAs) {
     });
   }
 
-  const bukaMentor = siapkanMentor(() => { uiOpen = false; keys.clear(); });
   const bukaOtello = pasangOtello($("otello-panel"), tutupGame);
   function useTable(t) {
     if (t.nomor && mejaGame !== t) {
@@ -500,13 +546,8 @@ async function start(profile, playingAs) {
       bukaOtello();
       return;
     }
-    if (t.id === "mentor") {
-      uiOpen = true;
-      keys.clear();
-      bukaMentor();
-      return;
-    }
     if (t.id === "kantor" || t.id === "sawah") {
+      if (playingAs === "anak") return;
       if (playingAs !== "ortu") return toast("Pekerjaan ini khusus untuk Ayah dan Ibu.");
       bukaKantor(t.id);
       return;
@@ -519,26 +560,7 @@ async function start(profile, playingAs) {
       return;
     }
     if (t.id === "bimbel") {
-      if (tabBelajar && !tabBelajar.closed) {
-        tabBelajar.focus();
-      } else {
-        tabBelajar = window.open("/bimbel/index.html", "_blank");
-        if (!tabBelajar) return toast("Izinkan tab baru untuk membuka Ruang Pintar.");
-        tabBelajar.opener = null;
-      }
-      if (playingAs !== "anak" || !room) return;
-      keys.clear();
-      menungguKursi = true;
-      room.send("move", posisiPemain());
-      room.send("belajar-bimbel", true);
-      batasWaktuKursi = setTimeout(berdiriDariKursi, 4000);
-      clearInterval(pantauTabBelajar);
-      pantauTabBelajar = setInterval(() => {
-        if (!tabBelajar.closed) return;
-        clearInterval(pantauTabBelajar);
-        tabBelajar = null;
-        if (me.duduk || menungguKursi) berdiriDariKursi();
-      }, 500);
+      if (playingAs === "anak") location.assign("/bimbel/index.html?dari=arena");
       return;
     }
     if (t.id === "kartu") {
@@ -747,6 +769,7 @@ async function start(profile, playingAs) {
 
     // Gerakkan pemain lain dengan halus
     for (const { av, p } of others.values()) {
+      av.root.setEnabled(!pekerjaArena.has(p.uid) && !muridArena.has(p.uid));
       const rp = av.root.position;
       const duduk = Boolean(p.kursiBimbel || p.mejaGame);
       if (av.duduk !== duduk || duduk) {
@@ -766,6 +789,8 @@ async function start(profile, playingAs) {
     nearTable = null;
     let jarakTerdekat = Infinity;
     for (const t of tables) {
+      if (t.id === "bimbel" && playingAs !== "anak") continue;
+      if ((t.id === "kantor" || t.id === "sawah") && playingAs === "anak") continue;
       const jarak = t.id === "bimbel" ? JARAK_INTERAKSI_BIMBEL : 2.6;
       const jarakMeja = Math.hypot(pos.x - t.x, pos.z - t.z);
       if (jarakMeja < jarak && jarakMeja < jarakTerdekat) {

@@ -2,7 +2,7 @@ import { bahasaDashboard, pilihanBahasa, terjemah } from "./bahasa.js";
 import { buatAlarm } from "./alarm-anak.js";
 // Dashboard anak: halaman pertama setelah anak masuk. Menu: Home, Tugas, Arena, Bimbel, Report, Chat, Avatar, Toko Avatar.
 // Hanya data milik anak itu sendiri (dari /api/saya, /api/kamarku, /api/toko). Pengaturan tetap di tangan orang tua.
-import { api } from "./api.js";
+import { api, pantauAktivitas } from "./api.js";
 import { pasangSuara } from "./chat-suara.js";
 import { gelembungChat, kotakPesanChat } from "./chat-tampilan.js";
 import { avatarPicker, anggotaDari } from "./avatar-picker.js";
@@ -396,8 +396,18 @@ function pasangChat() {
   muat();
   chatTimer = setInterval(muat, 5000);
 }
+function keluarDariBelajar() {
+  if (!anak || document.hidden || hal === "bimbel") return;
+  api("POST", "belajar/arena", { childId: anak.id, dashboard: true }).catch(() => {});
+}
+document.addEventListener("visibilitychange", keluarDariBelajar);
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) keluarDariBelajar();
+});
+
 function keHal(h) {
   hal = h;
+  keluarDariBelajar();
   galat("");
   history.replaceState(null, "", h === "home" ? location.pathname : `#${h}`);
   gambar();
@@ -563,6 +573,7 @@ async function muat() {
   $("memuat").hidden = true;
   if (!me.anak) { $("belum").hidden = false; return; }
   anak = me.anak;
+  keluarDariBelajar();
   alarmAnak = buatAlarm(anak.id);
   try { k = await api("GET", "kamarku"); } catch (x) { $("memuat").hidden = false; $("memuat").textContent = x.message; return; }
   tg = await api("GET", "tugas/saya").catch(() => null);
@@ -583,7 +594,9 @@ async function muat() {
     if (beda && !["avatar", "chat", "keuangan"].includes(hal)) gambar(); else tandaChat();
   }, 30000);
   $("dash").hidden = false;
+  catatAktivitas();
   document.title = `Dashboard ${anak.name}`;
   gambar();
 }
+const catatAktivitas = pantauAktivitas("anak", $("dash"));
 muat();

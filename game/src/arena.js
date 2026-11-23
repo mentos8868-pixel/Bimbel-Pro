@@ -249,7 +249,7 @@ function ruangKelas(scene, walls) {
     walls.push({ minX: x - 0.3, maxX: x + 0.3, minZ: z - 0.3, maxZ: z + 0.3 });
   }
   tabung(scene, 0.45, 0.4, "#5d6b7a", -7.2, 0.23, 20);
-  // Meja guru adalah tempat membuka Ruang Pintar (tab baru); titik aksi di depan meja.
+  // Titik aksi untuk membuka Ruang Pintar berada di depan meja guru.
   makeSign(scene, ["Ruang Pintar"], { width: 2.2, height: 0.6 }).position.set(gx, 1.7, gz - 0.7);
   return { id: "bimbel", ...TITIK_BIMBEL, label: "Ruang Pintar", action: "Belajar di Ruang Pintar", ready: true };
 }
@@ -346,7 +346,7 @@ export function createArena(canvas) {
   room(scene, walls, { cx: 0, cz: 25, w: 16, d: 12, door: "s", floor: "#fff3d6", wall: "#f2b134" });
   const bimbelSign = makeSign(scene, ["Ruang Bimbel", "Ruang Pintar"], { width: 5, height: 1.6, bg: "#f2b134", fg: "#3b2a05" });
   bimbelSign.position.set(0, 3.2, 18.6);
-  // Ruang kelas: papan tulis, meja guru (membuka Ruang Pintar di tab baru), meja-kursi murid, rak buku.
+  // Ruang kelas: papan tulis, meja guru, meja-kursi murid, rak buku.
   const studyDesk = ruangKelas(scene, walls);
 
   // Ruang Game (timur)
@@ -420,13 +420,9 @@ export function createArena(canvas) {
   for (const [x, z] of [[-9, 9], [9, 9], [-9, -9], [9, -9]]) walls.push({ minX: x - 0.3, maxX: x + 0.3, minZ: z - 0.3, maxZ: z + 0.3 });
 
   window.addEventListener("resize", () => engine.resize());
-  const mentor = { id: "mentor", x: -5, z: -3, action: "Bicara dengan Elon Musk (bot)" };
-  const bot = createAvatar(scene, { name: "Elon Musk", jenjang: "Bot simulasi", avatar: "manusia-ayah", color: "#39465f" });
-  bot.root.position.set(mentor.x, 0, mentor.z);
-  bot.root.rotation.y = Math.PI / 3;
   // Cahaya hangat, bayangan lembut, dan efek ala film (lihat grafis.js); dipasang setelah semua benda dibuat.
   const grafis = pasangGrafis({ scene, camera, sun, hemi });
-  return { engine, scene, camera, walls, grafis, tables: [...tables, studyDesk, kios, mentor, ...mejaKantor, sawah] };
+  return { engine, scene, camera, walls, grafis, tables: [...tables, studyDesk, kios, ...mejaKantor, sawah] };
 }
 
 // Gelembung chat di atas kepala avatar (hilang setelah 5 detik).

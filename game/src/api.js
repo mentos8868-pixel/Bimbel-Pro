@@ -28,3 +28,14 @@ export async function api(method, path, body) {
 export function reportResult(game, mode, outcome, score = 0) {
   api("POST", "hasil", { game, mode, outcome, score }).catch(() => {});
 }
+
+export function pantauAktivitas(sebagai, dashboard) {
+  function kirim() {
+    if (document.visibilityState === "visible" && !dashboard.hidden) {
+      api("POST", "aktivitas", { sebagai }).catch(() => {});
+    }
+  }
+  document.addEventListener("visibilitychange", kirim);
+  setInterval(kirim, 45_000);
+  return kirim;
+}

@@ -18,9 +18,10 @@ import { handleKeuangan } from "./keuangan.js";
 import { handleHadiah } from "./hadiah.js";
 import { handleTokoOrtu, avatarOrtuDimiliki, aksesoriOrtuDimiliki } from "./toko-ortu.js";
 import { handleKantor } from "./kantor.js";
-import { tanyaMentor } from "./mentor.js";
 import { negaraOr, isNegara, jenjangDariKelas } from "../shared/negara.js";
 import { parentView, parentDecide, unblock, purgeUid, notify, kick, isOnline } from "./social.js";
+import { aksesStatistik, catatAktivitas, statistikAdmin } from "./statistik.js";
+import { akhiriBelajarDashboard, muridBelajarPublik, ubahStatusBelajar } from "./belajar-arena.js";
 import { sendMail, APP_URL } from "./mailer.js";
 
 const DAY = 86400000;
@@ -47,6 +48,7 @@ export function checkSecret(secret, stored) {
 }
 
 const sha = (s) => createHash("sha256").update(s).digest("hex");
+const BINTANG_AWAL_ORTU = 100;
 const newToken = () => randomBytes(32).toString("base64url");
 const sandiAnakCadangan = hashSecret(randomBytes(32).toString("hex"));
 const loginAnak = (value) => typeof value === "string" ? value.trim().toLowerCase() : "";
@@ -379,8 +381,34 @@ export async function handleApi(req, res) {
     const maksBody = path[0] === "progres" ? 300000
       : path[0] === "chat" && path[1] === "keluarga" && path.length === 2 ? MAKS_BODY_SUARA : 20000;
     const body = m === "GET" ? {} : await readJson(req, maksBody);
-    if (m === "POST" && url.pathname === "/api/mentor/tanya") {
-      send(200, await tanyaMentor(body, ApiError));
+    if (m === "POST" && url.pathname === "/api/admin/statistik") {
+      if (!aksesStatistik(body.token)) throw new ApiError(403, "Kunci admin salah atau akses admin belum diaktifkan.");
+      send(200, statistikAdmin(body.jenis, body.halaman));
+      return true;
+    }
+    if (m === "POST" && url.pathname === "/api/aktivitas") {
+      const sesi = body.sebagai === "ortu" ? ortu : body.sebagai === "anak" ? anak : null;
+      catatAktivitas(sesi);
+      send(200, { ok: true });
+      return true;
+    }
+    if (m === "GET" && url.pathname === "/api/belajar/arena") {
+      send(200, { murid: muridBelajarPublik() });
+      return true;
+    }
+    if (m === "POST" && url.pathname === "/api/belajar/arena") {
+      if (!anak || body.childId !== anak.child_id) throw new ApiError(401, "Silakan masuk dengan akun anak.");
+      if (body.dashboard === true) {
+        akhiriBelajarDashboard(anak);
+        send(200, { ok: true });
+        return true;
+      }
+      if (typeof body.tab !== "string" || !/^[a-f0-9]{32}$/.test(body.tab) || typeof body.mulai !== "boolean") {
+        throw new ApiError(400, "Status belajar tidak valid.");
+      }
+      ubahStatusBelajar(anak, body.tab, body.mulai);
+      if (body.mulai) catatAktivitas(anak);
+      send(200, { ok: true });
       return true;
     }
     // ortuSaya = akun orang tua yang sedang masuk; keluargaId = kepala keluarga (pemilik data anak).
@@ -403,8 +431,8 @@ export async function handleApi(req, res) {
       if (!peran) throw new ApiError(400, "Pilih dulu: Ayah atau Ibu.");
       const now = Date.now();
       const login = idAwalOrtu(body.login);
-      const r = db.prepare("INSERT INTO parents (email, pass_hash, name, consent_at, created_at, avatar, peran, kepala_id, negara) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(email, hashSecret(body.password), name, now, now, AVATAR_PERAN[peran], peran, null, negaraOrtu(body.negara));
+      const r = db.prepare("INSERT INTO parents (email, pass_hash, name, consent_at, created_at, avatar, peran, kepala_id, negara, bintang) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(email, hashSecret(body.password), name, now, now, AVATAR_PERAN[peran], peran, null, negaraOrtu(body.negara), BINTANG_AWAL_ORTU);
       buatIdMasukOrtu({ id: Number(r.lastInsertRowid), name }, login);
       const token = createSession("ortu", Number(r.lastInsertRowid));
       return send(200, { ok: true }, { "Set-Cookie": cookie(COOKIE.ortu, token, SESSION_MS / 1000) }), true;
@@ -601,8 +629,8 @@ export async function handleApi(req, res) {
           const login = idAwalOrtu(body.login);
           const peran = anggota[0].peran === "ayah" ? "ibu" : "ayah";
           const now = Date.now();
-          const hasil = db.prepare("INSERT INTO parents (email, pass_hash, name, consent_at, created_at, avatar, peran, kepala_id, negara) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-            .run(email, hashSecret(body.password), name, now, now, AVATAR_PERAN[peran], peran, kepala, negaraOrtu(body.negara));
+          const hasil = db.prepare("INSERT INTO parents (email, pass_hash, name, consent_at, created_at, avatar, peran, kepala_id, negara, bintang) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            .run(email, hashSecret(body.password), name, now, now, AVATAR_PERAN[peran], peran, kepala, negaraOrtu(body.negara), BINTANG_AWAL_ORTU);
           buatIdMasukOrtu({ id: Number(hasil.lastInsertRowid), name }, login);
           db.exec("COMMIT");
         } catch (e) { db.exec("ROLLBACK"); throw e; }
