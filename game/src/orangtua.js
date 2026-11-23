@@ -392,7 +392,6 @@ function renderKid(c, soc) {
   function updateTime() {
     const used = c.usedMin;
     const pct = c.limitMin ? Math.min(100, (used / c.limitMin) * 100) : 0;
-    el.querySelector(".metric-time").textContent = `${used} menit`;
     el.querySelector(".today-text").textContent = c.limitMin
       ? `${used} dari ${c.limitMin} menit`
       : `${used} menit (tanpa batas)`;
@@ -402,9 +401,6 @@ function renderKid(c, soc) {
     fill.classList.toggle("full", pct >= 100);
   }
   updateTime();
-  el.querySelector(".metric-stars").textContent = c.stars;
-  el.querySelector(".metric-games").textContent = Object.values(c.stats).reduce((sum, stat) => sum + stat.main, 0);
-  el.querySelector(".metric-learning").textContent = c.starredExercises;
 
   const max = Math.max(30, ...c.week.map((d) => d.minutes));
   el.querySelector(".week").replaceChildren(...c.week.map((d) => {
