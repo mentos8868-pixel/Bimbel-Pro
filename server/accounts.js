@@ -64,6 +64,16 @@ function kredensialAnak(body, childId = null) {
   return [login, hashSecret(body.sandiAnak)];
 }
 
+function idAwalOrtu(value) {
+  if (value === undefined) return undefined;
+  const login = loginAnak(value);
+  if (!POLA_LOGIN_ANAK.test(login)) throw new ApiError(400, "ID masuk tidak valid.");
+  if (db.prepare("SELECT login FROM login_id_ortu WHERE login = ? UNION SELECT login_anak FROM children WHERE login_anak = ?").get(login, login)) {
+    throw new ApiError(409, "ID masuk sudah dipakai.");
+  }
+  return login;
+}
+
 function negaraOrtu(value) {
   if (value === undefined) return null;
   if (!isNegara(value)) throw new ApiError(400, "Pilih negara yang tersedia.");
@@ -392,9 +402,10 @@ export async function handleApi(req, res) {
       const peran = PERAN[body.peran] ? body.peran : null;
       if (!peran) throw new ApiError(400, "Pilih dulu: Ayah atau Ibu.");
       const now = Date.now();
+      const login = idAwalOrtu(body.login);
       const r = db.prepare("INSERT INTO parents (email, pass_hash, name, consent_at, created_at, avatar, peran, kepala_id, negara) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .run(email, hashSecret(body.password), name, now, now, AVATAR_PERAN[peran], peran, null, negaraOrtu(body.negara));
-      buatIdMasukOrtu({ id: Number(r.lastInsertRowid), name });
+      buatIdMasukOrtu({ id: Number(r.lastInsertRowid), name }, login);
       const token = createSession("ortu", Number(r.lastInsertRowid));
       return send(200, { ok: true }, { "Set-Cookie": cookie(COOKIE.ortu, token, SESSION_MS / 1000) }), true;
     }
@@ -587,11 +598,12 @@ export async function handleApi(req, res) {
           const anggota = anggotaKeluarga(kepala);
           if (anggota.length >= 2) throw new ApiError(409, "Keluarga ini sudah punya dua orang tua.");
           if (db.prepare("SELECT 1 FROM parents WHERE email = ?").get(email)) throw new ApiError(409, "Email ini sudah terdaftar. Gunakan email lain.");
+          const login = idAwalOrtu(body.login);
           const peran = anggota[0].peran === "ayah" ? "ibu" : "ayah";
           const now = Date.now();
           const hasil = db.prepare("INSERT INTO parents (email, pass_hash, name, consent_at, created_at, avatar, peran, kepala_id, negara) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
             .run(email, hashSecret(body.password), name, now, now, AVATAR_PERAN[peran], peran, kepala, negaraOrtu(body.negara));
-          buatIdMasukOrtu({ id: Number(hasil.lastInsertRowid), name });
+          buatIdMasukOrtu({ id: Number(hasil.lastInsertRowid), name }, login);
           db.exec("COMMIT");
         } catch (e) { db.exec("ROLLBACK"); throw e; }
         return send(200, ringkas()), true;
@@ -683,10 +695,14 @@ export async function handleApi(req, res) {
       if (n >= 6) throw new ApiError(400, "Maksimal 6 akun anak.");
       const f = validChildFields(body, false);
       if (!AVATAR_AWAL_ANAK.includes(f.avatar)) throw new ApiError(400, "Pilih avatar manusia untuk akun anak baru.");
+      const email = str(body.email, 120).toLowerCase();
+      if (body.email !== undefined && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new ApiError(400, "Alamat email anak tidak valid.");
+      }
       const login = kredensialAnak(body);
-      const r = db.prepare(`INSERT INTO children (parent_id, name, jenjang, kelas, kurikulum, negara, color, avatar, pin_hash, limit_min, allow_strangers, chat, created_at, login_anak, sandi_anak_hash)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(pid, f.name, f.jenjang, f.kelas ?? 0, f.kurikulum, f.negara, f.color, f.avatar, "", f.limit_min ?? 60, f.allow_strangers ?? 0, f.chat ?? "mati", Date.now(), ...login);
+      const r = db.prepare(`INSERT INTO children (parent_id, name, jenjang, kelas, kurikulum, negara, color, avatar, pin_hash, limit_min, allow_strangers, chat, created_at, login_anak, sandi_anak_hash, email)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(pid, f.name, f.jenjang, f.kelas ?? 0, f.kurikulum, f.negara, f.color, f.avatar, "", f.limit_min ?? 60, f.allow_strangers ?? 0, f.chat ?? "mati", Date.now(), ...login, email || null);
       return send(200, { child: publicChild(childRow(Number(r.lastInsertRowid))) }), true;
     }
     if (path[0] === "anak" && path.length === 2 && path[1] === "keluar" && m === "POST") {

@@ -123,6 +123,7 @@ if (!db.prepare("PRAGMA table_info(parents)").all().some((c) => c.name === "akse
 // Kolom negara dan kelas anak (diisi orang tua; 0 = kelas belum diisi).
 {
   const cols = db.prepare("PRAGMA table_info(children)").all().map((c) => c.name);
+  if (!cols.includes("email")) db.exec("ALTER TABLE children ADD COLUMN email TEXT");
   if (!cols.includes("login_anak")) db.exec("ALTER TABLE children ADD COLUMN login_anak TEXT");
   if (!cols.includes("sandi_anak_hash")) db.exec("ALTER TABLE children ADD COLUMN sandi_anak_hash TEXT");
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS children_login_anak ON children(login_anak)");
@@ -150,7 +151,11 @@ export function lastDays(n, now = Date.now()) {
 }
 
 db.exec("CREATE TABLE IF NOT EXISTS login_id_ortu (parent_id INTEGER PRIMARY KEY REFERENCES parents(id) ON DELETE CASCADE, login TEXT NOT NULL UNIQUE)");
-export function buatIdMasukOrtu(p) {
+export function buatIdMasukOrtu(p, pilihan) {
+  if (pilihan !== undefined) {
+    db.prepare("INSERT INTO login_id_ortu VALUES (?, ?)").run(p.id, pilihan);
+    return;
+  }
   const dasar = p.name.toLowerCase().replace(/[^a-z0-9_.-]/g, "").slice(0, 16);
   let percobaan = 0;
   let login = dasar.length >= 3 ? dasar : "ortu" + p.id;

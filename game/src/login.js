@@ -135,11 +135,11 @@ export function setupLogin(onStart) {
     if (b.dataset.go) return go(b.dataset.go);
     const act = b.dataset.act;
     if (act === "keluar") {
-      await api("POST", "keluar").catch(() => {});
+      await api("POST", "keluar").catch(() => { });
       return refresh();
     }
     if (act === "ganti") {
-      await api("POST", "anak/keluar").catch(() => {});
+      await api("POST", "anak/keluar").catch(() => { });
       return refresh();
     }
     if (act === "main-anak") {

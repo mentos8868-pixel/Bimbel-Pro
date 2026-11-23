@@ -216,7 +216,7 @@ $("form-daftar").addEventListener("submit", async (e) => {
   if (!f.consent.checked) return setErr(f, "Centang persetujuan orang tua dulu.");
   busy(f, true);
   try {
-    await api("POST", "daftar", { name: f.name.value, email: f.email.value, password: f.password.value, consent: true, negara: f.elements.negara.value, peran: peranDaftar.get() });
+    await api("POST", "daftar", { name: f.name.value, login: f.login.value, email: f.email.value, password: f.password.value, consent: true, negara: f.elements.negara.value, peran: peranDaftar.get() });
     peranDaftar.set("");
     f.reset();
     await load();
@@ -255,7 +255,7 @@ $("form-anak").addEventListener("submit", async (e) => {
   if (!f.kelas.value) return setErr(f, "Pilih kelas anak.");
   busy(f, true);
   try {
-    const hasil = await api("POST", "anak", { name: f.name.value, kelas: Number(f.kelas.value), kurikulum: f.kurikulum.value, negara: f.negara.value, color: newColor, avatar: newAvatar.get(), loginAnak: f.loginAnak.value, sandiAnak: f.sandiAnak.value });
+    const hasil = await api("POST", "anak", { name: f.name.value, email: f.email.value, kelas: Number(f.kelas.value), kurikulum: f.kurikulum.value, negara: f.negara.value, color: newColor, avatar: newAvatar.get(), loginAnak: f.loginAnak.value, sandiAnak: f.sandiAnak.value });
     f.reset();
     fillKelasNegara(f, 0, DEFAULT_NEGARA);
     anakDipilih = hasil.child.id;
@@ -1242,7 +1242,8 @@ function gambarKeluarga() {
       ${anggotaPasangan ? "" : `<h3>${terjemah(`Buat akun ${pasangan}`)}</h3>`}
       ${anggotaPasangan ? `<p>${terjemah("ID masuk")} · <strong>${esc(anggotaPasangan.login)}</strong></p>` : ""}
       <div class="grid2">
-        ${anggotaPasangan ? "" : `<label>${terjemah(`Nama ${pasangan}`)} <input name="name" maxlength="40" required /></label>`}
+        ${anggotaPasangan ? "" : `<label>${terjemah("Nama game")} <input name="name" maxlength="40" required /></label>
+        <label>${terjemah("ID masuk")} <input name="login" minlength="3" maxlength="24" required /></label>`}
         <label>${terjemah("Email pemulihan")} <input type="email" name="email" value="${esc(anggotaPasangan?.email || "")}" maxlength="120" autocomplete="off" required /></label>
         <label>${terjemah(anggotaPasangan ? "Kata sandi baru" : "Kata sandi")} <input type="password" name="password" minlength="8" maxlength="128" autocomplete="new-password" ${anggotaPasangan ? "" : "required"} />
           ${anggotaPasangan ? `<small>${terjemah("Kosongkan untuk memakai kata sandi saat ini.")}</small>` : ""}</label>
@@ -1283,7 +1284,7 @@ function gambarKeluarga() {
       const data = { negara: form.elements.negara.value, email: form.email.value, password: form.password.value };
       dataKeluarga = anggotaPasangan
         ? await api("PATCH", `keluarga/pasangan/${anggotaPasangan.id}`, data)
-        : await api("POST", "keluarga/pasangan", { ...data, name: form.elements.name.value });
+        : await api("POST", "keluarga/pasangan", { ...data, name: form.elements.name.value, login: form.elements.login.value });
       gambarKeluarga();
     } catch (x) {
       setErr(panel, x.message);

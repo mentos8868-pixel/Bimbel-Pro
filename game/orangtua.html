@@ -73,7 +73,8 @@
           <label>Kewarganegaraan <select name="negara" required></select></label>
           <div class="label">Saya adalah</div>
           <div class="pilih-peran" id="peran-daftar"></div>
-          <label>Nama (ditampilkan ke anak, misalnya "Bunda Sari") <input name="name" maxlength="40" required /></label>
+          <label>Nama game <input name="name" maxlength="40" required /></label>
+          <label>ID masuk <input name="login" minlength="3" maxlength="24" autocomplete="username" required /></label>
           <label>Email <input type="email" name="email" autocomplete="email" required /></label>
           <label>Kata sandi (minimal 8 karakter)
             <span class="pw"><input type="password" name="password" minlength="8" autocomplete="new-password" required /><button type="button" class="pw-eye" aria-label="Tampilkan kata sandi">Lihat</button></span>
@@ -166,7 +167,7 @@
         <form id="form-anak" hidden class="panel" data-hal="setting">
           <h2 data-terjemah>Tambah akun anak</h2>
           <div class="grid2">
-            <label><span data-terjemah>Nama panggilan</span> <input name="name" maxlength="16" required data-placeholder="Contoh: Budi" placeholder="Contoh: Budi" /></label>
+            <label><span data-terjemah>Nama game</span> <input name="name" maxlength="16" required data-placeholder="Contoh: Budi" placeholder="Contoh: Budi" /></label>
             <label><span data-terjemah>Kurikulum sekolah (pilih dulu)</span> 
               <select name="kurikulum" class="pilih-kurikulum"></select>
             </label>
@@ -176,11 +177,12 @@
             <label><span data-terjemah>Negara</span> 
               <select name="negara" class="pilih-negara"></select>
             </label>
-            <label><span data-terjemah>Nama pengguna anak</span> 
+            <label><span data-terjemah>ID masuk</span>
               <input name="loginAnak" required minlength="3" maxlength="24" autocomplete="off" />
             </label>
+            <label><span data-terjemah>Email</span> <input name="email" type="email" maxlength="120" required /></label>
             <label><span data-terjemah>Kata sandi anak</span> 
-              <input name="sandiAnak" required type="text" minlength="8" maxlength="128" autocomplete="new-password" autocapitalize="none" spellcheck="false" />
+              <input name="sandiAnak" required type="password" minlength="8" maxlength="128" autocomplete="new-password" autocapitalize="none" spellcheck="false" />
             </label>
             <div>
               <div class="label" data-terjemah>Warna aksesori (pita, topi, dasi, bunga)</div>

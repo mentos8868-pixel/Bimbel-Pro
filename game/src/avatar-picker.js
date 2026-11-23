@@ -60,7 +60,7 @@ export function avatarPicker(wrap, { value, accent = "#4f9cf0", onPick = () => {
       b.setAttribute("aria-pressed", id === current);
       b.innerHTML = avatarSvg(id, accent, { sized: true });
       const t = document.createElement("span");
-      t.textContent = id === DINO_AVATAR ? DINO_FAMILY.name : m.name;
+      t.textContent = FAMILIES.find((item) => item.id === family && item.hanyaAnggota)?.name ?? m.name;
       b.append(t);
       b.onclick = () => { current = id; render(); onPick(id); };
       return b;
