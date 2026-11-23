@@ -457,22 +457,88 @@ function pasangAvatar() {
 function tukarBintang() {
   if (!hd) return "";
   const status = { menunggu: "⏳ menunggu orang tua", disetujui: "✔ disetujui", ditolak: "✕ belum disetujui", batal: "↩ dibatalkan" };
-  const menunggu = hd.riwayat.filter((t) => t.status === "menunggu");
+  const menunggu = hd.riwayat.filter((t) => t.status === "menunggu" && !t.patungan);
   const lain = hd.riwayat.filter((t) => t.status !== "menunggu").slice(0, 5);
+  const formPatungan = (aksi, id, max, label) => `<details class="patungan-buka">
+    <summary>${label}</summary>
+    <form class="patungan-form" data-patungan="${aksi}" data-id="${id}">
+      <label>Jumlah bintang <input name="bintang" type="number" inputmode="numeric" min="1" max="${max}" step="1" required />
+        <span class="muted kecil">Maksimal ${max} ★</span>
+      </label>
+      <button type="submit" class="primary">${aksi === "buat" ? "Mulai patungan" : "Simpan bagianmu"}</button>
+    </form></details>`;
   return `<section class="panel"><h3>🎁 Tukar bintang <span class="saldo">★ ${hd.bisaDipakai} bisa dipakai</span></h3>
     ${hd.ditahan ? `<p class="muted kecil">${hd.ditahan} bintang sedang ditahan untuk penukaran yang menunggu.</p>` : ""}
     ${hd.hadiah.length ? `<div class="hadiah-grid">${hd.hadiah.map((h) => {
       const cukup = hd.bisaDipakai >= h.bintang;
+      const bisaTukar = cukup && !h.menunggu;
+      const aktif = (hd.patungan || []).find((t) => t.hadiahId === h.id);
       return `<div class="hadiah-item"><span class="ikon">${h.rupiah ? "💵" : "🎁"}</span><b>${esc(h.nama)}</b>
         <span class="muted">${h.bintang} ★ → ${h.rupiah ? rp(h.rupiah) : "hadiah"}</span>
-        <button class="${cukup ? "primary" : ""}" data-tukar="${h.id}" ${cukup ? "" : "disabled"}>${cukup ? "Tukar" : `Kurang ${h.bintang - hd.bisaDipakai} ★`}</button></div>`;
+        <button class="${bisaTukar ? "primary" : ""}" data-tukar="${h.id}" ${bisaTukar ? "" : "disabled"}>${h.menunggu ? "Sedang diajukan" : cukup ? "Tukar" : `Kurang ${h.bintang - hd.bisaDipakai} ★`}</button>
+        ${aktif ? `<button type="button" class="patungan-lihat" data-lihat-patungan="${aktif.id}">Lihat patungan</button>`
+          : !h.menunggu && !h.rupiah && hd.punyaSaudara && h.bintang > 1 && hd.bisaDipakai > 0
+          ? formPatungan("buat", h.id, Math.min(hd.bisaDipakai, h.bintang - 1), "Patungan") : ""}</div>`;
     }).join("")}</div>` : `<p class="muted">Orang tuamu belum membuat hadiah. Kumpulkan bintang dulu, ya!</p>`}
     ${menunggu.length ? `<h4>Menunggu orang tua</h4><ul class="daftar">${menunggu.map((t) => `<li><span class="cek">⏳</span><span>${esc(t.nama)} <span class="muted">· ${t.bintang} ★</span></span><button class="ghost kecil" data-batal-tukar="${t.id}">Batalkan</button></li>`).join("")}</ul>` : ""}
-    ${lain.length ? `<h4>Riwayat</h4><ul class="daftar">${lain.map((t) => `<li><span class="cek">🎁</span><span>${esc(t.nama)} <span class="muted">· ${t.bintang} ★</span></span><span class="muted">${status[t.status] || t.status}</span></li>`).join("")}</ul>` : ""}
+    ${hd.patungan?.length ? `<h4>Patungan keluarga</h4>${hd.patungan.map((t) => {
+      const sendiri = t.pemilik === anak.id;
+      const bagian = t.peserta.find((p) => p.id === anak.id);
+      const sisa = t.bintang - t.terkumpul;
+      const pesertaTunggal = t.peserta.length === 1 && Boolean(bagian);
+      const max = Math.min(sisa - Number(pesertaTunggal), hd.bisaDipakai);
+      return `<div class="hadiah-item" id="patungan-${t.id}" tabindex="-1"><b>${esc(t.nama)} · ${t.terkumpul}/${t.bintang} ★</b>
+        <ul class="patungan-rincian" aria-label="Rincian cicilan">${t.peserta.map((p) => {
+          const nama = esc(p.nama);
+          const sebelumnya = p.sebelumnya ?? p.bintang;
+          return `${sebelumnya ? `<li>${nama} ${sebelumnya} ★ <span class="muted">(sebelumnya)</span></li>` : ""}
+            ${(p.cicilan || []).map((jumlah) => `<li>${nama} ${jumlah} ★</li>`).join("")}`;
+        }).join("")}</ul>
+        <p class="muted kecil">${t.diterima ? `Disetujui ${t.diterima} ★ · ` : ""}${sisa > 0 ? `Kurang ${sisa} ★` : "Menunggu persetujuan orang tua"}</p>
+        ${max > 0 ? formPatungan("ikut", t.id, max, bagian ? "Tambah cicilan" : "Ikut patungan") : ""}
+        ${sendiri ? `<button class="ghost" data-batal-tukar="${t.id}">Batalkan patungan</button>`
+          : bagian ? `<button class="ghost" data-keluar-patungan="${t.id}">Tarik bagianmu</button>`
+          : ""}
+      </div>`;
+    }).join("")}` : ""}
+    ${lain.length ? `<h4>Riwayat</h4><ul class="daftar">${lain.map((t) => `<li><span class="cek">🎁</span><span>${esc(t.nama)} <span class="muted">· ${t.patungan ? `Patungan, bagianmu ${t.bagian}` : t.bintang} ★</span></span><span class="muted">${status[t.status] || t.status}</span></li>`).join("")}</ul>` : ""}
   </section>`;
 }
+function fokusPatungan(id) {
+  const kartu = $("patungan-" + id);
+  kartu?.focus({ preventScroll: true });
+  kartu?.scrollIntoView({ block: "nearest" });
+}
+$("halaman").addEventListener("submit", async (e) => {
+  const f = e.target.closest("form[data-patungan]");
+  if (!f) return;
+  e.preventDefault();
+  const tombol = f.querySelector("button");
+  if (tombol.disabled) return;
+  const label = tombol.textContent;
+  tombol.disabled = true;
+  tombol.textContent = "Menyimpan…";
+  galat("");
+  try {
+    const id = f.dataset.id;
+    const path = f.dataset.patungan === "buat" ? `hadiah/${id}/patungan` : `hadiah/patungan/${id}/ikut`;
+    hd = await api("POST", path, { bintang: f.elements.bintang.valueAsNumber });
+    gambar();
+    const hasil = f.dataset.patungan === "buat" ? hd.patungan.find((t) => String(t.hadiahId) === id)?.id : id;
+    if (hasil) fokusPatungan(hasil);
+  } catch (x) {
+    galat(x.message);
+    tombol.disabled = false;
+    tombol.textContent = label;
+  }
+});
 $("halaman").addEventListener("click", async (e) => {
-  const b = e.target.closest("button[data-tukar], button[data-batal-tukar]");
+  const lihat = e.target.closest("button[data-lihat-patungan]");
+  if (lihat) {
+    fokusPatungan(lihat.dataset.lihatPatungan);
+    return;
+  }
+  const b = e.target.closest("button[data-tukar], button[data-batal-tukar], button[data-keluar-patungan]");
   if (!b || b.disabled) return;
   galat("");
   try {
@@ -481,6 +547,9 @@ $("halaman").addEventListener("click", async (e) => {
       if (!confirm(`Tukar ${h.bintang} bintang dengan "${h.nama}"? Orang tuamu akan menyetujui dulu.`)) return;
       b.disabled = true;
       hd = await api("POST", `hadiah/${b.dataset.tukar}/tukar`);
+    } else if (b.dataset.keluarPatungan) {
+      b.disabled = true;
+      hd = await api("POST", `hadiah/patungan/${b.dataset.keluarPatungan}/keluar`);
     } else {
       b.disabled = true;
       hd = await api("POST", `hadiah/tukar/${b.dataset.batalTukar}/batal`);

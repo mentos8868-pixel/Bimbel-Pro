@@ -81,6 +81,21 @@ button.link { background: none; border: none; padding: 0; color: var(--primary);
 .hadiah-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px; border: 2px solid #f2dfa6; border-radius: 14px; background: #fffbea; text-align: center; }
 .hadiah-item .ikon { font-size: 30px; }
 .hadiah-item button { width: 100%; margin-top: 4px; }
+.patungan-rincian { list-style: none; margin: 4px 0; padding: 0; }
+.patungan-rincian li + li { margin-top: 3px; }
+.patungan-buka { width: 100%; margin-top: 4px; }
+.patungan-buka summary, button.patungan-lihat {
+  background: #eaf3ff; border: 1px solid #90b8e8; border-radius: 10px;
+  color: #174575; font-weight: 700; min-height: 44px; padding: 9px 12px;
+}
+.patungan-buka summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; }
+.patungan-buka summary::-webkit-details-marker { display: none; }
+.patungan-buka summary::after { content: ""; width: 8px; height: 8px; border: solid currentColor; border-width: 0 2px 2px 0; transform: translateY(-2px) rotate(45deg); }
+.patungan-buka[open] summary::after { transform: translateY(2px) rotate(225deg); }
+.patungan-buka summary:hover, button.patungan-lihat:hover { background: #dcecff; }
+.patungan-buka summary:focus-visible, .hadiah-item[tabindex]:focus { outline: 2px solid #255b93; outline-offset: 2px; }
+.patungan-form { display: grid; gap: 6px; max-width: 320px; margin: 10px auto 0; text-align: start; }
+.patungan-form label .kecil { font-weight: 400; }
 #alarm-anak header, .alarm-baris { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .alarm-baris { border-top:1px solid #cedcea; padding:10px 0; }
 .alarm-detail { display:grid; text-align:left; gap:4px; background:transparent; border:0; color:inherit; }

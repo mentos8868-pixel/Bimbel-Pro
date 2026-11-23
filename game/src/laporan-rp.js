@@ -58,6 +58,7 @@ function gambar(el, l, anak, d) {
     if (t.lv) x.lv.add(t.lv);
     latih.set(t.id, x);
   }
+  const benar = l.benar ?? [...latih.values()].reduce((jumlah, topik) => jumlah + topik.benar, 0);
   const info = (id) => d?.peta?.[id] || latih.get(id)?.cadangan || { nama: id };
   const persenDari = (x) => (x?.soal ? Math.round((x.benar / x.soal) * 100) : null);
 
@@ -69,7 +70,7 @@ function gambar(el, l, anak, d) {
       ? `${denganPelajaran ? `<span class="muted kecil">${esc(t.kur)}${t.kur && t.mapel ? " · " : ""}${esc(t.mapel)}${t.kelas ? ` · ${esc(t.kelas)}` : ""}</span><br>` : ""}<b>${esc(t.nama)}</b>${t.mix ? ' <span class="muted kecil">(campuran)</span>' : ""}`
       : `<span class="muted kecil">Memuat nama topik…</span>`;
     return `<tr class="${st === "belum" ? "rp-belum" : ""}"><td>${judul}</td><td>${tingkat}</td><td>${x ? x.soal : "–"}</td>
-      <td>${persen == null ? '<span class="muted">–</span>' : `<div class="rp-acc"><span class="rp-bar"><i class="${kls}" style="width:${persen}%"></i></span>${persen}%</div>`}</td>
+      <td>${persen == null ? '<span class="muted">–</span>' : `<div class="rp-acc"><span class="rp-bar"><i class="${kls}" style="width:${persen}%"></i></span><span>${persen}% <span class="muted">(${x.benar}/${x.soal})</span></span></div>`}</td>
       <td><span class="rp-pill ${kls}">${label}</span></td></tr>`;
   };
   const tabel = (ids, opsi) => `<div class="rp-tabel"><table><thead><tr><th>Topik</th><th>Tingkat dilatih</th><th>Soal</th><th>Ketepatan</th><th>Status</th></tr></thead>
@@ -114,6 +115,6 @@ function gambar(el, l, anak, d) {
 
   el.innerHTML = `<h4>Laporan Ruang Pintar</h4>
     <p class="muted kecil">Perkembangan belajar ${esc(namaAnak)}${l.terakhir ? ` · terakhir berlatih ${tgl(l.terakhir)}` : ""}</p>
-    <div class="rp-ringkas">${kotak("Soal dikerjakan", l.soal)}${kotak("Jawaban benar", l.benarPersen == null ? "–" : l.benarPersen + "%")}${kotak("Sesi latihan", l.sesi)}</div>
+    <div class="rp-ringkas">${kotak("Soal dikerjakan", l.soal)}${kotak("Jawaban benar", l.benarPersen == null ? "–" : `${benar}/${l.soal} (${l.benarPersen}%)`)}${kotak("Sesi latihan", l.sesi)}</div>
     ${saran}${bagianKelas}${bagianLain}${tryout}`;
 }

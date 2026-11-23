@@ -865,7 +865,7 @@ export async function handleApi(req, res) {
     if (handleKantor({ m, path, body, ortuSaya: ortu?.role === "ortu" ? ortuSaya : null, keluargaId, anak, url, send, ApiError })) return true;
 
     // --- kemajuan Ruang Pintar (anak) ---
-    if (handleProgres({ m, path, body, anak, send, ApiError })) return true;
+    if (handleProgres({ m, path, body, anak, url, needOrtu, ownChild, send, ApiError })) return true;
 
     // --- toko aksesori (anak) ---
     if (handleToko({ m, path, body, anak, send, ApiError })) return true;

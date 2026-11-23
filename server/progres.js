@@ -15,6 +15,20 @@ db.exec(`
     ringkasan TEXT NOT NULL DEFAULT '{}',
     updated_at INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS child_soal_dijawab (
+    id INTEGER PRIMARY KEY,
+    child_id INTEGER NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+    sesi TEXT NOT NULL,
+    nomor INTEGER NOT NULL,
+    jenis TEXT NOT NULL,
+    topik TEXT NOT NULL,
+    soal TEXT NOT NULL,
+    jawaban TEXT NOT NULL,
+    benar INTEGER NOT NULL,
+    waktu TEXT NOT NULL,
+    UNIQUE (child_id, sesi, nomor)
+  );
+  CREATE INDEX IF NOT EXISTS child_soal_riwayat ON child_soal_dijawab(child_id, id);
 `);
 
 const MAKS_TOPIK = 3000, MAKS_RIWAYAT = 50, MAKS_TRYOUT = 30, MAKS_MEDALI = 50;
@@ -122,7 +136,7 @@ function laporanBelajar(d, r, namaMapel) {
       tingkat: LV[k.split("|")[1]] || "", lv: Number(k.split("|")[1]) || 0, soal: t.att, benar: t.ok, persen, status: persen < 60 ? "perlu" : persen < 85 ? "berkembang" : "kuat" };
   }).sort((a, b) => a.persen - b.persen);
   return {
-    soal, benarPersen: soal ? Math.round((benar / soal) * 100) : null, sesi: d.sessions,
+    soal, benar, benarPersen: soal ? Math.round((benar / soal) * 100) : null, sesi: d.sessions,
     terakhir: d.history[0]?.d || null,
     topik,
     tryout: d.tryouts.slice(0, 10).map((t) => ({ d: t.d, mapel: namaMapel[t.mapel] || t.mapel, score: t.score, c: t.c, n: t.n, stars: t.stars, max: t.max })),
@@ -155,7 +169,45 @@ export function ringkasBelajar(childId, now = Date.now()) {
 }
 
 // Mengembalikan true bila permintaan ditangani. anak = sesi anak (atau null).
-export function handleProgres({ m, path, body, anak, send, ApiError }) {
+export function handleProgres({ m, path, body, anak, url, needOrtu, ownChild, send, ApiError }) {
+  if (path[0] === "progres" && path[1] === "soal") {
+    if (m === "GET" && path.length === 3) {
+      const child = ownChild(needOrtu(), path[2]);
+      const sebelum = url.searchParams.get("sebelum");
+      const cursor = sebelum === null ? null : Number(sebelum);
+      if (cursor !== null && (!Number.isSafeInteger(cursor) || cursor < 1)) throw new ApiError(400, "Halaman soal tidak valid.");
+      const daftar = db.prepare(`
+        SELECT id, nomor, jenis, topik, soal, jawaban, benar, waktu FROM child_soal_dijawab
+        WHERE child_id = ? AND id < COALESCE(?, 9223372036854775807) ORDER BY id DESC LIMIT 26
+      `).all(child.id, cursor);
+      const soal = daftar.slice(0, 25);
+      return send(200, { soal, berikut: daftar.length > 25 ? soal.at(-1).id : null }), true;
+    }
+    if (m === "POST" && path.length === 2) {
+      if (!anak || body.childId !== anak.child_id) throw new ApiError(401, "Masuk sebagai anak dulu.");
+      const baris = arr(body.soal);
+      if (!baris.length || baris.length > 25) throw new ApiError(400, "Jumlah catatan soal tidak valid.");
+      const catatan = baris.map((data) => {
+        const x = obj(data);
+        const tanggal = waktu(x.waktu);
+        const soal = teks(x.soal, 1500);
+        if (!ID.test(String(x.sesi ?? "")) || !Number.isInteger(x.nomor) || x.nomor < 1 || x.nomor > 200
+          || !["latihan", "tryout"].includes(x.jenis) || typeof x.benar !== "boolean" || !tanggal || !soal) {
+          throw new ApiError(400, "Catatan soal tidak valid.");
+        }
+        return [anak.child_id, x.sesi, x.nomor, x.jenis, teks(x.topik, 120), soal, teks(x.jawaban, 200), Number(x.benar), tanggal];
+      });
+      const simpan = db.prepare(`INSERT INTO child_soal_dijawab (child_id, sesi, nomor, jenis, topik, soal, jawaban, benar, waktu)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (child_id, sesi, nomor) DO NOTHING`);
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        for (const x of catatan) simpan.run(...x);
+        db.exec("COMMIT");
+      } catch (e) { db.exec("ROLLBACK"); throw e; }
+      return send(200, { ok: true }), true;
+    }
+    throw new ApiError(405, "Metode tidak didukung.");
+  }
   if (path[0] !== "progres" || path.length !== 1) return false;
   if (!anak) throw new ApiError(401, "Masuk sebagai anak dulu.");
   const id = anak.child_id;
@@ -174,7 +226,12 @@ export function handleProgres({ m, path, body, anak, send, ApiError }) {
 
   // "Hapus semua progres" di Ruang Pintar. Bintang dan XP di server tidak ikut terhapus.
   if (m === "DELETE") {
-    db.prepare("DELETE FROM child_progres WHERE child_id = ?").run(id);
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      db.prepare("DELETE FROM child_progres WHERE child_id = ?").run(id);
+      db.prepare("DELETE FROM child_soal_dijawab WHERE child_id = ?").run(id);
+      db.exec("COMMIT");
+    } catch (e) { db.exec("ROLLBACK"); throw e; }
     return send(200, { ok: true }), true;
   }
 
