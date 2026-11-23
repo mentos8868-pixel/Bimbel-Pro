@@ -48,6 +48,7 @@ export function parseAvatar(id) {
 export const isAvatar = (id) => !!parseAvatar(id);
 export const avatarOr = (id, fallback = DEFAULT_AVATAR) => (isAvatar(id) ? id : fallback);
 export const avatarName = (id) => {
+  if (id === DINO_AVATAR) return DINO_FAMILY.name;
   const a = parseAvatar(id);
   if (!a) return "";
   if (a.family.hanyaAnggota || a.member.id === "ayah" || a.member.id === "ibu") return a.family.name;

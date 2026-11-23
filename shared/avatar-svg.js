@@ -1,6 +1,6 @@
 // Gambar avatar 2D (SVG) untuk pemilih avatar dan daftar pemain.
 // accent = warna pilihan pemain, dipakai untuk aksesori (dasi kupu-kupu, bunga, pita, topi).
-import { parseAvatar, DEFAULT_AVATAR } from "./avatars.js";
+import { parseAvatar, DEFAULT_AVATAR, DINO_AVATAR } from "./avatars.js";
 import { rapikanAksesori, aksesoriById, aksesoriSvg } from "./aksesori.js";
 import { auraById, auraUrutan } from "./aura.js";
 

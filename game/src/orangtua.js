@@ -12,6 +12,12 @@ import { NEGARA, DEFAULT_NEGARA, drawFlag, negaraName, KURIKULUM, kurikulumName,
 import { renderLaporanRP } from "./laporan-rp.js";
 
 const $ = (id) => document.getElementById(id);
+let selectedChildId;
+$("tambah-anak").onclick = () => {
+  const form = $("form-anak");
+  form.scrollIntoView({ block: "start" });
+  form.elements.name.focus({ preventScroll: true });
+};
 // Pilihan kelas mengikuti kurikulum: Merdeka "Kelas 1 SD" … "Kelas 12 SMA", Cambridge/Singapore "Primary 1 (P1)" ….
 function lokalPengaturan(root) {
   for (const el of root.querySelectorAll("[data-terjemah], select option")) {
@@ -305,6 +311,9 @@ function renderSocial(el, c, soc) {
     row.className = "approval";
     return row;
   }));
+  if (!approvals.children.length) {
+    approvals.append(Object.assign(document.createElement("li"), { textContent: "Tidak ada permintaan." }));
+  }
   const friends = el.querySelector(".friends");
   const list = soc?.friends || [];
   friends.replaceChildren(...(list.length ? list.map((f) => li(`${f.name} (${f.jenjang})`, [
@@ -379,18 +388,23 @@ function renderKid(c, soc) {
   el.querySelector(".nama").textContent = c.name;
   el.querySelector(".jenjang").textContent = kelasText(c);
 
-  const used = c.week.at(-1)?.minutes ?? c.usedMin;
   const fill = el.querySelector(".bar-fill");
-  if (c.limitMin) {
-    el.querySelector(".today-text").textContent = `${used} dari ${c.limitMin} menit`;
-    const pct = Math.min(100, (used / c.limitMin) * 100);
+  function updateTime() {
+    const used = c.usedMin;
+    const pct = c.limitMin ? Math.min(100, (used / c.limitMin) * 100) : 0;
+    el.querySelector(".metric-time").textContent = `${used} menit`;
+    el.querySelector(".today-text").textContent = c.limitMin
+      ? `${used} dari ${c.limitMin} menit`
+      : `${used} menit (tanpa batas)`;
+    fill.parentElement.hidden = !c.limitMin;
     fill.style.width = pct + "%";
     fill.classList.toggle("warn", pct >= 75 && pct < 100);
     fill.classList.toggle("full", pct >= 100);
-  } else {
-    el.querySelector(".today-text").textContent = `${used} menit (tanpa batas)`;
-    fill.style.width = "0%";
   }
+  updateTime();
+  el.querySelector(".metric-stars").textContent = c.stars;
+  el.querySelector(".metric-games").textContent = Object.values(c.stats).reduce((sum, stat) => sum + stat.main, 0);
+  el.querySelector(".metric-learning").textContent = c.starredExercises;
 
   const max = Math.max(30, ...c.week.map((d) => d.minutes));
   el.querySelector(".week").replaceChildren(...c.week.map((d) => {
@@ -461,6 +475,8 @@ function renderKid(c, soc) {
       });
       Object.assign(c, r.child);
       el.querySelector(".jenjang").textContent = kelasText(c);
+      $("pilih-anak").querySelector(`[data-child="${c.id}"] .child-summary`).textContent = childSummary(c, soc);
+      updateTime();
       const ok = s.querySelector(".saved");
       ok.hidden = false;
       setTimeout(() => (ok.hidden = true), 2000);
