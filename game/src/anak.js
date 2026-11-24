@@ -34,9 +34,11 @@ let k = null;      // ringkasan dari /api/kamarku
 let toko = null;   // isi toko dari /api/toko (dimuat saat menu Toko Avatar dibuka)
 let tg = null;     // tugas dari orang tua: /api/tugas/saya
 let ch = { n: 0, terakhir: null, namaOrtu: "Orang tua" };   // ringkasan chat keluarga: /api/chat/belum
-const namaChatOrtu = () => ch.namaChat || ch.namaOrtu;
-let chatFamily = true;
-const kontakOrtu = (label) => `<button type="button" data-ruang-chat="ortu" aria-pressed="${!chatFamily}">${esc(label)} <span class="badge" id="ortu-belum" aria-label="Pesan orang tua belum dibaca" hidden></span></button>`;
+const NAMA_CHAT = { family: "Family", ayah: "Papa", ibu: "Mama" };
+let chatDipilih = "family";
+const kontakOrtu = (peran) => ch.peranOrtu?.includes(peran)
+  ? `<button type="button" data-ruang-chat="${peran}" aria-pressed="${chatDipilih === peran}">${NAMA_CHAT[peran]} <span class="badge" id="ortu-belum-${peran}" aria-label="Pesan belum dibaca" hidden></span></button>`
+  : `<span>${NAMA_CHAT[peran]}</span><small>Belum terhubung</small>`;
 let chatTimer = 0;
 let bersihkanSuara;
 let uang = null;   // uang saku (diberi orang tua) dan belanja/tabungan (dicatat anak): /api/keuangan/saya
@@ -151,8 +153,8 @@ const ISI = {
     <div class="dua">
       <section class="panel"><h3>✅ Tugas hari ini</h3>${daftarTugas()}<h3 class="sub-judul">🎯 Misi belajar</h3>${daftarMisi()}</section>
       <section class="panel"><h3>Mau ke mana?</h3><div class="aksi-besar">${tombolArena()}${tombolBimbel()}</div>
-        <h3 class="sub-judul">💬 Pesan dari ${esc(namaChatOrtu())}</h3>${ch.terakhir
-          ? `<p class="pesan-ortu">"${esc(ch.terakhir.isi)}"</p><button data-ruang-chat="ortu">${ch.n ? `Baca ${ch.n} pesan baru` : "Balas"}</button>`
+        <h3 class="sub-judul">💬 Pesan dari ${NAMA_CHAT[ch.terakhir?.peran] || "orang tua"}</h3>${ch.terakhir
+          ? `<p class="pesan-ortu">"${esc(ch.terakhir.isi)}"</p><button data-ruang-chat="${ch.terakhir.peran || "family"}">Buka percakapan</button>`
           : `<p class="muted kecil">Belum ada pesan. <button class="link" data-ke-hal="chat">Kirim pesan</button></p>`}</section>
     </div>
     ${uangSakuku()}`,
@@ -210,16 +212,15 @@ const ISI = {
   chat: () => `<div class="chat-jendela">
     <nav class="chat-daftar" aria-label="Percakapan"><h2>Percakapan</h2>
       <ul class="chat-prioritas">
-        <li><button type="button" data-ruang-chat="family" aria-pressed="${chatFamily}">Family <span class="badge" id="family-belum" aria-label="Pesan Family belum dibaca" hidden></span></button></li>
-        <li>${namaChatOrtu() === "Papa" ? kontakOrtu("Papa") : `<span>Papa</span><small>${ch.peranOrtu?.includes("ayah") ? "Terhubung di Family" : "Belum terhubung"}</small>`}</li>
-        <li>${namaChatOrtu() === "Mama" ? kontakOrtu("Mama") : `<span>Mama</span><small>${ch.peranOrtu?.includes("ibu") ? "Terhubung di Family" : "Belum terhubung"}</small>`}</li>
+        <li><button type="button" data-ruang-chat="family" aria-pressed="${chatDipilih === "family"}">Family <span class="badge" id="family-belum" aria-label="Pesan Family belum dibaca" hidden></span></button></li>
+        <li>${kontakOrtu("ayah")}</li>
+        <li>${kontakOrtu("ibu")}</li>
         <li><span>Anak</span><small>Belum ada percakapan</small></li>
         <li><span>Teman</span><small>Chat teman di arena</small></li>
-        ${["Papa", "Mama"].includes(namaChatOrtu()) ? "" : `<li>${kontakOrtu(namaChatOrtu())}</li>`}
       </ul>
     </nav>
     <section class="chat-keluarga" aria-labelledby="judul-chat">
-      <header class="chat-kepala"><h2 id="judul-chat">${chatFamily ? "Family" : esc(namaChatOrtu())}</h2></header>
+      <header class="chat-kepala"><h2 id="judul-chat">${NAMA_CHAT[chatDipilih]}</h2></header>
       <div class="chat-lokasi">
         <p class="muted kecil">Bagikan satu titik lokasi ke orang tua selama 1 jam.</p>
         <div class="row">
@@ -228,7 +229,7 @@ const ISI = {
         </div>
         <p class="muted kecil" id="pesan-lokasi" role="status"></p>
       </div>
-      ${kotakPesanChat(chatFamily ? "Family" : namaChatOrtu())}
+      ${kotakPesanChat(NAMA_CHAT[chatDipilih])}
     </section>
   </div>`,
   avatar: () => {
@@ -299,7 +300,9 @@ function gambar() {
 }
 function tandaChat() {
   const family = ch.family ?? 0;
-  for (const [id, n] of [["chat-badge", ch.n + family], ["family-belum", family], ["ortu-belum", ch.n]]) {
+  const papa = ch.belumOrtu?.ayah ?? 0;
+  const mama = ch.belumOrtu?.ibu ?? 0;
+  for (const [id, n] of [["chat-badge", papa + mama + family], ["family-belum", family], ["ortu-belum-ayah", papa], ["ortu-belum-ibu", mama]]) {
     const badge = $(id);
     if (!badge) continue;
     badge.textContent = n;
@@ -311,9 +314,10 @@ function tandaChat() {
 function pasangChat() {
   const f = $("form-chat");
   const g = $("gelembung");
-  const grup = chatFamily;
-  const query = grup ? "sebagai=anak&grup=1" : "sebagai=anak";
-  const pengirim = { sebagai: "anak", grup };
+  const kontak = chatDipilih;
+  const grup = kontak === "family";
+  const query = grup ? "sebagai=anak&grup=1" : `sebagai=anak&ortu=${kontak}`;
+  const pengirim = grup ? { sebagai: "anak", grup: true } : { sebagai: "anak", ortu: kontak };
   const aktif = () => f.isConnected && hal === "chat";
   const bagikanLokasi = $("bagikan-lokasi");
   const hapusLokasi = $("hapus-lokasi");
@@ -364,14 +368,14 @@ function pasangChat() {
       const isi = pesan.length
         ? pesan.map((p) => gelembungChat(p, "anak", query, (at) =>
           new Date(at).toLocaleString("id-ID", { weekday: "short", hour: "2-digit", minute: "2-digit" }))).join("")
-        : `<p class="muted chat-kosong">Belum ada pesan di percakapan ${grup ? "Family" : esc(namaChatOrtu())}.</p>`;
+        : `<p class="muted chat-kosong">Belum ada pesan di percakapan ${NAMA_CHAT[kontak]}.</p>`;
       if (isi !== isiTerakhir && ![...g.querySelectorAll("audio")].some((audio) => !audio.paused)) {
         g.innerHTML = isi;
         if (bawah || isiTerakhir === undefined) g.scrollTop = g.scrollHeight;
         isiTerakhir = isi;
       }
       if (grup) ch.family = 0;
-      else ch.n = 0;
+      else if (ch.belumOrtu) ch.belumOrtu[kontak] = 0;
       tandaChat();
     } catch (x) { if (aktif() && versi === versiMuat) galat(x.message); }
   };
@@ -416,15 +420,15 @@ function keHal(h) {
 $("menu").addEventListener("click", (e) => {
   const b = e.target.closest("[data-ke]");
   if (!b) return;
-  if (b.dataset.ke === "chat") chatFamily = true;
+  if (b.dataset.ke === "chat") chatDipilih = "family";
   keHal(b.dataset.ke);
 });
 $("halaman").addEventListener("click", (e) => {
   const ruang = e.target.closest("[data-ruang-chat]");
   if (ruang) {
-    const grup = ruang.dataset.ruangChat === "family";
-    if (hal !== "chat" || chatFamily !== grup) {
-      chatFamily = grup;
+    const kontak = ruang.dataset.ruangChat;
+    if (hal !== "chat" || chatDipilih !== kontak) {
+      chatDipilih = kontak;
       keHal("chat");
     }
     return;

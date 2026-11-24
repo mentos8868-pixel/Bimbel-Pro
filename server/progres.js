@@ -191,7 +191,7 @@ export function handleProgres({ m, path, body, anak, url, needOrtu, ownChild, se
         const x = obj(data);
         const tanggal = waktu(x.waktu);
         const soal = teks(x.soal, 1500);
-        if (!ID.test(String(x.sesi ?? "")) || !Number.isInteger(x.nomor) || x.nomor < 1 || x.nomor > 200
+        if (typeof x.sesi !== "string" || !ID.test(x.sesi) || !Number.isInteger(x.nomor) || x.nomor < 1 || x.nomor > 200
           || !["latihan", "tryout"].includes(x.jenis) || typeof x.benar !== "boolean" || !tanggal || !soal) {
           throw new ApiError(400, "Catatan soal tidak valid.");
         }

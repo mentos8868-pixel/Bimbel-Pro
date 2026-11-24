@@ -1,7 +1,40 @@
 // Laporan Ruang Pintar untuk dashboard orang tua (menu Report). Data dari /api/laporan → belajar.laporan.
 // Menampilkan SEMUA pelajaran dan topik di kelas dan kurikulum anak (yang belum dilatih ditandai "Belum dilatih"),
 // ringkasan angka, saran, topik lain yang pernah dilatih, dan 10 tryout terakhir.
+import { api } from "./api.js";
+
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+function daftarSoal(el, id) {
+  const detail = el.querySelector(".rp-soal");
+  if (!detail || !id) return;
+  const daftar = detail.querySelector("ol");
+  const status = detail.querySelector("[role=status]");
+  const tombol = detail.querySelector("button");
+  let berikut = null;
+  async function muat() {
+    if (tombol.disabled) return;
+    tombol.disabled = true;
+    status.textContent = "Memuat soal…";
+    try {
+      const data = await api("GET", `progres/soal/${id}${berikut ? `?sebelum=${berikut}` : ""}`);
+      daftar.insertAdjacentHTML("beforeend", data.soal.map((s) => `<li>
+        <small class="muted">${s.jenis === "tryout" ? "Tryout" : "Latihan"} · ${esc(s.topik)} · Soal ${s.nomor} · ${esc(new Date(s.waktu).toLocaleString("id-ID"))}</small>
+        <div>${esc(s.soal)}</div><small>Jawaban anak: <b>${esc(s.jawaban)}</b> · ${s.benar ? "Benar" : "Salah"}</small>
+      </li>`).join(""));
+      berikut = data.berikut;
+      tombol.hidden = !berikut;
+      status.textContent = daftar.childElementCount ? "" : "Belum ada rincian soal yang tersimpan.";
+    } catch (e) {
+      status.textContent = e.message;
+      tombol.hidden = false;
+    } finally {
+      tombol.disabled = false;
+    }
+  }
+  detail.addEventListener("toggle", () => { if (detail.open) muat(); }, { once: true });
+  tombol.addEventListener("click", muat);
+}
 
 // Daftar pelajaran dan topik diambil dari Ruang Pintar sendiri (satu sumber), lewat iframe tersembunyi
 // /bimbel/index.html?daftar-topik yang hanya mengirim daftar topik lalu berhenti. Dimuat sekali per halaman.
@@ -113,8 +146,15 @@ function gambar(el, l, anak, d) {
   const tryout = l.tryout.length ? `<h4>Riwayat tryout</h4><ul class="rp-tryout">${l.tryout.map((t) =>
     `<li><b>${esc(t.mapel)}</b>: nilai ${t.score} (${t.c} dari ${t.n} benar)${t.max ? ` · ${"★".repeat(t.stars)}${"☆".repeat(Math.max(0, t.max - t.stars))}` : ""}<span class="muted"> · ${tgl(t.d)}</span></li>`).join("")}</ul>` : "";
 
+  const detailSoal = el.querySelector(".rp-soal");
   el.innerHTML = `<h4>Laporan Ruang Pintar</h4>
     <p class="muted kecil">Perkembangan belajar ${esc(namaAnak)}${l.terakhir ? ` · terakhir berlatih ${tgl(l.terakhir)}` : ""}</p>
     <div class="rp-ringkas">${kotak("Soal dikerjakan", l.soal)}${kotak("Jawaban benar", l.benarPersen == null ? "–" : `${benar}/${l.soal} (${l.benarPersen}%)`)}${kotak("Sesi latihan", l.sesi)}</div>
+    ${anak?.id ? `<details class="rp-soal"><summary>Soal yang dijawab</summary>
+      <p class="muted kecil">Rincian tersedia untuk soal yang tercatat sejak fitur ini aktif.</p>
+      <ol></ol><p class="muted kecil" role="status"></p>
+      <button type="button" hidden>Muat soal berikutnya</button></details>` : ""}
     ${saran}${bagianKelas}${bagianLain}${tryout}`;
+  if (detailSoal && anak?.id) el.querySelector(".rp-soal").replaceWith(detailSoal);
+  else daftarSoal(el, anak?.id);
 }

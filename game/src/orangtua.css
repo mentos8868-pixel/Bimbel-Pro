@@ -150,6 +150,10 @@ label.check input { width: 20px; height: 20px; margin-top: 2px; flex: none; }
 .rp-saran { background: #eef6ff; color: #1d4f91; border-radius: 10px; padding: 10px 12px; font-size: 14px; margin: 10px 0 0; }
 .rp-tryout { margin: 6px 0 0; padding-left: 18px; font-size: 14px; }
 .rp-tryout li { padding: 2px 0; }
+.rp-soal { margin-top: 10px; }
+.rp-soal summary { cursor: pointer; font-weight: 700; }
+.rp-soal ol { padding-inline-start: 24px; }
+.rp-soal li { padding: 6px 0; overflow-wrap: anywhere; }
 .rp-pelajaran { margin-top: 12px; }
 .rp-pelajaran h5 { margin: 0 0 4px; font-size: 15px; display: flex; gap: 8px; align-items: baseline; }
 .rp-pelajaran h5 .muted { font-weight: 500; font-size: 13px; }

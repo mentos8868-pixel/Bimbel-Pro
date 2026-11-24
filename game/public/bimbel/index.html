@@ -987,9 +987,34 @@ function renderHome(app){
   $('#lihat-xp').onclick=()=>go('tryout');
 }
 
+const kunciAntreanSoal=()=>`${SKEY}_soal`;
+let antreanSoal=[], mengirimSoal=null;
+const simpanAntreanSoal=()=>{try{localStorage.setItem(kunciAntreanSoal(),JSON.stringify(antreanSoal))}catch(e){}};
+function kirimSoal(){
+  if(mengirimSoal||!antreanSoal.length)return mengirimSoal;
+  mengirimSoal=(async()=>{
+    while(antreanSoal.length){
+      const soal=antreanSoal.slice(0,10);
+      const r=await fetch('/api/progres/soal',{method:'POST',headers:{'Content-Type':'application/json','X-Bimbel':'1'},
+        body:JSON.stringify({childId:AKUN.id,soal}),keepalive:true});
+      if(!r.ok)break;
+      antreanSoal.splice(0,soal.length);simpanAntreanSoal();
+    }
+  })().catch(()=>{}).finally(()=>{mengirimSoal=null});
+  return mengirimSoal;
+}
+function catatSoal(sesi,nomor,jenis,topik,q,jawaban,benar){
+  const teks=document.createElement('template');
+  teks.innerHTML=String(q.q);
+  teks.content.querySelectorAll('script,style').forEach(el=>el.remove());
+  teks.content.querySelectorAll('.frac').forEach(el=>{el.textContent=[...el.children].map(anak=>anak.textContent).join('/')});
+  const soal=teks.content.textContent.replace(/\s+/g,' ').trim().slice(0,1500);
+  if(soal)antreanSoal.push({sesi,nomor,jenis,topik,soal,jawaban:String(jawaban??'').slice(0,200),benar,waktu:new Date().toISOString()});
+  simpanAntreanSoal();
+}
 function start(id){if(jedaSP1()>Date.now())return render();const t=topicsFor(S.mapel,S.kelas).find(x=>x.id===id)||topicById(id);LV=S.lv;
   const qs=buildSession(t,JUMLAH_SOAL);if(!qs.length){alert('Belum ada soal untuk topik ini.');return}
-  sess={t,lv:S.lv,qs,i:0,res:[],streak:0,answered:false,done:false};render();
+  sess={t,lv:S.lv,qs,i:0,res:[],streak:0,answered:false,done:false,catatanId:`latihan-${Date.now()}-${Math.random().toString(36).slice(2)}`};render();
 }
 function ansText(q){if(q.kind==='str')return esc(q.ans);if(q.kind==='frac'){let [n,d]=q.ans;if(d<0){n=-n;d=-d}const g=gcd(n,d);n/=g;d/=g;return d===1?`${n}`:(n<0?'−':'')+F(Math.abs(n),d)}
   return q.kind==='dec'?fmtD(q.ans,2):(Math.abs(q.ans)>=1000?q.ans.toLocaleString('id-ID'):q.ans)}
@@ -1035,6 +1060,8 @@ function renderQ(app){const s=sess,q=s.qs[s.i];
 }
 function answer(ok,btn){const s=sess;if(!s||s.answered)return;
   if(jedaSP1()>Date.now()){sess=null;return render()}
+  catatSoal(s.catatanId,s.i+1,'latihan',s.t.name,s.qs[s.i],btn?.dataset.c??$('#inp')?.value,ok);
+  kirimSoal();
   if(catatSP1(ok,s))return;
   const q=s.qs[s.i];s.answered=true;s.res.push(ok);
   if(ok)s.streak++;else s.streak=0;
@@ -1115,9 +1142,11 @@ function renderReport(app){
   ${thBlock}
   <p style="margin-top:18px"><button class="btn ghost" id="reset">Hapus semua data (mulai dari awal)</button></p>`;
   $('#reset').onclick=async()=>{if(confirm('Hapus semua progres dan medali?')){
+    await kirimSoal();
     /* hapus juga salinan di server, kalau tidak kemajuan lama akan kembali saat sinkron */
     try{const r=await fetch('/api/progres',{method:'DELETE',credentials:'same-origin',headers:{'x-bimbel':'1'}});if(!r.ok)throw 0}
     catch(e){alert('Gagal menghapus progres di server. Periksa koneksi, lalu coba lagi.');return}
+    antreanSoal=[];simpanAntreanSoal();
     clearTimeout(sinkronTimer);sinkronTimer=null;localStorage.removeItem(SKEY);clearInterval(exTimer);ex=null;exSave();S=Object.assign({},DEF,{medals:[],topics:{},history:[],tryouts:[],tryoutHari:S.tryoutHari});/* jatah tryout hari ini tidak ikut terhapus */pakaiAkun();save();go('belajar')}};
 }
 
@@ -1286,6 +1315,8 @@ function submitExam(auto,yakin){
     tanya(`Kumpulkan jawaban sekarang?${kosong?`\n• ${kosong} soal belum dijawab`:''}${ragu?`\n• ${ragu} soal ditandai ragu-ragu`:''}`,'Ya, kumpulkan',()=>submitExam(false,true));return}
   clearInterval(exTimer);tutupTanya();
   ex.res=ex.qs.map((q,i)=>isAns(ex.ans[i])?!!check(q,ex.ans[i]):null);
+  ex.qs.forEach((q,i)=>{if(ex.res[i]!==null)catatSoal(`tryout-${ex.start}`,i+1,'tryout',q.topic, q,ex.ans[i],ex.res[i])});
+  kirimSoal();
   ex.correct=ex.res.filter(r=>r===true).length;
   ex.score=Math.round(ex.correct/ex.qs.length*100);
   ex.used=Math.min(ex.menit*60,Math.round((Date.now()-ex.start)/1000));
@@ -1415,6 +1446,9 @@ async function mulai(){
   }
   if(!me||!me.anak||!me.anak.kelas){$('#app').innerHTML='';return gerbang(me)}
   AKUN=me.anak;SKEY=`ruangpintar_a${AKUN.id}`;EXKEY=`ruangpintar_ujian_a${AKUN.id}`;
+  try{antreanSoal=JSON.parse(localStorage.getItem(kunciAntreanSoal())||'[]')}catch(e){}
+  kirimSoal();
+  window.addEventListener('online',kirimSoal);
   $('#kembali-arena').hidden=new URLSearchParams(location.search).get('dari')!=='arena';
   try{S=Object.assign({},DEF,JSON.parse(localStorage.getItem(SKEY)||'{}'))}catch(e){S=Object.assign({},DEF)}
   pakaiAkun();save();sinkron();   /* ambil kemajuan dari perangkat lain sekarang juga */

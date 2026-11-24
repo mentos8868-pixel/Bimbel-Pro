@@ -113,23 +113,24 @@ function daftarFamily(keluargaId, pengirim) {
   }));
 }
 
-const daftarPesan = (childId, sebagai) => db.prepare(
+const cakupanOrtu = "(? IS NULL OR ortu_id = ? OR (? = 1 AND ortu_id IS NULL))";
+const daftarPesan = (childId, sebagai, kontak) => db.prepare(
   `SELECT id, dari, isi, dibaca, created_at AS at, tipe_suara IS NOT NULL AS suara, ortu_id AS ortuId,
           (SELECT name FROM parents WHERE id = ortu_id) AS nama,
           (SELECT peran FROM parents WHERE id = ortu_id) AS peran
-   FROM pesan_keluarga WHERE child_id = ? ORDER BY id DESC LIMIT 100`,
-).all(childId).reverse().map(({ peran, ...p }) => ({
+   FROM pesan_keluarga WHERE child_id = ? AND ${cakupanOrtu} ORDER BY id DESC LIMIT 100`,
+).all(childId, kontak, kontak, Number(sebagai === "ortu")).reverse().map(({ peran, ...p }) => ({
   ...p, nama: sebagai === "anak" ? sapaanOrtu({ peran, name: p.nama }) : p.nama, dibaca: !!p.dibaca, suara: !!p.suara,
 }));
 
 // Nama orang tua dalam satu keluarga (kepala keluarga dan pasangannya), mis. "Bunda & Ayah".
-const orangTuaKeluarga = (kepalaId) => db.prepare("SELECT name, peran FROM parents WHERE id = ? OR kepala_id = ? ORDER BY kepala_id IS NOT NULL, id")
+const orangTuaKeluarga = (kepalaId) => db.prepare("SELECT id, name, peran FROM parents WHERE id = ? OR kepala_id = ? ORDER BY kepala_id IS NOT NULL, id")
   .all(kepalaId, kepalaId);
 
 // Jumlah pesan yang belum dibaca oleh "untuk" (ortu: pesan dari anak; anak: pesan dari orang tua).
-const belumDibaca = (childId, untuk) => db.prepare(
-  "SELECT COUNT(*) AS n FROM pesan_keluarga WHERE child_id = ? AND dari = ? AND dibaca = 0",
-).get(childId, untuk === "ortu" ? "anak" : "ortu").n;
+const belumDibaca = (childId, untuk, kontak = null) => db.prepare(
+  `SELECT COUNT(*) AS n FROM pesan_keluarga WHERE child_id = ? AND dari = ? AND dibaca = 0 AND ${cakupanOrtu}`,
+).get(childId, untuk === "ortu" ? "anak" : "ortu", kontak, kontak, Number(untuk === "ortu")).n;
 
 // Mengembalikan true bila permintaan ditangani.
 // sebagai=ortu|anak menentukan peran (di perangkat keluarga, orang tua dan anak bisa sama-sama masuk).
@@ -181,14 +182,16 @@ export function handleChat({ m, path, body, url, ortuId, ortuSaya, anak, ownChil
     `).get(parentId, parentId, penerima, pengirim.ortu, pengirim.anak).n;
     if (sebagai === "anak") {
       // Untuk Home anak: pesan terakhir dari orang tua (tanpa menandainya sudah dibaca).
-      const t = db.prepare("SELECT isi, created_at AS at FROM pesan_keluarga WHERE child_id = ? AND dari = 'ortu' ORDER BY id DESC LIMIT 1").get(childId);
+      const t = db.prepare(`SELECT p.isi, p.created_at AS at, o.peran FROM pesan_keluarga p
+        LEFT JOIN parents o ON o.id = p.ortu_id WHERE p.child_id = ? AND p.dari = 'ortu' ORDER BY p.id DESC LIMIT 1`).get(childId);
       const keluarga = orangTuaKeluarga(parentId);
       const namaOrtu = keluarga.map((p) => p.name).join(" & ") || "Orang tua";
       const namaChat = keluarga.map(sapaanOrtu).join(" & ") || namaOrtu;
-      return send(200, { n: belumDibaca(childId, "anak"), family, terakhir: t || null, namaOrtu, namaChat, peranOrtu: keluarga.map((p) => p.peran) }), true;
+      const belumOrtu = Object.fromEntries(keluarga.map((p) => [p.peran, belumDibaca(childId, "anak", p.id)]));
+      return send(200, { n: belumDibaca(childId, "anak"), family, terakhir: t || null, namaOrtu, namaChat, peranOrtu: keluarga.map((p) => p.peran), belumOrtu }), true;
     }
     const kids = db.prepare("SELECT id FROM children WHERE parent_id = ?").all(parentId);
-    return send(200, { family, anak: Object.fromEntries(kids.map((k) => [k.id, belumDibaca(k.id, "ortu")])) }), true;
+    return send(200, { family, anak: Object.fromEntries(kids.map((k) => [k.id, belumDibaca(k.id, "ortu", pengirim.ortu)])) }), true;
   }
 
   // Riwayat chat arena anak (hanya orang tua).
@@ -202,11 +205,23 @@ export function handleChat({ m, path, body, url, ortuId, ortuSaya, anak, ownChil
 
   if (path[1] === "keluarga") {
     const grup = m === "GET" ? url.searchParams.get("grup") === "1" : body.grup === true;
+    let kontak = null;
     if (!grup && sebagai === "ortu") childId = ownChild(parentId, m === "GET" ? url.searchParams.get("anak") : body.anak).id;
+    if (!grup) {
+      if (sebagai === "ortu") kontak = pengirim.ortu;
+      else {
+        const peran = m === "GET" ? url.searchParams.get("ortu") ?? undefined : body.ortu;
+        if (peran !== undefined) {
+          kontak = orangTuaKeluarga(parentId).find((p) => p.peran === peran)?.id;
+          if (!kontak) throw new ApiError(404, "Orang tua belum terhubung.");
+        }
+      }
+    }
     if (path[2] === "suara" && path.length === 4 && m === "GET") {
       const p = grup
         ? db.prepare("SELECT suara, tipe_suara FROM pesan_family WHERE id = ? AND keluarga_id = ?").get(Number(path[3]), parentId)
-        : db.prepare("SELECT suara, tipe_suara FROM pesan_keluarga WHERE id = ? AND child_id = ?").get(Number(path[3]), childId);
+        : db.prepare(`SELECT suara, tipe_suara FROM pesan_keluarga WHERE id = ? AND child_id = ? AND ${cakupanOrtu}`)
+          .get(Number(path[3]), childId, kontak, kontak, Number(sebagai === "ortu"));
       if (!p?.suara) throw new ApiError(404, "Pesan suara tidak ditemukan.");
       return sendAudio(p.tipe_suara, Buffer.from(p.suara)), true;
     }
@@ -228,8 +243,9 @@ export function handleChat({ m, path, body, url, ortuId, ortuSaya, anak, ownChil
         return send(200, { pesan, lokasi }), true;
       }
       // Membuka percakapan berarti pesan dari pihak lain sudah dibaca.
-      db.prepare("UPDATE pesan_keluarga SET dibaca = 1 WHERE child_id = ? AND dari = ? AND dibaca = 0").run(childId, sebagai === "ortu" ? "anak" : "ortu");
-      return send(200, { pesan: daftarPesan(childId, sebagai), lokasi }), true;
+      db.prepare(`UPDATE pesan_keluarga SET dibaca = 1 WHERE child_id = ? AND dari = ? AND dibaca = 0 AND ${cakupanOrtu}`)
+        .run(childId, sebagai === "ortu" ? "anak" : "ortu", kontak, kontak, Number(sebagai === "ortu"));
+      return send(200, { pesan: daftarPesan(childId, sebagai, kontak), lokasi }), true;
     }
     if (m === "POST") {
       const kunci = grup ? `family:${sebagai}:${pengirim.ortu ?? pengirim.anak}` : `${sebagai}:${childId}`;
@@ -257,7 +273,7 @@ export function handleChat({ m, path, body, url, ortuId, ortuSaya, anak, ownChil
         return send(200, { pesan: daftarFamily(parentId, pengirim) }), true;
       }
       db.prepare("INSERT INTO pesan_keluarga (child_id, dari, isi, created_at, suara, tipe_suara, ortu_id) VALUES (?, ?, ?, ?, ?, ?, ?)")
-        .run(childId, sebagai, isi, Date.now(), suara, tipe, sebagai === "ortu" ? (ortuSaya ?? parentId) : null);
+        .run(childId, sebagai, isi, Date.now(), suara, tipe, kontak);
       db.prepare(`DELETE FROM pesan_keluarga WHERE child_id = ? AND id NOT IN
                   (SELECT id FROM pesan_keluarga WHERE child_id = ? ORDER BY id DESC LIMIT ${MAKS_PESAN})`).run(childId, childId);
       if (sebagai === "ortu") {
@@ -265,7 +281,7 @@ export function handleChat({ m, path, body, url, ortuId, ortuSaya, anak, ownChil
         const nama = pengirim ? sapaanOrtu(pengirim) : "orang tua";
         notify(`a${childId}`, "info", `💬 Pesan dari ${nama}: ${isi.length > 60 ? isi.slice(0, 60) + "…" : isi}`);
       }
-      return send(200, { pesan: daftarPesan(childId, sebagai) }), true;
+      return send(200, { pesan: daftarPesan(childId, sebagai, kontak) }), true;
     }
   }
   throw new ApiError(404, "Alamat tidak ditemukan.");
