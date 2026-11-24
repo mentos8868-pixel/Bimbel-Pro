@@ -639,6 +639,31 @@ $("halaman").addEventListener("click", async (e) => {
   }
 });
 
+let notifikasiAnak = [];
+let memuatNotifikasiAnak = false;
+const tombolBacaNotifikasi = $("baca-notifikasi-anak");
+async function muatNotifikasiAnak(sampai) {
+  if (!anak || document.hidden || memuatNotifikasiAnak) return;
+  memuatNotifikasiAnak = true;
+  try {
+    const hasil = sampai ? await api("POST", "notifikasi-anak", { sampai }) : await api("GET", "notifikasi-anak");
+    if (JSON.stringify(hasil.notifikasi) === JSON.stringify(notifikasiAnak)) return;
+    notifikasiAnak = hasil.notifikasi;
+    $("daftar-notifikasi-anak").replaceChildren(...notifikasiAnak.map(({ pesan }) => {
+      const li = document.createElement("li");
+      li.textContent = pesan;
+      return li;
+    }));
+    $("notifikasi-anak").hidden = notifikasiAnak.length === 0;
+  } catch (e) {
+    if (sampai) galat(e.message);
+  } finally {
+    memuatNotifikasiAnak = false;
+  }
+}
+tombolBacaNotifikasi.onclick = () => muatNotifikasiAnak(notifikasiAnak.at(-1)?.id);
+document.addEventListener("visibilitychange", () => muatNotifikasiAnak());
+
 // ---------- muat ----------
 async function muat() {
   let me;
@@ -667,6 +692,8 @@ async function muat() {
     if (beda && !["avatar", "chat", "keuangan"].includes(hal)) gambar(); else tandaChat();
   }, 30000);
   $("dash").hidden = false;
+  muatNotifikasiAnak();
+  setInterval(muatNotifikasiAnak, 5000);
   catatAktivitas();
   document.title = `Dashboard ${anak.name}`;
   gambar();

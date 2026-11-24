@@ -15,6 +15,7 @@ import { handleTanggapanBelajar } from "./tanggapan-belajar.js";
 import { handleTugas } from "./tugas.js";
 import { handleChat, MAKS_BODY_SUARA } from "./chat.js";
 import { handleKeuangan } from "./keuangan.js";
+import { handleNotifikasiAnak } from "./notifikasi-anak.js";
 import { handleHadiah } from "./hadiah.js";
 import { handleTokoOrtu, avatarOrtuDimiliki, aksesoriOrtuDimiliki } from "./toko-ortu.js";
 import { handleKantor } from "./kantor.js";
@@ -851,6 +852,7 @@ export async function handleApi(req, res) {
     // --- kegiatan belajar anak (latihan dan tryout) yang menunggu tanggapan orang tua ---
     if (handleTanggapanBelajar({ m, path, body, ortuId: ortu ? keluargaId : null, ortuSaya, ownChild, send, ApiError })) return true;
 
+    if (handleNotifikasiAnak({ m, path, body, anak, send, ApiError })) return true;
     if (handleKeuangan({ m, path, body, ortuId: ortu ? keluargaId : null, ortuSaya, anak, ownChild, send, ApiError })) return true;
 
     // --- hadiah tukar bintang (orang tua membuat, anak menukar, orang tua menyetujui) ---

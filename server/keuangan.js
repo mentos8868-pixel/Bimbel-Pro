@@ -9,6 +9,7 @@
 // ambil (tabungan -> dompet). Saldo tidak boleh menjadi minus. Satu target tabungan per anak.
 import { db, today } from "./db.js";
 import { notify } from "./social.js";
+import { catatNotifikasiAnak } from "./notifikasi-anak.js";
 import { cekPesanKeluarga } from "../shared/chat.js";
 
 db.exec(`
@@ -152,10 +153,16 @@ export function handleKeuangan({ m, path, body, ortuId, ortuSaya, anak, ownChild
     const baru = { id: Number.MAX_SAFE_INTEGER, jenis, jumlah, tanggal };
     const masalah = cekUrutan([...semua(c.id), baru]);
     if (masalah) throw new ApiError(400, masalah);
-    db.prepare("INSERT INTO keuangan_catatan (child_id, jenis, jumlah, catatan, tanggal, created_at, oleh) VALUES (?, ?, ?, ?, ?, ?, 'ortu')")
-      .run(c.id, jenis, jumlah, teks(body.catatan, 80), tanggal, Date.now());
     const nama = db.prepare("SELECT name FROM parents WHERE id = ?").get(ortuSaya ?? ortuId)?.name || "Orang tua";
-    notify(`a${c.id}`, "info", `💰 ${nama} memberimu uang saku Rp${jumlah.toLocaleString("id-ID")}`);
+    const pesan = `💰 ${nama} memberimu uang saku Rp${jumlah.toLocaleString("id-ID")}`;
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      db.prepare("INSERT INTO keuangan_catatan (child_id, jenis, jumlah, catatan, tanggal, created_at, oleh) VALUES (?, ?, ?, ?, ?, ?, 'ortu')")
+        .run(c.id, jenis, jumlah, teks(body.catatan, 80), tanggal, Date.now());
+      catatNotifikasiAnak(c.id, pesan);
+      db.exec("COMMIT");
+    } catch (e) { db.exec("ROLLBACK"); throw e; }
+    notify(`a${c.id}`, "info", pesan);
     return send(200, ringkasKeuangan(c.id)), true;
   }
   // Target tabungan dipasang anak sendiri; orang tua hanya melihat.

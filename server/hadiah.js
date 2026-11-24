@@ -4,6 +4,7 @@
 // Daftar hadiah berlaku untuk semua anak dalam satu keluarga.
 import { db, today } from "./db.js";
 import { notify } from "./social.js";
+import { catatNotifikasiAnak } from "./notifikasi-anak.js";
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS hadiah (
@@ -244,14 +245,19 @@ export function handleHadiah({ m, path, body, ortuId, anak, send, ApiError }) {
   }
   if (path[1] === "tukar" && (path[3] === "setujui" || path[3] === "tolak") && m === "POST") {
     const setuju = path[3] === "setujui";
-    const { t, peserta, cicilan } = transaksi(() => {
+    const notifikasi = transaksi(() => {
       const t = db.prepare(`SELECT t.* FROM hadiah_tukar t JOIN children c ON c.id = t.child_id
                             WHERE t.id = ? AND c.parent_id = ? AND t.status = 'menunggu'`).get(Number(path[2]), ortuId);
       if (!t) throw new ApiError(404, "Penukaran tidak ditemukan atau sudah dijawab.");
       const peserta = t.patungan ? pesertaPatungan(t.id) : [{ id: t.child_id, bintang: t.bintang }];
+      const catat = (penerima, buatPesan) => penerima.map((p) => {
+        const pesan = buatPesan(p);
+        catatNotifikasiAnak(p.id, pesan);
+        return { id: p.id, pesan };
+      });
       if (!setuju) {
         db.prepare("UPDATE hadiah_tukar SET status = 'ditolak', diputus_at = ? WHERE id = ?").run(Date.now(), t.id);
-        return { t, peserta };
+        return catat(peserta, () => `Penukaran "${t.nama}" belum disetujui orang tua. Bintangmu tetap utuh.`);
       }
       const hadiah = db.prepare("SELECT aktif, ditukar FROM hadiah WHERE id = ? AND parent_id = ?").get(t.hadiah_id, ortuId);
       if (!hadiah?.aktif || hadiah.ditukar) throw new ApiError(409, "Hadiah ini sudah ditukar atau tidak aktif.");
@@ -261,7 +267,8 @@ export function handleHadiah({ m, path, body, ortuId, anak, send, ApiError }) {
         if (terkumpul < t.bintang) {
           const r = db.prepare("UPDATE hadiah_patungan SET diterima = bintang WHERE tukar_id = ? AND diterima < bintang").run(t.id);
           if (!r.changes) throw new ApiError(409, "Belum ada cicilan baru untuk disetujui.");
-          return { t, peserta, cicilan: true };
+          return catat(peserta.filter((p) => p.diterima < p.bintang),
+            (p) => `🎁 Cicilan ${p.bintang - p.diterima} bintang untuk "${t.nama}" disetujui.`);
         }
         if (peserta.length < 2 || terkumpul !== t.bintang) {
           throw new ApiError(400, "Patungan harus dibayar sesuai harga oleh minimal dua anak.");
@@ -281,15 +288,9 @@ export function handleHadiah({ m, path, body, ortuId, anak, send, ApiError }) {
         db.prepare("INSERT INTO keuangan_catatan (child_id, jenis, jumlah, catatan, tanggal, created_at, oleh) VALUES (?, 'masuk', ?, ?, ?, ?, 'ortu')")
           .run(t.child_id, t.rupiah, `Tukar ${t.bintang} bintang: ${t.nama}`.slice(0, 80), today(), Date.now());
       }
-      return { t, peserta };
+      return catat(peserta, (p) => `🎁 Penukaran "${t.nama}" disetujui! −${p.bintang} bintang${t.rupiah ? `, +Rp${t.rupiah.toLocaleString("id-ID")} uang saku` : ""}`);
     });
-    if (cicilan) return send(200, untukOrtu(ortuId)), true;
-    for (const p of peserta) {
-      const pesan = setuju
-        ? `🎁 Penukaran "${t.nama}" disetujui! −${p.bintang} bintang${t.rupiah ? `, +Rp${t.rupiah.toLocaleString("id-ID")} uang saku` : ""}`
-        : `Penukaran "${t.nama}" belum disetujui orang tua. Bintangmu tetap utuh.`;
-      notify(`a${p.id}`, "info", pesan);
-    }
+    for (const p of notifikasi) notify(`a${p.id}`, "info", p.pesan);
     return send(200, untukOrtu(ortuId)), true;
   }
   throw new ApiError(404, "Alamat tidak ditemukan.");

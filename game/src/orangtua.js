@@ -747,7 +747,7 @@ $("pilih-anak").addEventListener("click", (e) => { const b = e.target.closest("[
 // ---------------- menu Tugas ----------------
 // Data dari GET /api/tugas: { anak: { <id>: { tugas, menunggu, hariIni, minggu } } }.
 let dataTugas = {};
-let kuotaBintangTugas = null;
+let kuotaBintangTugas = {};
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const IKON_JENIS = { ibadah: "🕌", rumah: "🏠", belajar: "📚", lainnya: "⭐" };
 const NAMA_JENIS = { ibadah: "Ibadah", rumah: "Rumah", belajar: "Belajar", lainnya: "Lainnya" };
@@ -769,6 +769,7 @@ function gambarTugas() {
     return;
   }
   const nama = esc(document.querySelector(`#pilih-anak [data-anak="${anakDipilih}"]`)?.textContent || "anak");
+  const kuota = kuotaBintangTugas[anakDipilih];
   const kotak = (judul, isi, kecil) => `<div class="kotak-ortu"><span class="muted">${judul}</span><b>${isi}</b><span class="muted kecil">${kecil}</span></div>`;
   const tunggu = d.menunggu.length
     ? d.menunggu.map((t) => `<li class="approval"><span>${IKON_JENIS[t.jenis] || ""} <b>${esc(t.judul)}</b> · ${tanggalTeks(t.tanggal)}${t.bintang ? ` · ★${t.bintang}` : ""}</span>
@@ -789,7 +790,7 @@ function gambarTugas() {
       ${kotak("7 hari terakhir", d.minggu.persen === null ? "–" : `${d.minggu.persen}%`, `${d.minggu.beres} dari ${d.minggu.wajib} tugas selesai`)}
     </div>
     <section class="panel"><h2>Menunggu dicek</h2>
-      ${kuotaBintangTugas ? `<p class="muted">Sisa kuota hari ini: ${kuotaBintangTugas.sisa} dari ${kuotaBintangTugas.batas} bintang untuk semua anak. Kuota direset setiap pukul 00.00 WIB.</p>` : ""}
+      ${kuota ? `<p class="muted">Sisa kuota ${nama} hari ini ${kuota.sisa} dari ${kuota.batas} bintang. Kuota direset setiap pukul 00.00 WIB.</p>` : ""}
       <ul class="tugas-list">${tunggu}</ul></section>
     <section class="panel"><h2>Tugas ${nama}</h2><ul class="tugas-list">${daftar}</ul></section>
     <form class="panel" id="form-tugas">
@@ -834,7 +835,7 @@ $("tugas-isi").addEventListener("click", async (e) => {
       const aksi = b.dataset.setujui ? "setujui" : "belum";
       const { kuotaBintang, ...ringkasan } = await api("POST", `tugas/${b.dataset.setujui || b.dataset.belum}/${aksi}`, { tanggal: b.dataset.tgl });
       dataTugas[childId] = ringkasan;
-      kuotaBintangTugas = kuotaBintang;
+      kuotaBintangTugas[childId] = kuotaBintang;
     }
     gambarTugas();
   } catch (x) { alert(x.message); b.disabled = false; }
