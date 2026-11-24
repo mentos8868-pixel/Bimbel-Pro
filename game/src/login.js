@@ -2,6 +2,7 @@
 import { api } from "./api.js";
 import { avatarSvg } from "./avatar-svg.js";
 import { DEFAULT_ORTU_AVATAR } from "../../shared/avatars.js";
+import { TEMPAT_KERJA } from "../../shared/tempat-kerja.js";
 
 const $ = (id) => document.getElementById(id);
 const box = () => $("login");
@@ -39,19 +40,33 @@ export function setupLogin(onStart) {
   };
 
   const go = (step) => show(step);
-  // Orang tua yang sedang bekerja tidak bisa masuk arena: tampilkan waktu kerja dan tombol Stop kerja.
   let timerKerja = 0;
-  const tampilBekerja = (status) => {
+  const masukArenaOrtu = () => {
+    if (box().hidden) return;
     clearInterval(timerKerja);
-    const tempat = status.pekerjaan === "sawah" ? "Sawah" : "Kantor";
-    const aksi = $("bekerja-aksi");
+    box().hidden = true;
+    onStart({ role: "ortu", name: me.ortu.name, negara: me.ortu.negara || "", jenjang: "Orang tua", gameJenjang: jenjangOrtu(), color: WARNA_ORTU, avatar: me.ortu.avatar || DEFAULT_ORTU_AVATAR, aksesori: (me.ortu.aksesori || []).join(",") }, "ortu");
+  };
+  const tampilBekerja = (statusAwal) => {
+    clearInterval(timerKerja);
+    let status = statusAwal;
+    let memuat = false;
+    let cekLagi = 0;
     const detak = () => {
-      const detik = Math.max(0, Math.floor((Date.now() - status.mulaiAt) / 1000));
-      $("bekerja-sisa").textContent = [Math.floor(detik / 3600), Math.floor(detik / 60) % 60, detik % 60].map((n) => String(n).padStart(2, "0")).join(":");
+      const sekarang = Date.now();
+      const detik = Math.max(0, Math.ceil((status.berikutAt - sekarang) / 1000));
+      const waktu = [Math.floor(detik / 3600), Math.floor(detik / 60) % 60, detik % 60].map((n) => String(n).padStart(2, "0")).join(":");
+      $("bekerja-sisa").textContent = `Jam penuh berikutnya · ${waktu}`;
+      const tempat = TEMPAT_KERJA[status.pekerjaan]?.nama || "tempat kerja";
+      $("bekerja-info").textContent = `${tempat} · ${status.hariIni + status.tertundaHariIni}/${status.batasHarian} bintang kerja hari ini (${status.tertundaHariIni} belum cair).`;
+      if (memuat || sekarang < cekLagi) return;
+      cekLagi = sekarang + 5000;
+      memuat = true;
+      api("GET", "kantor").then((terbaru) => {
+        if (terbaru.mulaiAt == null) masukArenaOrtu();
+        else status = terbaru;
+      }).catch(() => {}).finally(() => { memuat = false; });
     };
-    $("bekerja-info").textContent = `Kamu sedang bekerja di ${tempat}. Selama bekerja kamu tidak bisa masuk arena. Tekan Stop kerja untuk berhenti dan menerima bintang untuk setiap jam penuh.`;
-    aksi.textContent = "⏹ Stop kerja";
-    aksi.dataset.act = "stop-kerja";
     go("bekerja");
     detak();
     timerKerja = setInterval(detak, 1000);
@@ -59,9 +74,7 @@ export function setupLogin(onStart) {
   const mainOrtu = async () => {
     const kerja = await api("GET", "kantor").catch(() => null);
     if (kerja?.mulaiAt != null) return tampilBekerja(kerja);
-    clearInterval(timerKerja);
-    box().hidden = true;
-    onStart({ role: "ortu", name: me.ortu.name, negara: me.ortu.negara || "", jenjang: "Orang tua", gameJenjang: jenjangOrtu(), color: WARNA_ORTU, avatar: me.ortu.avatar || DEFAULT_ORTU_AVATAR, aksesori: (me.ortu.aksesori || []).join(",") }, "ortu");
+    masukArenaOrtu();
   };
   const refresh = async () => {
     show("muat");
@@ -160,15 +173,16 @@ export function setupLogin(onStart) {
       return;
     }
     if (act === "main-ortu") mainOrtu();
-    if (act === "stop-kerja") {
-      const sec = b.closest("[data-step]");
-      busy(sec, true);
+    if (act === "stop-kerja" && !b.disabled) {
+      b.disabled = true;
       try {
-        await api("POST", "kantor/stop");
-        await mainOrtu();
-      } catch (x) {
-        err("bekerja", x.message);
-      } finally { busy(sec, false); }
+        const hasil = await api("POST", "kantor/stop");
+        if (hasil.mulaiAt == null) masukArenaOrtu();
+      } catch (e) {
+        err("bekerja", e.message);
+      } finally {
+        b.disabled = false;
+      }
     }
   });
 

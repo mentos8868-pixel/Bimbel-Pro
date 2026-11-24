@@ -9,6 +9,7 @@ import { pasangGrafis } from "./grafis.js";
 import { drawFlag, namaKelas } from "../../shared/negara.js";
 import { BARIS_BIMBEL, KOLOM_BIMBEL, TITIK_BIMBEL } from "../../shared/kursi-bimbel.js";
 import { MEJA_GAME } from "../../shared/meja-game.js";
+import { TEMPAT_KERJA } from "../../shared/tempat-kerja.js";
 
 export const ARENA_RADIUS = 38;
 
@@ -301,6 +302,43 @@ function kiosToko(scene, x, z, walls) {
   return { id: "toko", x, z: front - 0.9, label: "Toko Avatar", action: "Buka Toko Avatar", ready: true };
 }
 
+function tokoKerja(scene, walls, id, x, { warna, lantai, produk }) {
+  const { nama, kapasitas } = TEMPAT_KERJA[id];
+  const z = -25;
+  room(scene, walls, { cx: x, cz: z, w: 8.6, d: 8, door: "n", floor: lantai, wall: warna });
+  for (let i = 0; i < 8; i++) {
+    box(scene, "kanopi-toko", { w: 1.08, h: 0.14, d: 1.5, x: x - 3.78 + i * 1.08, y: 2.35, z: z + 3.85, color: i % 2 ? "#fff4e4" : warna });
+  }
+  for (const dx of [-3.95, 3.95]) {
+    box(scene, "tiang-toko", { w: 0.18, h: 2.35, d: 0.18, x: x + dx, z: z + 4, color: warna });
+  }
+  makeSign(scene, [nama], { width: 5.1, height: 1.0, bg: warna, fg: "#ffffff" }).position.set(x, 3.05, z + 4);
+
+  // Konter keenam tetap tersedia untuk avatar dari sesi yang dimulai sebelum kapasitas turun.
+  const posisiKerja = Array.from({ length: Math.max(kapasitas, 6) }, (_, i) => ({
+    x: x + (i % 3 - 1) * 2.5, z: z - 2.25 + Math.floor(i / 3) * 3, ry: 0,
+  }));
+  for (const p of posisiKerja) {
+    const depan = p.z + 0.85;
+    box(scene, "konter-toko", { w: 1.85, h: 0.78, d: 0.68, x: p.x, z: depan, color: warna, walls });
+    box(scene, "permukaan-konter", { w: 1.95, h: 0.1, d: 0.78, x: p.x, y: 0.78, z: depan, color: "#f5dfc4" });
+    for (const [i, warnaProduk] of produk.entries()) {
+      const px = p.x + (i - 1) * 0.48;
+      if (id === "bunga") {
+        tabung(scene, 0.1, 0.19, "#667b64", px, 0.92, depan);
+        box(scene, "tangkai", { w: 0.045, h: 0.2, d: 0.045, x: px, y: 1.05, z: depan, color: "#4b8047" });
+        const bunga = MeshBuilder.CreateSphere("bunga-toko", { diameter: 0.21, segments: 8 }, scene);
+        bunga.position.set(px, 1.17, depan);
+        bunga.material = mat(scene, warnaProduk);
+      } else {
+        tabung(scene, 0.19, 0.035, "#fff7eb", px, 0.85, depan);
+        tabung(scene, 0.12, id === "sarapan" ? 0.13 : 0.05, warnaProduk, px, 0.92, depan);
+      }
+    }
+  }
+  return { id, x, z: z + 4.45, action: `Bekerja di ${nama}`, posisiKerja };
+}
+
 export function createArena(canvas) {
   const engine = new Engine(canvas, true, { preserveDrawingBuffer: false, stencil: false }, true);
   const scene = new Scene(engine);
@@ -331,7 +369,7 @@ export function createArena(canvas) {
   const plaza = MeshBuilder.CreateCylinder("plaza", { diameter: 16, height: 0.06, tessellation: 48 }, scene);
   plaza.position.y = 0.03;
   plaza.material = mat(scene, "#e8dcc2");
-  const plazaSign = makeSign(scene, ["Alun-alun", "Bimbel utara · Game timur · Kantor barat"], { width: 6, height: 1.5 });
+  const plazaSign = makeSign(scene, ["Alun-alun", "Bimbel utara · Game timur · Pertokoan selatan"], { width: 7.4, height: 1.5 });
   plazaSign.position.set(0, 3, 0);
   // Kios Toko Avatar di sisi barat laut alun-alun (terlihat dari tempat muncul).
   const kios = kiosToko(scene, -5, 4.6, walls);
@@ -357,6 +395,7 @@ export function createArena(canvas) {
   const gayaMeja = {
     catur: ["Catur", "#c99563"], scramble: ["Scramble Words", "#9b7bd8"],
     kartu: ["Kartu Kilat", "#ef6f5e"], otello: ["Otello", "#31877f"],
+    matematika: ["Lomba Matematika", "#7758c2"],
   };
   const tables = MEJA_GAME.map((meja) => {
     const [label, warna] = gayaMeja[meja.id];
@@ -406,9 +445,12 @@ export function createArena(canvas) {
     }
   }
 
-  box(scene, "plot", { w: 12, h: 0.05, d: 12, x: 0, y: 0.025, z: -24, color: "#d9c7a0" });
-  const cadangan = makeSign(scene, ["Lahan cadangan"], { width: 3.6, height: 0.9, bg: "#f7f1e3" });
-  cadangan.position.set(0, 1.6, -24);
+  box(scene, "jalan-pertokoan", { w: 29, h: 0.045, d: 2.7, x: 0, y: 0.023, z: -19.8, color: "#efe7d4" });
+  const pertokoan = [
+    tokoKerja(scene, walls, "sarapan", -10, { warna: "#a45621", lantai: "#fff0cf", produk: ["#e8ac59", "#ae6934", "#edc37a"] }),
+    tokoKerja(scene, walls, "bunga", 0, { warna: "#963f66", lantai: "#f9eaf1", produk: ["#e8618d", "#c17ed7", "#efbf52"] }),
+    tokoKerja(scene, walls, "restoran", 10, { warna: "#8c3e37", lantai: "#f8e8dc", produk: ["#bc6d39", "#65a653", "#c06159"] }),
+  ];
 
   // Pepohonan di pinggir arena
   for (let i = 0; i < 28; i++) {
@@ -422,7 +464,7 @@ export function createArena(canvas) {
   window.addEventListener("resize", () => engine.resize());
   // Cahaya hangat, bayangan lembut, dan efek ala film (lihat grafis.js); dipasang setelah semua benda dibuat.
   const grafis = pasangGrafis({ scene, camera, sun, hemi });
-  return { engine, scene, camera, walls, grafis, tables: [...tables, studyDesk, kios, ...mejaKantor, sawah] };
+  return { engine, scene, camera, walls, grafis, tables: [...tables, studyDesk, kios, ...mejaKantor, sawah, ...pertokoan] };
 }
 
 // Gelembung chat di atas kepala avatar (hilang setelah 5 detik).
@@ -482,7 +524,7 @@ export function createAvatar(scene, { color, avatar, aksesori = "", aura = "", n
 export function aturStatusKerja(av, pekerjaan) {
   if (av.pekerjaan === pekerjaan) return;
   av.pekerjaan = pekerjaan;
-  av.statusAktivitas.setEnabled(pekerjaan === "kantor");
+  av.statusAktivitas.setEnabled(Boolean(pekerjaan) && pekerjaan !== "sawah");
   av.statusSawah?.setEnabled(pekerjaan === "sawah");
   av.laptop?.setEnabled(pekerjaan === "kantor");
   av.cangkul?.setEnabled(pekerjaan === "sawah");

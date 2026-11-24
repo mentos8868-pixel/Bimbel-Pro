@@ -33,7 +33,7 @@ export function authTable(room, options = {}) {
   const game = room.roomName === "chess" ? "catur" : room.roomName;
   // Meja game di arena ("Main online di meja ini"): satu ruang per meja untuk siapa saja yang duduk di sana
   // (anak atau orang tua). Pemain berikutnya hanya diterima bila boleh bermain dengan SEMUA pemain yang sudah ada.
-  if (["chess", "scramble", "kartu"].includes(room.roomName) && !room.listing.private) {
+  if (["chess", "scramble", "kartu", "matematika"].includes(room.roomName) && !room.listing.private) {
     if (typeof options.meja !== "string" || !dudukDiMeja(p, game, options.meja)) throw new ServerError(4403, "Duduk di meja permainan dahulu.");
     if (!room.clients.every((c) => !c.auth || bolehSemeja(c.auth, p))) {
       throw new ServerError(4403, "Pemain di meja ini belum bisa diajak bermain bersamamu. Pilih meja lain atau lawan bot.");

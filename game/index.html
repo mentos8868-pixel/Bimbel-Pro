@@ -49,13 +49,14 @@
           <button class="ghost" data-go="keluarga">Kembali</button>
         </section>
 
-        <!-- Orang tua sedang bekerja (Kantor/Sawah): tidak bisa masuk arena sebelum Stop kerja -->
+        <!-- Orang tua kembali ke Arena setelah sesi kerja selesai otomatis. -->
         <section data-step="bekerja" hidden>
           <h2>💼 Sedang bekerja</h2>
           <p id="bekerja-info" class="muted"></p>
           <p id="bekerja-sisa" class="bekerja-sisa"></p>
+          <p class="muted">Upah cair saat sesi selesai otomatis. Berhenti lebih awal membuat upah yang belum cair hangus.</p>
           <span class="error" hidden></span>
-          <button class="primary" id="bekerja-aksi" data-act="stop-kerja">⏹ Stop kerja</button>
+          <button type="button" id="bekerja-aksi" data-act="stop-kerja">Stop bekerja</button>
           <a class="btn" href="/orangtua.html">Dashboard orang tua</a>
         </section>
 
@@ -295,6 +296,41 @@
           <button type="button" data-tutup>Keluar</button>
         </div>
       </div>
+    </div>
+
+    <div id="matematika-panel" class="overlay" hidden>
+      <section class="card lomba-mat" role="dialog" aria-modal="true" aria-labelledby="matematika-judul">
+        <h2 id="matematika-judul">Lomba Matematika</h2>
+        <p data-mat-status role="status"></p>
+        <div class="lomba-mat-pengaturan" data-mat-pengaturan>
+          <label>Tingkat kesulitan <select data-mat-tingkat aria-describedby="matematika-tingkat-info"></select></label>
+          <p id="matematika-tingkat-info" data-mat-tingkat-info class="muted"></p>
+          <label>Mode main berdua <select data-mat-mode aria-describedby="matematika-mode-info"></select></label>
+          <p id="matematika-mode-info" data-mat-mode-info class="muted"></p>
+        </div>
+        <section class="lomba-mat-tunggu" data-mat-tunggu hidden>
+          <h3>Ruang tunggu</h3>
+          <ul data-mat-pemain aria-label="Pemain di meja"></ul>
+          <button type="button" data-mat-siap class="primary">Siap</button>
+        </section>
+        <div data-mat-ronde hidden>
+          <div class="lomba-mat-info"><span data-mat-angka></span><span data-mat-waktu></span></div>
+          <progress data-mat-bar aria-label="Waktu tersisa"></progress>
+          <p class="lomba-mat-soal" data-mat-soal></p>
+          <div class="lomba-mat-jawaban">
+            <button type="button" data-mat-pilih="0"></button>
+            <button type="button" data-mat-pilih="1"></button>
+            <button type="button" data-mat-pilih="2" hidden></button>
+            <button type="button" data-mat-pilih="3" hidden></button>
+          </div>
+        </div>
+        <ul class="lomba-mat-skor" data-mat-skor></ul>
+        <div class="row">
+          <button type="button" class="primary" data-mat-online>Main berdua</button>
+          <button type="button" data-mat-latihan>Latihan sendiri</button>
+          <button type="button" data-mat-tutup>Keluar meja</button>
+        </div>
+      </section>
     </div>
 
     <!-- Menu meja Kartu Kilat -->

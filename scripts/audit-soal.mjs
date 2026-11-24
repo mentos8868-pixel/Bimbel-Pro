@@ -7,7 +7,7 @@ const html = read('index.html');
 const source = html.match(/<script>\s*([\s\S]*?)const DEF=/)?.[1];
 if (!source) throw new Error('Skrip latihan Ruang Bimbel tidak ditemukan.');
 
-const context = createContext({ window: {} });
+const context = createContext({ window: {}, URLSearchParams, location: { search: '' } });
 runInContext(`
   let seed = 20261121;
   Math.random = () => {

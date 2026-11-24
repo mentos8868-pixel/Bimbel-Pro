@@ -26,6 +26,10 @@ export async function joinArena() {
   return client.joinOrCreate("arena", { ticket: await ticket() });
 }
 
+export async function joinLombaMatematika(meja, tingkat, mode) {
+  return client.joinOrCreate("matematika", { ticket: await ticket(), meja, tingkat, mode });
+}
+
 // ----- Catur -----
 export async function findChessMatch(profile, meja) {
   return client.joinOrCreate("chess", { ticket: await ticket(), jenjang: profile.jenjang, meja });

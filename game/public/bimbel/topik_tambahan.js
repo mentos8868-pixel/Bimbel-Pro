@@ -47,7 +47,7 @@ const SEGI=[{n:'Persegi',p:'22,10 98,10 98,86 22,86',c:'4 sisi sama panjang dan 
   {n:'Belah ketupat',p:'60,4 104,46 60,88 16,46',c:'4 sisi sama panjang, tetapi sudutnya tidak siku-siku'},
   {n:'Trapesium',p:'34,20 86,20 114,76 6,76',c:'tepat sepasang sisi sejajar'},
   {n:'Layang-layang',p:'60,4 96,34 60,88 24,34',c:'2 pasang sisi bersebelahan yang sama panjang'},
-  {n:'Segitiga sama sisi',p:'60,8 108,84 12,84',c:'3 sisi sama panjang dan 3 sudut sama besar'},
+  {n:'Segitiga sama sisi',p:'60,3 108,86.1384 12,86.1384',c:'3 sisi sama panjang dan 3 sudut sama besar'},
   {n:'Segitiga siku-siku',p:'14,8 14,84 106,84',c:'satu sudut siku-siku'}];
 const HARI=['Senin','Selasa','Rabu','Kamis','Jumat'];
 const v3=(a,b,c)=>pick(D(a,b,c));   // pilih varian soal menurut tingkat

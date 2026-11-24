@@ -1,12 +1,13 @@
 import { Vector3, Scalar, PointerEventTypes } from "@babylonjs/core";
 import { aturPoseBelajar, aturStatusKerja, createArena, createAvatar, disposeAvatar, moveWithCollision, showBubble } from "./arena.js";
 import { JARAK_INTERAKSI_BIMBEL } from "../../shared/kursi-bimbel.js";
+import { TEMPAT_KERJA } from "../../shared/tempat-kerja.js";
 import { kursiMeja } from "../../shared/meja-game.js";
 import { SocialUI } from "./social-ui.js";
 import {
   joinArena, findChessMatch, createChessTable, joinChessTable,
   findScrambleMatch, createScrambleTable, joinScrambleTable,
-  findKartuMatch, createKartuTable, joinKartuTable,
+  findKartuMatch, createKartuTable, joinKartuTable, joinLombaMatematika,
   setPlayingAs, canGoOnline,
 } from "./net.js";
 import { setupLogin } from "./login.js";
@@ -15,6 +16,7 @@ import { ChessUI } from "./chess-ui.js";
 import { ScrambleUI } from "./scramble-ui.js";
 import { pasangPapanKata } from "./papan-kata.js";
 import { pasangOtello } from "./otello-ui.js";
+import { pasangLombaMatematika } from "./lomba-matematika.js";
 import { TokoUI } from "./toko-ui.js";
 import { pasangChatKeluarga } from "./chat-keluarga-arena.js";
 import { KUALITAS, NAMA_KUALITAS } from "./grafis.js";
@@ -123,12 +125,11 @@ async function start(profile, playingAs) {
     uiOpen = false;
     keys.clear();
     if (!mejaGame) return;
+    if (mejaGame.id === "matematika") lombaMatematika.tutup();
     mejaGame = null;
     if (room) room.send("meja-game-berdiri");
-    else if (posisiSebelumGame) {
-      posisiAvatar(posisiSebelumGame);
-      aturPoseBelajar(me, false);
-    }
+    if (posisiSebelumGame) posisiAvatar(posisiSebelumGame);
+    aturPoseBelajar(me, false);
     posisiSebelumGame = null;
   }
 
@@ -142,15 +143,25 @@ async function start(profile, playingAs) {
     keys.clear();
     if (mejaMenunggu) {
       mejaMenunggu = null;
+      posisiSebelumGame = null;
       room?.send("meja-game-berdiri");
-    } else room?.send("belajar-bimbel", false);
+    } else {
+      room?.send("meja-game-berdiri");
+      room?.send("belajar-bimbel", false);
+    }
   }
 
   window.addEventListener("keydown", (e) => {
     if (e.target.tagName === "INPUT") return;
     const key = e.key.toLowerCase();
     keys.add(key);
-    if (e.repeat || uiOpen) return;
+    if (e.repeat) return;
+    if (key === "escape" && mejaGame?.id === "matematika") {
+      e.preventDefault();
+      tutupGame();
+      return;
+    }
+    if (uiOpen) return;
     if ((key === "e" || key === "escape") && mejaGame) { tutupGame(); return; }
     if ((key === "e" || key === "escape") && (me.duduk || menungguKursi)) {
       e.preventDefault();
@@ -212,8 +223,9 @@ async function start(profile, playingAs) {
   let memuatKerjaArena = false;
 
   function gambarPekerjaArena() {
-    const indeks = { kantor: 0, sawah: 0 };
-    const tampil = hasilKerjaArena.map((p) => ({ ...p, slot: indeks[p.pekerjaan]++ }));
+    const indeks = Object.fromEntries(Object.keys(TEMPAT_KERJA).map((id) => [id, 0]));
+    const tampil = hasilKerjaArena.filter((p) => Object.hasOwn(TEMPAT_KERJA, p.pekerjaan))
+      .map((p) => ({ ...p, slot: indeks[p.pekerjaan]++ }));
     for (const [uid, av] of pekerjaArena) {
       if (tampil.some((p) => p.uid === uid && p.pekerjaan === av.pekerjaan && p.slot === av.slot && p.avatar === av.avatar && p.aksesori === av.aksesori && p.negara === av.negara)) continue;
       disposeAvatar(av);
@@ -221,12 +233,19 @@ async function start(profile, playingAs) {
     }
     for (const p of tampil) {
       if (pekerjaArena.has(p.uid)) continue;
-      const av = createAvatar(scene, { ...p, role: "ortu", jenjang: "Orang tua", color: "#5b6b7c" });
-      if (p.pekerjaan === "sawah") av.root.position.set(-28 + (p.slot % 5) * 2, 0, -17 + Math.floor(p.slot / 5) * 1.6);
-      else {
+      let posisi;
+      if (p.pekerjaan === "sawah") {
+        posisi = { x: -28 + (p.slot % 5) * 2, z: -17 + Math.floor(p.slot / 5) * 1.6 };
+      } else if (p.pekerjaan === "kantor") {
         const meja = tables.filter((t) => t.id === "kantor")[p.slot];
-        av.root.position.set(meja.x, 0, meja.z - 0.7);
+        if (meja) posisi = { x: meja.x, z: meja.z - 0.7 };
+      } else {
+        posisi = tables.find((t) => t.id === p.pekerjaan)?.posisiKerja?.[p.slot];
       }
+      if (!posisi) continue;
+      const av = createAvatar(scene, { ...p, role: "ortu", jenjang: "Orang tua", color: "#5b6b7c" });
+      av.root.position.set(posisi.x, 0, posisi.z);
+      av.root.rotation.y = posisi.ry ?? 0;
       aturStatusKerja(av, p.pekerjaan);
       Object.assign(av, { slot: p.slot, avatar: p.avatar, aksesori: p.aksesori, negara: p.negara });
       pekerjaArena.set(p.uid, av);
@@ -317,6 +336,7 @@ async function start(profile, playingAs) {
     }
     room.onLeave((code) => {
       room = null;
+      if (mejaGame?.id === "matematika") tutupGame();
       mejaMenunggu = null;
       for (const { av } of others.values()) disposeAvatar(av);
       others.clear();
@@ -331,7 +351,7 @@ async function start(profile, playingAs) {
     });
   } catch (e) {
     if (e?.code === 4403) return timeUp(e.message);
-    // Orang tua sedang bekerja: kembali ke layar "Sedang bekerja" (ada tombol Stop kerja).
+    // Orang tua sedang bekerja: kembali ke layar status kerja.
     if (e?.code === 4409) { location.replace("/?arena=ortu"); return; }
     $("hud-status").textContent = playingAs ? "Offline (lawan bot tetap bisa)" : "Pengunjung";
   }
@@ -480,6 +500,7 @@ async function start(profile, playingAs) {
   // Menerima undangan teman: tutup meja/menu yang terbuka, lalu gabung ke meja dengan kodenya.
   async function joinInvite(game, code) {
     if (playingAs === "anak") return toast(`Duduk di meja ${game} dan masukkan kode privat ${code}.`);
+    if (mejaGame?.id === "matematika") tutupGame();
     for (const ui of [chessUI, scrambleUI, kartuUI]) if (!ui.el.hidden) ui.close();
     for (const id of ["chess-menu", "scramble-menu", "kartu-menu", "toko-panel", "teman-panel", "profil"]) $(id).hidden = true;
     uiOpen = true;
@@ -516,12 +537,13 @@ async function start(profile, playingAs) {
   }
 
   const bukaOtello = pasangOtello($("otello-panel"), tutupGame);
+  const lombaMatematika = pasangLombaMatematika($("matematika-panel"), tutupGame, joinLombaMatematika);
   function useTable(t) {
     if (t.nomor && mejaGame !== t) {
       if (mejaGame || menungguKursi) return;
       keys.clear();
+      posisiSebelumGame = posisiPemain();
       if (!room) {
-        posisiSebelumGame = posisiPemain();
         mejaGame = t;
         posisiAvatar(kursiMeja(t)[0]);
         aturPoseBelajar(me, true);
@@ -534,6 +556,7 @@ async function start(profile, playingAs) {
       room.send("meja-game-duduk", t.nomor);
       batasWaktuKursi = setTimeout(() => {
         mejaMenunggu = null;
+        posisiSebelumGame = null;
         selesaiMenungguKursi();
         room?.send("meja-game-berdiri");
         toast("Meja belum merespons. Coba duduk lagi.");
@@ -546,7 +569,13 @@ async function start(profile, playingAs) {
       bukaOtello();
       return;
     }
-    if (t.id === "kantor" || t.id === "sawah") {
+    if (t.id === "matematika") {
+      uiOpen = true;
+      keys.clear();
+      lombaMatematika.buka(kunciMeja());
+      return;
+    }
+    if (Object.hasOwn(TEMPAT_KERJA, t.id)) {
       if (playingAs === "anak") return;
       if (playingAs !== "ortu") return toast("Pekerjaan ini khusus untuk Ayah dan Ibu.");
       bukaKantor(t.id);
@@ -612,10 +641,12 @@ async function start(profile, playingAs) {
   });
   room?.onMessage("meja-game-gagal", (pesan) => {
     mejaMenunggu = null;
+    posisiSebelumGame = null;
     selesaiMenungguKursi();
     toast(pesan);
   });
   room?.onMessage("meja-game-berdiri", (posisi) => {
+    if (mejaGame || mejaMenunggu) return;
     posisiAvatar(posisi);
     aturPoseBelajar(me, false);
   });
@@ -624,47 +655,41 @@ async function start(profile, playingAs) {
   const kantorAksi = $("kantor-aksi");
   const kantorPesan = $("kantor-pesan");
   let kantorStatus = null;
-  let kantorTimer;
   let kantorSlotTimer;
   let kantorMemuat = false;
   let tempatKerja = "kantor";
 
   function tampilKantor() {
-    const detik = Math.max(0, Math.floor((Date.now() - (kantorStatus?.mulaiAt ?? Date.now())) / 1000));
     const slot = kantorStatus?.slot?.[tempatKerja];
-    const penuh = kantorStatus?.mulaiAt === null && slot?.tersedia === 0;
+    const penuh = slot?.tersedia === 0;
+    const batasTercapai = kantorStatus && kantorStatus.hariIni >= kantorStatus.batasHarian;
     $("kantor-slot").textContent = slot ? `Slot tersedia ${slot.tersedia}/${slot.kapasitas}` : "";
-    kantorAksi.disabled = kantorMemuat || penuh;
+    kantorAksi.disabled = kantorMemuat || penuh || batasTercapai;
     $("kantor-saldo").textContent = kantorStatus ? `★ ${kantorStatus.bintang} bintang` : "";
     if (!kantorStatus) {
       $("kantor-status").textContent = kantorMemuat ? "Memuat sesi kerja…" : "";
       kantorAksi.textContent = "Coba lagi";
+    } else if (batasTercapai) {
+      $("kantor-status").textContent = `Batas ${kantorStatus.batasHarian} bintang hari ini sudah tercapai. Bisa bekerja lagi besok (WIB).`;
+      kantorAksi.textContent = "Mulai bekerja";
     } else if (penuh) {
       $("kantor-status").textContent = "Slot sedang penuh. Kamu bisa mulai saat ada sesi yang selesai.";
       kantorAksi.textContent = "Mulai bekerja";
-    } else if (kantorStatus.mulaiAt === null) {
-      $("kantor-status").textContent = `Bekerja selama ${kantorStatus.durasi / 3600} jam untuk mendapat ${kantorStatus.hadiah} bintang.`;
-      kantorAksi.textContent = tempatKerja === "sawah" ? "Mulai bertani" : "Mulai bekerja";
     } else {
-      const waktu = [Math.floor(detik / 3600), Math.floor(detik / 60) % 60, detik % 60].map((n) => String(n).padStart(2, "0")).join(":");
-      $("kantor-status").textContent = `Sedang bekerja · ${waktu}`;
-      kantorAksi.textContent = "Berhenti bekerja";
+      const upah = slot?.upah ?? TEMPAT_KERJA[tempatKerja].upah;
+      $("kantor-status").textContent = `Upah ${upah} bintang per jam penuh cair saat batas kerja ${kantorStatus.batasHarian} bintang tercapai. Berhenti lebih awal membuat upah yang belum cair hangus.`;
+      kantorAksi.textContent = tempatKerja === "sawah" ? "Mulai bertani" : "Mulai bekerja";
     }
   }
 
-  async function muatKantor(aksi) {
+  async function muatKantor(mulai = false) {
     if (kantorMemuat) return;
     kantorMemuat = true;
-    if (aksi || !kantorStatus) kantorPesan.hidden = true;
+    if (mulai || !kantorStatus) kantorPesan.hidden = true;
     tampilKantor();
     try {
-      kantorStatus = await (aksi ? api("POST", `kantor/${aksi}`, aksi === "mulai" ? { pekerjaan: tempatKerja } : {}) : api("GET", "kantor"));
-      // Mulai bekerja = keluar dari arena; layar masuk menampilkan "Sedang bekerja" dengan tombol Stop kerja.
-      if (aksi === "mulai" && kantorStatus.mulaiAt > 0) { location.replace("/?arena=ortu"); return; }
-      if (aksi === "stop") {
-        kantorPesan.textContent = `Kerja selesai · ${kantorStatus.diperoleh} bintang masuk ke saldo.`;
-        kantorPesan.hidden = false;
-      }
+      kantorStatus = await (mulai ? api("POST", "kantor/mulai", { pekerjaan: tempatKerja }) : api("GET", "kantor"));
+      if (kantorStatus.mulaiAt !== null) location.replace("/?arena=ortu");
     } catch (err) {
       kantorStatus = null;
       kantorPesan.textContent = err.message;
@@ -679,16 +704,14 @@ async function start(profile, playingAs) {
     uiOpen = true;
     keys.clear();
     tempatKerja = tempat;
-    $("kantor-judul").textContent = tempat === "sawah" ? "Pekerjaan pertanian" : "Kantor Ayah dan Ibu";
+    $("kantor-judul").textContent = TEMPAT_KERJA[tempat].nama;
     kantorPanel.hidden = false;
     $("kantor-tutup").focus();
-    kantorTimer = setInterval(tampilKantor, 250);
     kantorSlotTimer = setInterval(() => muatKantor(), 10000);
     muatKantor();
   }
-  kantorAksi.onclick = () => muatKantor(kantorStatus && (kantorStatus.mulaiAt === null ? "mulai" : "stop"));
+  kantorAksi.onclick = () => muatKantor(Boolean(kantorStatus));
   $("kantor-tutup").onclick = () => {
-    clearInterval(kantorTimer);
     clearInterval(kantorSlotTimer);
     kantorPanel.hidden = true;
     uiOpen = false;
@@ -790,7 +813,7 @@ async function start(profile, playingAs) {
     let jarakTerdekat = Infinity;
     for (const t of tables) {
       if (t.id === "bimbel" && playingAs !== "anak") continue;
-      if ((t.id === "kantor" || t.id === "sawah") && playingAs === "anak") continue;
+      if (Object.hasOwn(TEMPAT_KERJA, t.id) && playingAs === "anak") continue;
       const jarak = t.id === "bimbel" ? JARAK_INTERAKSI_BIMBEL : 2.6;
       const jarakMeja = Math.hypot(pos.x - t.x, pos.z - t.z);
       if (jarakMeja < jarak && jarakMeja < jarakTerdekat) {

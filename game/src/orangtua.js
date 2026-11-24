@@ -10,6 +10,7 @@ import { avatarSvg } from "./avatar-svg.js";
 import { AKSESORI, SLOT } from "../../shared/aksesori.js";
 import { NEGARA, DEFAULT_NEGARA, drawFlag, negaraName, KURIKULUM, kurikulumName, namaKelas } from "../../shared/negara.js";
 import { renderLaporanRP } from "./laporan-rp.js";
+import { TEMPAT_KERJA } from "../../shared/tempat-kerja.js";
 
 const $ = (id) => document.getElementById(id);
 let selectedChildId;
@@ -632,22 +633,41 @@ function bagianKegiatan(children) {
 }
 let kerja = null;
 let kerjaMemuat = false;
+const pilihanKerja = $("pilihan-kerja");
+let kerjaDipilih = "kantor";
+pilihanKerja.insertAdjacentHTML("beforeend", Object.entries(TEMPAT_KERJA).map(([id, tempat]) => `
+  <label><input type="radio" name="pekerjaan" value="${id}" ${id === kerjaDipilih ? "checked" : ""}>
+    <span><b>${tempat.nama}</b><span class="muted kecil">${tempat.upah} ★ per jam penuh</span></span>
+    <span id="slot-kerja-${id}" class="muted kecil">${tempat.kapasitas} slot</span>
+  </label>`).join(""));
+pilihanKerja.addEventListener("change", (e) => {
+  kerjaDipilih = e.target.value;
+  tampilKerja();
+});
 
 function tampilKerja() {
   const tombol = $("kerja-aksi");
-  const detik = Math.max(0, Math.floor((Date.now() - (kerja?.mulaiAt ?? Date.now())) / 1000));
-  const siap = kerja && kerja.mulaiAt !== null;
-  const kantor = kerja?.slot?.kantor, sawah = kerja?.slot?.sawah;
-  const penuh = !siap && kantor?.tersedia === 0;
+  const detik = Math.max(0, Math.ceil(((kerja?.berikutAt ?? Date.now()) - Date.now()) / 1000));
+  const aktif = kerja?.mulaiAt != null;
+  const batasTercapai = kerja && kerja.hariIni >= kerja.batasHarian;
+  const dipilih = aktif ? kerja.pekerjaan : kerjaDipilih;
+  const tempat = TEMPAT_KERJA[dipilih];
+  const penuh = kerja?.slot?.[dipilih]?.tersedia === 0;
+  pilihanKerja.disabled = aktif || Boolean(batasTercapai);
+  for (const opsi of pilihanKerja.querySelectorAll("input")) {
+    opsi.checked = opsi.value === dipilih;
+    const slot = kerja?.slot?.[opsi.value];
+    if (slot) $(`slot-kerja-${opsi.value}`).textContent = `${slot.tersedia}/${slot.kapasitas} slot tersedia`;
+  }
   const waktu = [Math.floor(detik / 3600), Math.floor(detik / 60) % 60, detik % 60].map((n) => String(n).padStart(2, "0")).join(":");
   $("kerja-status").textContent = !kerja ? (kerjaMemuat ? "Memuat sesi kerja…" : "")
-    : penuh ? "Slot Kantor sedang penuh."
-    : !siap ? "Siap mulai bekerja."
-    : `Sedang bekerja · ${waktu}`;
-  $("kerja-kuota").textContent = kerja ? `★ ${kerja.hariIni}/${kerja.batasHarian} bintang kerja hari ini · Saldo ${kerja.bintang} bintang` : "";
-  $("kerja-slot").textContent = kantor && sawah ? `Slot tersedia · Kantor ${kantor.tersedia}/${kantor.kapasitas} · Sawah ${sawah.tersedia}/${sawah.kapasitas}` : "";
-  tombol.disabled = kerjaMemuat || penuh;
-  tombol.textContent = !kerja ? "Coba lagi" : siap ? "Berhenti bekerja" : "Mulai bekerja";
+    : aktif ? `Sedang bekerja di ${tempat?.nama || "tempat kerja"} · Jam penuh berikutnya ${waktu}`
+    : batasTercapai ? "Kerja selesai. Bisa bekerja lagi besok (WIB)."
+    : penuh ? `Slot ${tempat.nama} sedang penuh. Pilih pekerjaan lain.`
+    : "";
+  $("kerja-kuota").textContent = kerja ? `★ ${kerja.hariIni + kerja.tertundaHariIni}/${kerja.batasHarian} bintang kerja hari ini${aktif ? ` (${kerja.tertundaHariIni} belum cair)` : ""} · Saldo ${kerja.bintang} bintang` : "";
+  tombol.disabled = kerjaMemuat || (!aktif && (batasTercapai || penuh));
+  tombol.textContent = !kerja ? "Coba lagi" : aktif ? "Stop bekerja" : "Mulai bekerja";
 }
 
 async function muatKerja(aksi) {
@@ -657,10 +677,11 @@ async function muatKerja(aksi) {
   if (aksi || !kerja) pesan.hidden = true;
   tampilKerja();
   try {
-    kerja = await (aksi ? api("POST", `kantor/${aksi}`) : api("GET", "kantor"));
+    kerja = await (aksi ? api("POST", `kantor/${aksi}`, aksi === "mulai" ? { pekerjaan: kerjaDipilih } : undefined) : api("GET", "kantor"));
+    if (kerja.pekerjaan && Object.hasOwn(TEMPAT_KERJA, kerja.pekerjaan)) kerjaDipilih = kerja.pekerjaan;
     dataOrtu.bintang = kerja.bintang;
-    if (aksi === "stop") {
-      pesan.textContent = `Kerja selesai · ${kerja.diperoleh} bintang masuk ke saldo.`;
+    if (kerja.dihentikan) {
+      pesan.textContent = "Sesi kerja dihentikan. Upah sesi ini tidak dicairkan.";
       pesan.hidden = false;
     }
   } catch (e) {
@@ -673,10 +694,13 @@ async function muatKerja(aksi) {
   }
 }
 
-$("kerja-aksi").onclick = () => muatKerja(kerja && (kerja.mulaiAt === null ? "mulai" : "stop"));
+$("kerja-aksi").onclick = () => muatKerja(kerja ? (kerja.mulaiAt === null ? "mulai" : "stop") : undefined);
 setInterval(() => {
   if (hal === "home" && !$("dash").hidden && !document.hidden && kerja?.mulaiAt != null) tampilKerja();
 }, 1000);
+setInterval(() => {
+  if (hal === "home" && !$("dash").hidden && !document.hidden) muatKerja();
+}, 5000);
 window.addEventListener("focus", () => {
   if (hal === "home" && !$("dash").hidden) muatKerja();
 });

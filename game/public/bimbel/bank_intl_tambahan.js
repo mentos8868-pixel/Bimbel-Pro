@@ -3,6 +3,7 @@
 (() => {
   const jumlahTambahan = [6, 7, 7];
   const jawaban = (soal) => soal.o[soal.a];
+  const akhiriKalimat = (teks) => /[.!?…]$/.test(teks) ? teks : `${teks}.`;
   const pengecoh = (soal, indeks) => soal.o.filter((_, i) => i !== soal.a)[indeks % 3];
 
   function buatSoal(a, b, nomor) {
@@ -21,7 +22,7 @@
       q: `Choose the option that answers both questions.\n1) ${a.q}\n2) ${b.q}`,
       o: opsi.slice(geser).concat(opsi.slice(0, geser)),
       a: nomor % opsi.length,
-      p: `1) ${benarA}. ${a.p}\n2) ${benarB}. ${b.p}`,
+      p: `1) ${akhiriKalimat(benarA)} ${a.p}\n2) ${akhiriKalimat(benarB)} ${b.p}`,
     };
   }
 

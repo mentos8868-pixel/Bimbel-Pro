@@ -12,16 +12,23 @@ export function siapkanKursiGame(room) {
   const posisiAwal = new Map();
   function berdiri(client) {
     const p = room.state.players.get(client.sessionId);
-    const awal = posisiAwal.get(client.sessionId);
-    if (!p?.mejaGame || !awal) return;
+    if (!p) return;
     const uid = uidOf(client.auth);
     if (kursiAktif.get(uid)?.client === client) kursiAktif.delete(uid);
+    const awal = posisiAwal.get(client.sessionId);
     posisiAwal.delete(client.sessionId);
-    Object.assign(p, awal);
+    const meja = MEJA_GAME[p.mejaGame - 1];
+    const kursi = meja && kursiMeja(meja)[p.kursiGame - 1];
+    if (awal) Object.assign(p, awal);
+    else if (kursi) {
+      p.x = meja.x + (kursi.x - meja.x) * 1.4;
+      p.z = meja.z + (kursi.z - meja.z) * 1.4;
+    }
+    const tadinyaDuduk = Boolean(p.mejaGame);
     p.mejaGame = 0;
     p.kursiGame = 0;
-    room.keluarBedaGambar?.(client);
-    client.send("meja-game-berdiri", awal);
+    if (tadinyaDuduk) room.keluarBedaGambar?.(client);
+    if (!p.kursiBimbel) client.send("meja-game-berdiri", { x: p.x, z: p.z, ry: p.ry });
   }
   room.onMessage("meja-game-duduk", (client, nomor) => {
     const p = room.state.players.get(client.sessionId);

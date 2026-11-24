@@ -7,6 +7,7 @@ import { avatarOr } from "../../shared/avatars.js";
 import { db } from "../db.js";
 import { daftarMuridBelajar, pantauStatusBelajar } from "../belajar-arena.js";
 import { sedangBekerja } from "../kantor.js";
+import { TEMPAT_KERJA } from "../../shared/tempat-kerja.js";
 import { siapkanKursiGame } from "./kursi-game.js";
 import { rapikanAksesori } from "../../shared/aksesori.js";
 import { levelDariXp, auraUntukLevel, auraDipakai } from "../../shared/aura.js";
@@ -136,9 +137,9 @@ export class ArenaRoom extends Room {
 
   onAuth(client, options) {
     const p = authPlayer(options);
-    // Orang tua yang sedang bekerja (Kantor/Sawah) tidak bisa masuk arena sampai sesi selesai atau dihentikan.
+    // Orang tua kembali ke arena setelah sesi kerja selesai otomatis.
     const kerja = p.role === "ortu" ? sedangBekerja(p.parentId) : "";
-    if (kerja) throw new ServerError(4409, `Kamu sedang bekerja di ${kerja === "sawah" ? "Sawah" : "Kantor"}. Tekan Stop kerja dulu untuk masuk arena.`);
+    if (kerja) throw new ServerError(4409, `Kamu sedang bekerja di ${TEMPAT_KERJA[kerja]?.nama || "tempat kerja"}. Kamu bisa kembali setelah sesi selesai.`);
     return p;
   }
 

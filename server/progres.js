@@ -29,6 +29,10 @@ db.exec(`
     UNIQUE (child_id, sesi, nomor)
   );
   CREATE INDEX IF NOT EXISTS child_soal_riwayat ON child_soal_dijawab(child_id, id);
+  CREATE TABLE IF NOT EXISTS child_progres_versi (
+    child_id INTEGER PRIMARY KEY REFERENCES children(id) ON DELETE CASCADE,
+    versi INTEGER NOT NULL
+  );
 `);
 
 const MAKS_TOPIK = 3000, MAKS_RIWAYAT = 50, MAKS_TRYOUT = 30, MAKS_MEDALI = 50;
@@ -41,6 +45,22 @@ const teks = (v, max) => String(v ?? "").replace(/[\u0000-\u001f]/g, "").trim().
 const waktu = (v) => { const t = Date.parse(v); return Number.isFinite(t) ? new Date(t).toISOString() : null; };
 const obj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
 const arr = (v) => (Array.isArray(v) ? v : []);
+const versiProgres = (id) => db.prepare("SELECT versi FROM child_progres_versi WHERE child_id = ?").get(id)?.versi ?? 0;
+
+function transaksiProgres(fn) {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const hasil = fn();
+    db.exec("COMMIT");
+    return hasil;
+  } catch (e) { db.exec("ROLLBACK"); throw e; }
+}
+
+function simpanProgres(id, data, ringkasan) {
+  db.prepare(`INSERT INTO child_progres (child_id, data, ringkasan, updated_at) VALUES (?, ?, ?, ?)
+    ON CONFLICT(child_id) DO UPDATE SET data = excluded.data, ringkasan = excluded.ringkasan, updated_at = excluded.updated_at`)
+    .run(id, JSON.stringify(data), JSON.stringify(ringkasan), Date.now());
+}
 
 function rapikanData(d) {
   d = obj(d);
@@ -199,11 +219,12 @@ export function handleProgres({ m, path, body, anak, url, needOrtu, ownChild, se
       });
       const simpan = db.prepare(`INSERT INTO child_soal_dijawab (child_id, sesi, nomor, jenis, topik, soal, jawaban, benar, waktu)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (child_id, sesi, nomor) DO NOTHING`);
-      db.exec("BEGIN IMMEDIATE");
-      try {
+      const tersimpan = transaksiProgres(() => {
+        if ((body.versi ?? 0) !== versiProgres(anak.child_id)) return false;
         for (const x of catatan) simpan.run(...x);
-        db.exec("COMMIT");
-      } catch (e) { db.exec("ROLLBACK"); throw e; }
+        return true;
+      });
+      if (!tersimpan) return send(409, { versi: versiProgres(anak.child_id), data: bacaProgres(anak.child_id)?.data || null }), true;
       return send(200, { ok: true }), true;
     }
     throw new ApiError(405, "Metode tidak didukung.");
@@ -212,27 +233,36 @@ export function handleProgres({ m, path, body, anak, url, needOrtu, ownChild, se
   if (!anak) throw new ApiError(401, "Masuk sebagai anak dulu.");
   const id = anak.child_id;
 
-  if (m === "GET") return send(200, { data: bacaProgres(id)?.data || null }), true;
+  if (m === "GET") return send(200, { data: bacaProgres(id)?.data || null, versi: versiProgres(id) }), true;
 
   if (m === "POST") {
-    const lama = bacaProgres(id);
-    const data = lama ? gabung(rapikanData(lama.data), rapikanData(body.data)) : rapikanData(body.data);
-    const ringkasan = body.ringkasan ? rapikanRingkasan(body.ringkasan) : (lama?.ringkasan || rapikanRingkasan({}));
-    db.prepare(`INSERT INTO child_progres (child_id, data, ringkasan, updated_at) VALUES (?, ?, ?, ?)
-                ON CONFLICT(child_id) DO UPDATE SET data = excluded.data, ringkasan = excluded.ringkasan, updated_at = excluded.updated_at`)
-      .run(id, JSON.stringify(data), JSON.stringify(ringkasan), Date.now());
-    return send(200, { data }), true;
+    const hasil = transaksiProgres(() => {
+      const versi = versiProgres(id);
+      const lama = bacaProgres(id);
+      if ((body.versi ?? 0) !== versi) return { konflik: true, versi, data: lama?.data || null };
+      const data = lama ? gabung(rapikanData(lama.data), rapikanData(body.data)) : rapikanData(body.data);
+      const ringkasan = body.ringkasan ? rapikanRingkasan(body.ringkasan) : (lama?.ringkasan || rapikanRingkasan({}));
+      simpanProgres(id, data, ringkasan);
+      return { data, versi };
+    });
+    return send(hasil.konflik ? 409 : 200, hasil), true;
   }
 
   // "Hapus semua progres" di Ruang Pintar. Bintang dan XP di server tidak ikut terhapus.
   if (m === "DELETE") {
-    db.exec("BEGIN IMMEDIATE");
-    try {
-      db.prepare("DELETE FROM child_progres WHERE child_id = ?").run(id);
+    if (body.childId !== undefined && body.childId !== id) throw new ApiError(409, "Akun anak sudah berganti.");
+    const hasil = transaksiProgres(() => {
+      const lama = bacaProgres(id);
+      const versi = versiProgres(id) + 1;
+      const data = rapikanData({ tryoutHari: { ...obj(body.tryoutHari), ...obj(lama?.data.tryoutHari) } });
+      const mapel = arr(lama?.ringkasan.mapel).map((m) => ({ ...m, selesai: 0 }));
+      simpanProgres(id, data, rapikanRingkasan({ ...lama?.ringkasan, mapel, ulangi: null, medaliTerbaru: "", laporan: [] }));
       db.prepare("DELETE FROM child_soal_dijawab WHERE child_id = ?").run(id);
-      db.exec("COMMIT");
-    } catch (e) { db.exec("ROLLBACK"); throw e; }
-    return send(200, { ok: true }), true;
+      db.prepare(`INSERT INTO child_progres_versi (child_id, versi) VALUES (?, ?)
+        ON CONFLICT (child_id) DO UPDATE SET versi = excluded.versi`).run(id, versi);
+      return { ok: true, data, versi };
+    });
+    return send(200, hasil), true;
   }
 
   throw new ApiError(405, "Metode tidak didukung.");

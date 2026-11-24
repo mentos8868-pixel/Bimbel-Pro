@@ -54,7 +54,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 .panel-float.right { left: auto; right: 12px; }
 
-/* Layar "Sedang bekerja" (orang tua tidak bisa masuk arena sampai Stop kerja) */
+/* Layar status sesi kerja orang tua. */
 .bekerja-sisa { font-size: 32px; font-weight: 800; text-align: center; margin: 4px 0; font-variant-numeric: tabular-nums; }
 
 /* Ruang tunggu catur: dua pemain menekan Siap sebelum mulai */
@@ -385,3 +385,21 @@ a.btn.utama { background: var(--primary); color: #fff; border-color: var(--prima
 .papan-kata .huruf { font-size: 58cqw; transform: translate(-6%, -4%); }
 .papan-kata .nilai { font-size: 24cqw; right: 8%; bottom: 4%; }
 .papan-kata [data-bot] { background: linear-gradient(160deg, #eadcff, #c9b2f2); box-shadow: inset 0 -2px 0 #8a6cc7, 0 0 0 2px #7d5bd0; }
+.lomba-mat { width: min(100%, 480px); }
+.lomba-mat-info { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
+.lomba-mat progress { width: 100%; height: 8px; accent-color: #7758c2; }
+.lomba-mat-soal { margin: 16px 0; color: #362563; font-size: clamp(36px, 8vw, 56px); font-weight: 800; text-align: center; }
+.lomba-mat-jawaban { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(64px, 100%), 1fr)); gap: 12px; }
+.lomba-mat-jawaban button { min-height: 58px; color: #362563; background: #eee8ff; border: 1px solid #b39be6; font-size: 24px; font-weight: 800; }
+.lomba-mat-skor { padding-inline-start: 20px; }
+.lomba-mat-pengaturan { background: #f4f0fc; border-radius: 12px; padding: 12px; margin-block: 10px; }
+.lomba-mat-pengaturan label { display: grid; gap: 6px; font-weight: 700; }
+.lomba-mat-pengaturan select { width: 100%; }
+.lomba-mat-pengaturan p { margin: 8px 0 0; }
+.lomba-mat-pengaturan p + label { margin-top: 12px; }
+.lomba-mat-tunggu { margin-block: 12px; }
+.lomba-mat-tunggu ul { display: grid; gap: 6px; list-style: none; padding: 0; }
+.lomba-mat-tunggu li {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 8px 10px; border: 1px solid var(--line, #dad1ed); border-radius: 8px; overflow-wrap: anywhere;
+}

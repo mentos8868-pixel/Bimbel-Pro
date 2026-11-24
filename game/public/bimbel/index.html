@@ -406,7 +406,7 @@ const G={
       steps:[st?`Soal ini mencari KPK dari ${a} dan ${b}.`:`KPK = kelipatan persekutuan terkecil.`,`Kelipatan ${a}: ${ma.join(', ')}, …`,`Kelipatan ${b}: ${mb.join(', ')}, …`,`Kelipatan yang sama dan paling kecil: <b>${l}</b>.`]}},
   fpb(){const g=R(D(2,2,4),D(5,9,15)),M=D(5,8,10);let m=R(1,M),n=R(1,M);while(n===m||gcd(m,n)!==1){m=R(1,M);n=R(1,M)}const a=g*m,b=g*n;
     const fa=[],fb=[];for(let i=1;i<=a;i++)if(a%i===0)fa.push(i);for(let i=1;i<=b;i++)if(b%i===0)fb.push(i);const st=story();
-    return {q:st?`Ada <b>${a}</b> apel dan <b>${b}</b> jeruk. Buah-buah itu akan dimasukkan ke keranjang dengan isi yang sama banyak dan tidak bersisa. Paling banyak berapa keranjang yang bisa dibuat?`:`Berapa FPB dari <b>${a}</b> dan <b>${b}</b>?`,ans:g,kind:'int',
+    return {q:st?`Ada <b>${a}</b> apel dan <b>${b}</b> jeruk. Buah-buah itu akan dimasukkan ke keranjang tanpa sisa. Jumlah apel di setiap keranjang harus sama, begitu juga jumlah jeruknya. Paling banyak berapa keranjang yang bisa dibuat?`:`Berapa FPB dari <b>${a}</b> dan <b>${b}</b>?`,ans:g,kind:'int',
       steps:[st?`Soal ini mencari FPB dari ${a} dan ${b}.`:`FPB = faktor persekutuan terbesar.`,`Faktor ${a}: ${fa.join(', ')}.`,`Faktor ${b}: ${fb.join(', ')}.`,`Faktor yang sama dan paling besar: <b>${g}</b>.`]}},
   luas(){if(LV===3&&Math.random()<.6){const p=R(4,20),l=R(2,p-1);return {q:`Luas sebuah persegi panjang <b>${p*l} cm²</b> dan panjangnya <b>${p} cm</b>. Berapa cm lebarnya?`,ans:l,kind:'int',hint:'Tulis angkanya saja.',
       steps:[`Luas = panjang × lebar, jadi lebar = luas : panjang.`,`${p*l} : ${p} = <b>${l}</b> cm.`]}}
@@ -417,11 +417,11 @@ const G={
   bulat(){const base=D(10,pick([10,100]),pick([100,1000])),[lo,hi]=D([101,999],[101,9999],[10001,99999]),n=R(lo,hi),r=Math.round(n/base)*base,dig=Math.floor(n/(base/10))%10;
     const nama={10:'puluhan',100:'ratusan',1000:'ribuan'}[base],cek={10:'satuan',100:'puluhan',1000:'ratusan'}[base];
     return {q:`Bulatkan <b>${fmtN(n)}</b> ke ${nama} terdekat.`,ans:r,kind:'int',
-      steps:[`Lihat angka ${cek}: ${dig}.`,dig>=5?`${dig} adalah 5 atau lebih → bulatkan ke atas.`:`${dig} kurang dari 5 → bulatkan ke bawah.`,`Hasilnya <b>${fmtN(r)}</b>.`]}},
+      steps:[`Lihat angka ${cek}: ${dig}.`,r===n?`Bilangan ini sudah merupakan kelipatan ${base}, jadi nilainya tetap.`:dig>=5?`${dig} adalah 5 atau lebih → bulatkan ke atas.`:`${dig} kurang dari 5 → bulatkan ke bawah.`,`Hasilnya <b>${fmtN(r)}</b>.`]}},
 
   /* ---------- Kelas 5 ---------- */
   faddDiff(){const M=D(4,6,10);let b=R(2,M),d=R(2,M);while(d===b)d=R(2,M);const a=R(1,b-1),c=R(1,d-1),L=lcm(b,d),na=a*L/b,nc=c*L/d,s=na+nc;
-    return {q:`${F(a,b)} + ${F(c,d)} = ?`,ans:[s,L],kind:'frac',hint:'Tulis pecahan seperti 7/6.',
+    return {q:`${F(a,b)} + ${F(c,d)} = ?`,ans:[s,L],kind:'frac',hint:'Tulis pecahan seperti 7/6 atau 1 1/6.',
       steps:simpSteps(s,L,[`Samakan penyebut dulu. KPK dari ${b} dan ${d} adalah ${L}.`,`${F(a,b)} = ${F(na,L)} dan ${F(c,d)} = ${F(nc,L)}.`,`Jumlahkan pembilang: ${na} + ${nc} = ${s}, jadi ${F(s,L)}.`])}},
   fsubDiff(){const M=D(4,8,12);let a,b,c,d;do{b=R(2,M);d=R(2,M);a=R(1,b-1);c=R(1,d-1)}while(b===d||a*d<=c*b);const L=lcm(b,d),na=a*L/b,nc=c*L/d,s=na-nc;
     return {q:`${F(a,b)} − ${F(c,d)} = ?`,ans:[s,L],kind:'frac',hint:'Tulis pecahan seperti 1/6.',
@@ -435,7 +435,7 @@ const G={
     const r=plus?ai+bi:ai-bi,c=r/sc;
     return {q:`${fmtD(ai/sc,pl)} ${plus?'+':'−'} ${fmtD(bi/sc,pl)} = ?`,ans:c,kind:'dec',hint:'Boleh pakai koma, contoh 4,7.',
       steps:[`Susun kedua bilangan dengan koma sejajar.`,`Hitung seperti bilangan biasa (dalam ${pl===1?'persepuluhan':'perseratusan'}): ${ai} ${plus?'+':'−'} ${bi} = ${r}.`,`Beri koma ${pl} angka dari kanan: <b>${fmtD(c,pl)}</b>.`]}},
-  pecPersen(){if(LV===3){if(Math.random()<.5){const p=pick([5,15,24,35,45,60,75,80]),g=gcd(p,100);return {q:`Ubah ke bentuk pecahan paling sederhana: &nbsp;${p}% = ?`,ans:[p,100],kind:'frac',hint:'Tulis pecahan seperti 3/4.',
+  pecPersen(){if(LV===3){if(Math.random()<.5){const p=pick([5,15,24,35,45,60,75,80]),g=gcd(p,100);return {q:`Ubah ke bentuk pecahan paling sederhana: &nbsp;${p}% = ?`,ans:[p/g,100/g],kind:'frac',simplest:true,hint:'Tulis pecahan seperti 3/4.',
         steps:[`${p}% = ${F(p,100)}.`,`Sederhanakan (bagi dengan ${g}): <b>${F(p/g,100/g)}</b>.`]}}
       const p=pick([5,12,25,40,65,75,8,95]);return {q:`Ubah ke bentuk persen: &nbsp;${fmtD(p/100,2)} = ... %`,ans:p,kind:'int',hint:'Tulis angkanya saja.',
         steps:[`Untuk mengubah desimal ke persen, kalikan dengan 100.`,`${fmtD(p/100,2)} × 100 = <b>${p}%</b>.`]}}
@@ -535,11 +535,11 @@ const G={
     if(v===0)return {q:`Berapa derajat penyiku (komplemen) dari sudut ${x}°?`,ans:90-x,kind:'int',steps:[`Dua sudut saling berpenyiku jika jumlahnya 90°.`,`90° − ${x}° = <b>${90-x}°</b>.`]};
     if(v===1){const y=R(20,160);return {q:`Berapa derajat pelurus (suplemen) dari sudut ${y}°?`,ans:180-y,kind:'int',steps:[`Dua sudut saling berpelurus jika jumlahnya 180°.`,`180° − ${y}° = <b>${180-y}°</b>.`]}}
     if(v===2){const a=R(30,80),b=R(30,80);return {q:`Dua sudut sebuah segitiga besarnya ${a}° dan ${b}°. Berapa derajat sudut ketiga?`,ans:180-a-b,kind:'int',steps:[`Jumlah sudut dalam segitiga = 180°.`,`180° − ${a}° − ${b}° = <b>${180-a-b}°</b>.`]}}
-    const xx=R(10,40),k=R(2,4),c=R(5,30),ang=k*xx+c;return {q:`Sudut pertama besarnya (${k}x + ${c})° dan sudut kedua yang bertolak belakang dengannya besarnya ${ang}°. Berapa nilai x?`,ans:xx,kind:'int',
+    const k=R(2,4),c=R(5,30),xx=R(10,Math.min(40,Math.floor((179-c)/k))),ang=k*xx+c;return {q:`Sudut pertama besarnya (${k}x + ${c})° dan sudut kedua yang bertolak belakang dengannya besarnya ${ang}°. Berapa nilai x?`,ans:xx,kind:'int',
       steps:[`Sudut bertolak belakang besarnya sama: ${k}x + ${c} = ${ang}.`,`${k}x = ${ang-c}.`,`x = <b>${xx}</b>.`]}},
   himpunan(){const nA=R(10,30),nB=R(10,30),nAB=R(2,Math.min(nA,nB)-2),u=nA+nB-nAB,kls=pick(['siswa','anak']);
-    if(LV===3){const lain=R(1,10),S=u+lain;return {q:`Dari <b>${S}</b> ${kls}, <b>${nA}</b> suka matematika, <b>${nB}</b> suka IPA, dan <b>${nAB}</b> suka keduanya. Berapa ${kls} yang tidak suka keduanya?`,ans:lain,kind:'int',
-      steps:[`Yang suka minimal salah satu: n(A ∪ B) = ${nA} + ${nB} − ${nAB} = ${u}.`,`Tidak suka keduanya = ${S} − ${u} = <b>${lain}</b>.`]}}
+    if(LV===3){const lain=R(1,10),S=u+lain;return {q:`Dari <b>${S}</b> ${kls}, <b>${nA}</b> suka matematika, <b>${nB}</b> suka IPA, dan <b>${nAB}</b> suka keduanya. Berapa ${kls} yang tidak suka matematika maupun IPA?`,ans:lain,kind:'int',
+      steps:[`Yang suka minimal salah satu: n(A ∪ B) = ${nA} + ${nB} − ${nAB} = ${u}.`,`Tidak suka satu pun = ${S} − ${u} = <b>${lain}</b>.`]}}
     return {q:LV===1?`Diketahui n(A) = ${nA}, n(B) = ${nB}, dan n(A ∩ B) = ${nAB}. Berapa n(A ∪ B)?`:`Di kelas, <b>${nA}</b> ${kls} suka voli, <b>${nB}</b> suka futsal, dan <b>${nAB}</b> suka keduanya. Berapa ${kls} yang suka voli atau futsal?`,ans:u,kind:'int',
       steps:[`n(A ∪ B) = n(A) + n(B) − n(A ∩ B).`,`${nA} + ${nB} − ${nAB} = <b>${u}</b>.`]}},
   perbSenilai(){if(Math.random()<.5){const n1=R(2,6),hs=R(2,15)*1000,n2=R(n1+1,12);return {q:`Harga <b>${n1}</b> buku adalah ${rupiah(n1*hs)}. Berapa rupiah harga <b>${n2}</b> buku?`,ans:n2*hs,kind:'int',hint:'Tulis angkanya saja.',
@@ -553,7 +553,7 @@ const G={
     if(LV===3&&Math.random()<.5){const i=R(2,4),j=R(i+2,9),Ui=a+(i-1)*b,Uj=a+(j-1)*b;return {q:`Suku ke-${i} barisan aritmetika adalah ${Ui} dan suku ke-${j} adalah ${Uj}. Berapa suku ke-${n}?`,ans:a+(n-1)*b,kind:'int',
       steps:[`Beda: b = (${Uj} − ${fmtZ(Ui)}) : (${j} − ${i}) = ${b}.`,`Suku pertama: a = ${Ui} − ${i-1} × ${fmtZ(b)} = ${a}.`,`U${n} = a + (n − 1)b = ${a} + ${n-1} × ${fmtZ(b)} = <b>${a+(n-1)*b}</b>.`]}}
     const seq=[0,1,2,3].map(i=>a+i*b);
-    return {q:`Diketahui barisan: ${seq.join(', ')}, … Berapa suku ke-${n}?`,ans:a+(n-1)*b,kind:'int',
+    return {q:`Diketahui barisan aritmetika: ${seq.join(', ')}, … Berapa suku ke-${n}?`,ans:a+(n-1)*b,kind:'int',
       steps:[`Suku pertama a = ${a}, beda b = ${b}.`,`Rumus: U<sub>n</sub> = a + (n − 1)b.`,`U${n} = ${a} + ${n-1} × ${fmtZ(b)} = <b>${a+(n-1)*b}</b>.`]}},
   gradien(){let x1,y1,x2,y2;
     if(LV===1){const m=nz(R(-4,4)),dx=R(1,4);x1=R(-5,5);y1=R(-5,5);x2=x1+dx;y2=y1+m*dx}else{do{x1=R(-6,6);y1=R(-6,6);x2=R(-6,6);y2=R(-6,6)}while(x2===x1||y2===y1)}
@@ -564,8 +564,11 @@ const G={
     if(LV===1){const s=x+y,d=x-y;return {q:`Diketahui x + y = ${s} dan x − y = ${d}. Berapa nilai x?`,ans:x,kind:'int',hint:'Boleh negatif.',
       steps:[`Jumlahkan kedua persamaan: 2x = ${s} + ${fmtZ(d)} = ${s+d}.`,`x = ${s+d} : 2 = <b>${x}</b>.`]}}
     let a1,b1,a2,b2;do{a1=R(1,5);b1=nz(R(-5,5));a2=R(1,5);b2=nz(R(-5,5))}while(a1*b2-a2*b1===0);const c1=a1*x+b1*y,c2=a2*x+b2*y,askX=Math.random()<.5;
+    const m1=askX?b2:a2,m2=askX?b1:a1;
+    const koef=askX?a1*m1-a2*m2:b1*m1-b2*m2,hasil=c1*m1-c2*m2;
+    const variabel=askX?'x':'y';
     return {q:`Diketahui:<br>${poly([[a1,'x'],[b1,'y']])} = ${c1}<br>${poly([[a2,'x'],[b2,'y']])} = ${c2}<br>Berapa nilai ${askX?'x':'y'}?`,ans:askX?x:y,kind:'int',hint:'Boleh negatif.',
-      steps:[`Gunakan eliminasi: samakan koefisien salah satu variabel lalu kurangkan kedua persamaan.`,`Didapat x = ${x} dan y = ${y}.`,`Cek: ${a1}(${x}) + ${fmtZ(b1)}(${y}) = ${c1} ✓. Jadi ${askX?'x':'y'} = <b>${askX?x:y}</b>.`]}},
+      steps:[`Kalikan persamaan pertama dengan ${m1} dan kedua dengan ${m2} agar koefisien ${askX?'y':'x'} sama.`,`Kurangkan persamaan kedua dari persamaan pertama setelah dikalikan: ${koef}${variabel} = ${c1*m1} − (${c2*m2}) = ${hasil}.`,`Bagi kedua ruas dengan ${koef}: ${variabel} = <b>${askX?x:y}</b>.`]}},
   pythagoras(){const T=pick([[3,4,5],[5,12,13],[8,15,17],[7,24,25],[6,8,10],[9,12,15]]),k=R(1,D(1,3,5)),[a,b,c]=T.map(v=>v*k);
     if(LV===1||Math.random()<.4)return {q:`Segitiga siku-siku memiliki sisi tegak <b>${a} cm</b> dan <b>${b} cm</b>. Berapa cm panjang sisi miringnya?`,ans:c,kind:'int',hint:'Tulis angkanya saja.',
       steps:[`c² = a² + b² = ${a*a} + ${b*b} = ${c*c}.`,`c = √${c*c} = <b>${c}</b> cm.`]};
@@ -685,7 +688,7 @@ const G={
       steps:[`Urutan tidak penting → kombinasi C(${n}, ${r}).`,`C(${n}, ${r}) = ${n}! / (${r}! × ${n-r}!) = <b>${C(n,r)}</b>.`]}}
     const n=R(5,10);return {q:`Dari ${n} calon akan dipilih ketua, sekretaris, dan bendahara. Berapa banyak susunan pengurus yang mungkin?`,ans:P(n,3),kind:'int',
       steps:[`Urutan (jabatan) penting → permutasi P(${n}, 3).`,`P(${n}, 3) = ${n} × ${n-1} × ${n-2} = <b>${P(n,3)}</b>.`]}},
-  frekHarapan(){if(LV===3){const n=R(2,10)*16;return {q:`Dua koin dilempar bersamaan sebanyak ${n} kali. Berapa frekuensi harapan muncul dua angka?`,ans:n/4,kind:'int',
+  frekHarapan(){if(LV===3){const n=R(2,10)*16;return {q:`Dalam setiap percobaan, dua koin adil dilempar secara independen. Jika dilakukan ${n} percobaan, berapa frekuensi harapan muncul dua angka?`,ans:n/4,kind:'int',
       steps:[`Ruang sampel: AA, AG, GA, GG → P(dua angka) = ${F(1,4)}.`,`Fh = P × n = ${F(1,4)} × ${n} = <b>${n/4}</b>.`]}}
     const ev=pick([['angka 6',1],['angka genap',3],['angka prima',3],['angka kurang dari 3',2]]),n=R(2,20)*6;
     if(LV===1){return {q:`Sebuah dadu dilempar ${n} kali. Berapa frekuensi harapan muncul ${ev[0]}?`,ans:n*ev[1]/6,kind:'int',steps:[`P(${ev[0]}) = ${F(ev[1],6)}.`,`Fh = ${F(ev[1],6)} × ${n} = <b>${n*ev[1]/6}</b>.`]}}
@@ -704,12 +707,12 @@ const G={
     const s=R(2,15),ruang=LV===2&&Math.random()<.6;
     return {q:`Kubus memiliki rusuk ${s} cm. Panjang diagonal ${ruang?'ruang':'sisi'}nya = a√${ruang?3:2} cm. Berapa nilai a?`,ans:s,kind:'int',
       steps:[ruang?`Diagonal ruang kubus = s√3.`:`Diagonal sisi kubus = s√2.`,`Dengan s = ${s}, diagonal = ${s}√${ruang?3:2}. Jadi a = <b>${s}</b>.`]}},
-  peluangMajemuk(){if(LV===1){const ev=pick([['dua gambar',1],['tepat satu gambar',2],['paling sedikit satu gambar',3]]);return {q:`Dua koin dilempar bersamaan. Berapa peluang muncul ${ev[0]}?`,ans:[ev[1],4],kind:'frac',hint:'Tulis pecahan seperti 1/4.',
+  peluangMajemuk(){if(LV===1){const ev=pick([['dua gambar',1],['tepat satu gambar',2],['paling sedikit satu gambar',3]]);return {q:`Dua koin adil dilempar secara independen. Berapa peluang muncul ${ev[0]}?`,ans:[ev[1],4],kind:'frac',hint:'Tulis pecahan seperti 1/4.',
       steps:simpSteps(ev[1],4,[`Ruang sampel: AA, AG, GA, GG (4 kemungkinan).`,`Kejadian ${ev[0]}: ${ev[1]} kemungkinan → ${F(ev[1],4)}.`])}}
-    if(LV===2){const s=R(2,12),cnt=6-Math.abs(s-7);return {q:`Dua dadu dilempar. Berapa peluang jumlah mata dadu ${s}?`,ans:[cnt,36],kind:'frac',hint:'Tulis pecahan seperti 1/6.',
+    if(LV===2){const s=R(2,12),cnt=6-Math.abs(s-7);return {q:`Dua dadu adil bersisi enam dilempar secara independen. Berapa peluang jumlah mata dadu ${s}?`,ans:[cnt,36],kind:'frac',hint:'Tulis pecahan seperti 1/6.',
       steps:simpSteps(cnt,36,[`Ruang sampel 36. Pasangan berjumlah ${s}: ${cnt}.`,`Peluang = ${F(cnt,36)}.`])}}
     const m=R(3,7),b=R(2,6),N=m+b,num=m*(m-1),den=N*(N-1);
-    return {q:`Dalam kotak ada ${m} bola merah dan ${b} bola putih. Diambil 2 bola satu per satu tanpa pengembalian. Berapa peluang keduanya merah?`,ans:[num,den],kind:'frac',hint:'Tulis pecahan seperti 2/15.',
+    return {q:`Dalam kotak ada ${m} bola merah dan ${b} bola putih. Diambil 2 bola secara acak satu per satu tanpa pengembalian. Berapa peluang keduanya merah?`,ans:[num,den],kind:'frac',hint:'Tulis pecahan seperti 2/15.',
       steps:simpSteps(num,den,[`Pengambilan pertama merah: ${F(m,N)}. Kedua merah (tanpa pengembalian): ${F(m-1,N-1)}.`,`${F(m,N)} × ${F(m-1,N-1)} = ${F(num,den)}.`])}},
   bungaTunggal(){const M=R(2,20)*1000000,p=pick([6,12,18,24]),n=pick(D([12,24],[6,12,18,24],[3,8,10,15,20])),bunga=M*p*n/1200;
     const tanyaTotal=LV===3&&Math.random()<.5;
@@ -811,13 +814,13 @@ function makeQ(t){let tt=t;if(t.g==='__mix'){tt=pick(TOPICS[t.kelas].filter(x=>x
   const q=G[tt.g](tt.p);q.from=tt.name;if(t.kelas<=2&&q.kind==='int'&&!q.choices)q.choices=choicesFor(q.ans);return q}
 function bankQ(s){const order=shuffle([0,1,2,3]);return {q:esc(s.q).replace(/\n/g,'<br>'),ans:s.o[s.a],kind:'str',choices:order.map(i=>s.o[i]),steps:s.p.split('\n').map(line=>esc(line)),from:s.from,text:true}}
 function variedPractice(draw,n){
-  const result=[],seen=new Set(),repeats=[];
+  const result=[],seen=new Set();
   for(let attempt=0;result.length<n && attempt<16*n;attempt++){
     const q=draw();if(!q)break;
-    if(seen.has(q.q)){if(repeats.length<n)repeats.push(q);continue}
+    if(seen.has(q.q))continue;
     seen.add(q.q);result.push(q);
   }
-  return shuffle(result.concat(repeats.slice(0,n-result.length)));
+  return shuffle(result);
 }
 function buildSession(t,n){
   if(t.parts){   // latihan campuran: gabungan topik bank soal dan topik soal otomatis
@@ -831,7 +834,7 @@ function buildSession(t,n){
 }
 
 /* ============ Penyimpanan (di browser) ============ */
-const JUMLAH_SOAL=10;   // jumlah soal tetap untuk setiap sesi latihan
+const JUMLAH_SOAL=10;   // jumlah maksimum soal unik per sesi latihan
 const DEF={name:'',avatar:'🦊',owned:['🦊'],xp:0,sessions:0,perfect:0,medals:[],topics:{},history:[],tryouts:[],kelas:4,lv:2,mapel:'mat',kur:'merdeka'};
 /* Ruang Pintar hanya untuk akun anak yang dibuat orang tua (lihat mulai()).
    Progres disimpan per anak: kunci ruangpintar_a<id anak>. */
@@ -841,7 +844,7 @@ const save=()=>{if(!SKEY)return;try{localStorage.setItem(SKEY,JSON.stringify(S))
 /* Kemajuan juga disalin ke server (/api/progres) supaya sama di semua perangkat dan terlihat di
    Kamarku dan dashboard orang tua. Server menggabungkan tanpa mengurangi kemajuan. */
 const PROGRES=['sessions','perfect','medals','topics','history','tryouts','tryoutHari'];
-let SV=0,sinkronTimer=null;   // SV naik setiap S disimpan
+let SV=0,sinkronTimer=null,meresetProgres=false;   // SV naik setiap S disimpan
 const jadwalSinkron=()=>{if(!AKUN)return;clearTimeout(sinkronTimer);sinkronTimer=setTimeout(sinkron,1500)};
 function ringkasan(){
   const kur=S.kur,k=S.kelas,mp=KURS[kur].mapel,namaTopik={};
@@ -857,11 +860,13 @@ function ringkasan(){
   return {kur,kelas:k,mapel,ulangi,totalMedali:MEDALS.length,medaliTerbaru:akhir?akhir.n:'',laporan};
 }
 async function sinkron(keepalive){
-  if(!AKUN)return;clearTimeout(sinkronTimer);sinkronTimer=null;
-  const v=SV,data={};PROGRES.forEach(k=>data[k]=S[k]);
+  if(!AKUN||meresetProgres)return;clearTimeout(sinkronTimer);sinkronTimer=null;
+  const v=SV,versi=S.versiProgres??0,data={};PROGRES.forEach(k=>data[k]=S[k]);
   try{const r=await fetch('/api/progres',{method:'POST',credentials:'same-origin',keepalive:!!keepalive,
-      headers:{'Content-Type':'application/json','x-bimbel':'1'},body:JSON.stringify({data,ringkasan:ringkasan()})});
-    if(!r.ok||keepalive)return;const j=await r.json();
+      headers:{'Content-Type':'application/json','x-bimbel':'1'},body:JSON.stringify({data,versi,ringkasan:ringkasan()})});
+    if((!r.ok&&r.status!==409)||keepalive)return;const j=await r.json();
+    if(meresetProgres||versi!==(S.versiProgres??0))return;
+    if(r.status===409){pakaiResetProgres(j);return}
     if(v!==SV)return jadwalSinkron();   // ada kemajuan baru selama dikirim: kirim ulang nanti
     let beda=false;PROGRES.forEach(k=>{if(JSON.stringify(S[k])!==JSON.stringify(j.data[k])){S[k]=j.data[k];beda=true}});
     if(beda){try{localStorage.setItem(SKEY,JSON.stringify(S))}catch(e){}if(!sess&&!ex&&!$('#tanya'))render()}
@@ -991,12 +996,15 @@ const kunciAntreanSoal=()=>`${SKEY}_soal`;
 let antreanSoal=[], mengirimSoal=null;
 const simpanAntreanSoal=()=>{try{localStorage.setItem(kunciAntreanSoal(),JSON.stringify(antreanSoal))}catch(e){}};
 function kirimSoal(){
-  if(mengirimSoal||!antreanSoal.length)return mengirimSoal;
+  if(meresetProgres||mengirimSoal||!antreanSoal.length)return mengirimSoal;
+  const versi=S.versiProgres??0;
   mengirimSoal=(async()=>{
-    while(antreanSoal.length){
+    while(!meresetProgres&&antreanSoal.length){
       const soal=antreanSoal.slice(0,10);
       const r=await fetch('/api/progres/soal',{method:'POST',headers:{'Content-Type':'application/json','X-Bimbel':'1'},
-        body:JSON.stringify({childId:AKUN.id,soal}),keepalive:true});
+        body:JSON.stringify({childId:AKUN.id,soal,versi}),keepalive:true});
+      if(meresetProgres||versi!==(S.versiProgres??0))break;
+      if(r.status===409){pakaiResetProgres(await r.json());break}
       if(!r.ok)break;
       antreanSoal.splice(0,soal.length);simpanAntreanSoal();
     }
@@ -1024,10 +1032,19 @@ function check(q,v){
   v=String(v).trim().toLowerCase().replace(/−/g,'-');if(!v)return null;
   if(q.kind==='str')return v===String(q.ans).trim().toLowerCase().replace(/−/g,'-');
   if(q.kind==='frac'){
+    const mixed=v.match(/^([+-]?)(\d+)\s+(\d+)\s*\/\s*(\d+)$/);
+    if(mixed&&!q.simplest){
+      const [,sign,whole,part,denominator]=mixed;
+      const d=BigInt(denominator),p=BigInt(part);
+      const n=(BigInt(whole)*d+p)*(sign==='-'?-1n:1n);
+      return p<d&&n*BigInt(q.ans[1])===BigInt(q.ans[0])*d;
+    }
     const parts=v.match(/^([+-]?\d+)(?:\s*\/\s*([+-]?\d+))?$/);
     if(!parts)return false;
     const n=Number(parts[1]),d=Number(parts[2]??1);
-    return Number.isSafeInteger(n)&&Number.isSafeInteger(d)&&d!==0&&n*q.ans[1]===q.ans[0]*d;
+    if(q.simplest)return n===q.ans[0]&&d===q.ans[1];
+    return Number.isSafeInteger(n)&&Number.isSafeInteger(d)&&d!==0
+      &&BigInt(n)*BigInt(q.ans[1])===BigInt(q.ans[0])*BigInt(d);
   }
   if(q.kind==='dec'){
     if(!/^[+-]?(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(v))return false;
@@ -1140,14 +1157,41 @@ function renderReport(app){
   <div class="note">${weak.length?`<b>Saran:</b> ajak ${esc(S.name||'anak')} berlatih lagi: <b>${weak.map(r=>`${mapelName(r.t)} – ${esc(r.t.name)} (${(KURS[r.t.kur]||KURS.merdeka).label(r.t.kelas)}, ${LVNAME[r.lv]})`).join('; ')}</b>.`:`<b>Bagus!</b> Belum ada topik yang tertinggal.`}
     ${strong.length?` Sudah kuat di: ${strong.map(r=>esc(r.t.name)+' ('+LVNAME[r.lv]+')').join(', ')}.`:''}</div>
   ${thBlock}
-  <p style="margin-top:18px"><button class="btn ghost" id="reset">Hapus semua data (mulai dari awal)</button></p>`;
-  $('#reset').onclick=async()=>{if(confirm('Hapus semua progres dan medali?')){
-    await kirimSoal();
-    /* hapus juga salinan di server, kalau tidak kemajuan lama akan kembali saat sinkron */
-    try{const r=await fetch('/api/progres',{method:'DELETE',credentials:'same-origin',headers:{'x-bimbel':'1'}});if(!r.ok)throw 0}
-    catch(e){alert('Gagal menghapus progres di server. Periksa koneksi, lalu coba lagi.');return}
-    antreanSoal=[];simpanAntreanSoal();
-    clearTimeout(sinkronTimer);sinkronTimer=null;localStorage.removeItem(SKEY);clearInterval(exTimer);ex=null;exSave();S=Object.assign({},DEF,{medals:[],topics:{},history:[],tryouts:[],tryoutHari:S.tryoutHari});/* jatah tryout hari ini tidak ikut terhapus */pakaiAkun();save();go('belajar')}};
+  <p style="margin-top:18px"><button class="btn ghost" id="reset" ${meresetProgres?'disabled':''}>Hapus semua data (mulai dari awal)</button></p>
+  <p id="reset-status" role="status"></p>`;
+  $('#reset').onclick=()=>tanya('Hapus progres, riwayat soal, dan medali Ruang Pintar?','Ya, hapus progres',resetProgres);
+}
+
+function pakaiResetProgres(hasil){
+  if(!Number.isSafeInteger(hasil.versi)||hasil.versi<=(S.versiProgres??0))return;
+  clearTimeout(sinkronTimer);sinkronTimer=null;
+  clearInterval(exTimer);ex=null;exSave();
+  antreanSoal=[];simpanAntreanSoal();
+  for(const k of PROGRES)S[k]=hasil.data?.[k]??DEF[k];
+  S.versiProgres=hasil.versi;
+  save();go('belajar',true);
+}
+async function resetProgres(){
+  if(meresetProgres)return;
+  meresetProgres=true;
+  clearTimeout(sinkronTimer);sinkronTimer=null;
+  const tombol=$('#reset'),status=$('#reset-status');
+  tombol.disabled=true;
+  status.textContent='Menghapus progres…';
+  try{
+    const r=await fetch('/api/progres',{method:'DELETE',credentials:'same-origin',headers:{'Content-Type':'application/json','x-bimbel':'1'},
+      body:JSON.stringify({childId:AKUN.id,tryoutHari:S.tryoutHari})});
+    const hasil=await r.json();
+    if(!r.ok)throw new Error(hasil.error);
+    pakaiResetProgres(hasil);
+  }catch(e){
+    status.textContent=e instanceof TypeError?'Server belum tersambung. Coba lagi.':e.message||'Gagal menghapus progres. Coba lagi.';
+    meresetProgres=false;
+    jadwalSinkron();kirimSoal();
+  }finally{
+    meresetProgres=false;
+    tombol.disabled=false;
+  }
 }
 
 /* ============ Tryout / Mode Ujian ============ */

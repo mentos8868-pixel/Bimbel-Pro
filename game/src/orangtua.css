@@ -323,3 +323,13 @@ main:has(#dash:not([hidden])) { max-width: 1200px; }
 .toko-item button.yakin { background: #ffcf40; border-color: #e0a400; }
 .toko-item button:disabled { opacity: 0.55; }
 details[data-katalog-avatar] summary { cursor: pointer; font-weight: 700; margin-bottom: 8px; }
+.pilihan-kerja { min-width: 0; margin: 0; padding: 0; border: 0; }
+.pilihan-kerja legend { font-weight: 700; margin-bottom: 6px; }
+.pilihan-kerja label {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
+  gap: 12px; padding: 10px 12px; border: 1px solid var(--border);
+  border-radius: 10px; margin-bottom: 6px; cursor: pointer;
+}
+.pilihan-kerja label:has(input:checked) { border-color: var(--primary); background: #eef6ff; }
+.pilihan-kerja label span { display: block; }
+.pilihan-kerja input { width: 18px; height: 18px; margin: 0; }
