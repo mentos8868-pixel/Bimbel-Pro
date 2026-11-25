@@ -22,6 +22,8 @@ import { handleKantor } from "./kantor.js";
 import { negaraOr, isNegara, jenjangDariKelas } from "../shared/negara.js";
 import { parentView, parentDecide, unblock, purgeUid, notify, kick, isOnline } from "./social.js";
 import { aksesStatistik, catatAktivitas, statistikAdmin } from "./statistik.js";
+import { pengaturanGame, simpanPengaturanGame } from "./pengaturan-game.js";
+import { katalogToko, simpanKatalogToko } from "./katalog-toko.js";
 import { akhiriBelajarDashboard, muridBelajarPublik, ubahStatusBelajar } from "./belajar-arena.js";
 import { sendMail, APP_URL } from "./mailer.js";
 
@@ -378,6 +380,9 @@ export async function handleApi(req, res) {
     const ip = clientIp(req);
     const path = url.pathname.slice(5).split("/").filter(Boolean); // tanpa "/api/"
     const m = req.method;
+    if (m === "GET" && url.pathname === "/api/pengaturan-game") {
+      return send(200, pengaturanGame()), true;
+    }
     // Kemajuan Ruang Pintar boleh lebih besar (daftar topik dan riwayat).
     const maksBody = path[0] === "progres" ? 300000
       : path[0] === "chat" && path[1] === "keluarga" && path.length === 2 ? MAKS_BODY_SUARA : 20000;
@@ -386,6 +391,14 @@ export async function handleApi(req, res) {
       if (!aksesStatistik(body.token)) throw new ApiError(403, "Kunci admin salah atau akses admin belum diaktifkan.");
       send(200, statistikAdmin(body.jenis, body.halaman));
       return true;
+    }
+    if (m === "PUT" && url.pathname === "/api/admin/pengaturan-game") {
+      if (!aksesStatistik(body?.token)) throw new ApiError(403, "Kunci admin salah atau akses admin belum diaktifkan.");
+      return send(200, simpanPengaturanGame(body.config, ApiError)), true;
+    }
+    if ((m === "POST" || m === "PUT") && url.pathname === "/api/admin/katalog-toko") {
+      if (!aksesStatistik(body?.token)) throw new ApiError(403, "Kunci admin salah atau akses admin belum diaktifkan.");
+      return send(200, m === "POST" ? katalogToko() : simpanKatalogToko(body.items, ApiError)), true;
     }
     if (m === "POST" && url.pathname === "/api/aktivitas") {
       const sesi = body.sebagai === "ortu" ? ortu : body.sebagai === "anak" ? anak : null;

@@ -834,7 +834,15 @@ function buildSession(t,n){
 }
 
 /* ============ Penyimpanan (di browser) ============ */
-const JUMLAH_SOAL=10;   // jumlah maksimum soal unik per sesi latihan
+const LEVEL_PENGATURAN=['mudah','sedang','sulit'];
+let pengaturanGame=null;
+async function muatPengaturanGame(){
+  try{
+    const r=await fetch('/api/pengaturan-game',{signal:AbortSignal.timeout(4000)});
+    if(r.ok)pengaturanGame=await r.json();
+  }catch{}
+  return pengaturanGame;
+}
 const DEF={name:'',avatar:'🦊',owned:['🦊'],xp:0,sessions:0,perfect:0,medals:[],topics:{},history:[],tryouts:[],kelas:4,lv:2,mapel:'mat',kur:'merdeka'};
 /* Ruang Pintar hanya untuk akun anak yang dibuat orang tua (lihat mulai()).
    Progres disimpan per anak: kunci ruangpintar_a<id anak>. */
@@ -891,7 +899,7 @@ const XP_PER_JAWABAN_TRYOUT=10;
 const xpPerJawabanLatihan=(tingkat)=>10+(tingkat-1)*5;
 
 /* ============ Tampilan ============ */
-let view='belajar', sess=null;
+let view='belajar', sess=null, permintaanSesi=0;
 function header(){
   $('#uname').textContent=S.name||'Murid';
   const sl=$('#saldo');if(sl){sl.hidden=!TOKO;if(TOKO)sl.textContent=`★ ${TOKO.bintang}`}
@@ -912,7 +920,7 @@ function tutupTanya(){const m=$('#tanya');if(m)m.remove()}
 function go(v,paksa){
   if(!paksa&&ex&&!ex.done&&view==='tryout'&&v!=='tryout'){tanya('Tryout masih berjalan dan waktunya terus berjalan. Tetap pindah halaman?','Ya, pindah',()=>go(v,true));return}
   if(ex&&ex.done)ex=null;
-  view=v;sess=null;render();window.scrollTo(0,0)}
+  permintaanSesi++;view=v;sess=null;render();window.scrollTo(0,0)}
 document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));
 
 const ATURAN_SP1={salahBeruntun:4,batasJawabMs:2000,jedaMs:5*60*1000};
@@ -1020,9 +1028,17 @@ function catatSoal(sesi,nomor,jenis,topik,q,jawaban,benar){
   if(soal)antreanSoal.push({sesi,nomor,jenis,topik,soal,jawaban:String(jawaban??'').slice(0,200),benar,waktu:new Date().toISOString()});
   simpanAntreanSoal();
 }
-function start(id){if(jedaSP1()>Date.now())return render();const t=topicsFor(S.mapel,S.kelas).find(x=>x.id===id)||topicById(id);LV=S.lv;
-  const qs=buildSession(t,JUMLAH_SOAL);if(!qs.length){alert('Belum ada soal untuk topik ini.');return}
-  sess={t,lv:S.lv,qs,i:0,res:[],streak:0,answered:false,done:false,catatanId:`latihan-${Date.now()}-${Math.random().toString(36).slice(2)}`};render();
+async function start(id){
+  if(jedaSP1()>Date.now())return render();
+  const t=topicsFor(S.mapel,S.kelas).find(x=>x.id===id)||topicById(id);
+  if(!t)return;
+  const permintaan=++permintaanSesi,lv=S.lv,mapel=S.mapel,kelas=S.kelas,kur=S.kur;
+  const config=await muatPengaturanGame();
+  if(permintaan!==permintaanSesi||lv!==S.lv||mapel!==S.mapel||kelas!==S.kelas||kur!==S.kur)return;
+  LV=lv;
+  const jumlah=config?.latihan?.[LEVEL_PENGATURAN[lv-1]]?.jumlahSoal??10;
+  const qs=buildSession(t,jumlah);if(!qs.length){alert('Belum ada soal untuk topik ini.');return}
+  sess={t,lv,qs,i:0,res:[],streak:0,answered:false,done:false,catatanId:`latihan-${Date.now()}-${Math.random().toString(36).slice(2)}`};render();
 }
 function ansText(q){if(q.kind==='str')return esc(q.ans);if(q.kind==='frac'){let [n,d]=q.ans;if(d<0){n=-n;d=-d}const g=gcd(n,d);n/=g;d/=g;return d===1?`${n}`:(n<0?'−':'')+F(Math.abs(n),d)}
   return q.kind==='dec'?fmtD(q.ans,2):(Math.abs(q.ans)>=1000?q.ans.toLocaleString('id-ID'):q.ans)}
@@ -1197,11 +1213,8 @@ async function resetProgres(){
 /* ============ Tryout / Mode Ujian ============ */
 let EXKEY='ruangpintar_ujian';   // diganti per anak di mulai()
 let ex=null, exTimer=null;
-// ===== PENGATURAN PUSAT: komposisi tingkat soal tryout =====
-// Ubah angka di sini saja (dalam persen). Sisa dari sulit + sedang otomatis menjadi soal mudah.
-// Anak tidak melihat dan tidak bisa mengubah pengaturan ini.
-const TRYOUT_TINGKAT={sulit:70,sedang:20};
-const TO={n:30,menit:60,lv:0,rf:'all'};          // lv 0 = komposisi TRYOUT_TINGKAT
+const TRYOUT_AWAL={sulit:70,sedang:20};
+const TO={n:30,menit:60,lv:0,rf:'all'};          // lv 0 = komposisi soal campuran
 const TO_N=[30,50],TO_MENIT=[60,90];
 const mixShort=kur=>kur&&kur!=='merdeka'?'Random':'Acak';
 // Tryout hanya 1x sehari per pelajaran (dihitung sejak tryout dimulai, jadi membatalkan tetap memakai jatah).
@@ -1215,8 +1228,8 @@ function tryoutStars(correct,n,target){
   const i=batas.findIndex(b=>miss<=b);return {stars:i<0?0:max-i,max};
 }
 const starsOf=(n,max)=>`<span class="stars">${Array.from({length:max},(_,i)=>`<span class="${i<n?'s':''}">★</span>`).join('')}</span>`;
-// Daftar tingkat untuk n soal menurut TRYOUT_TINGKAT: sulit (3), sedang (2), sisanya mudah (1), urutan diacak.
-function mixLevels(n){const h=Math.min(n,Math.round(n*TRYOUT_TINGKAT.sulit/100)),m=Math.min(n-h,Math.round(n*TRYOUT_TINGKAT.sedang/100));return shuffle([...Array(h).fill(3),...Array(m).fill(2),...Array(Math.max(0,n-h-m)).fill(1)])}
+// Tingkat sulit (3), sedang (2), sisanya mudah (1). Urutan diacak.
+function mixLevels(n,{sulit,sedang}){const h=Math.min(n,Math.round(n*sulit/100)),m=Math.min(n-h,Math.round(n*sedang/100));return shuffle([...Array(h).fill(3),...Array(m).fill(2),...Array(n-h-m).fill(1)])}
 const fmtT=s=>{s=Math.max(0,Math.ceil(s));return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`};
 const isAns=a=>a!==null&&a!==undefined&&String(a).trim()!=='';
 function exSave(){try{ex&&!ex.done?localStorage.setItem(EXKEY,JSON.stringify(ex)):localStorage.removeItem(EXKEY)}catch(e){}}
@@ -1224,14 +1237,14 @@ const tryoutTopics=()=>topicsFor(S.mapel,S.kelas).filter(t=>!t.mix&&t.g!=='__mix
 
 // Soal tryout dari semua topik secara bergiliran, mengikuti komposisi tingkat mixLevels().
 // Bila satu tingkat habis (bank soal terbatas), dipakai tingkat terdekat.
-function buildExam(topics,n){
+function buildExam(topics,n,komposisi){
   const pools=shuffle(topics.map(t=>t.bank?{t,bank:{1:shuffle(t.bank.filter(s=>s.lv===1)),2:shuffle(t.bank.filter(s=>s.lv===2)),3:shuffle(t.bank.filter(s=>s.lv===3))}}:{t,gen:true}));
   const qs=[],seen=new Set();let k=0;
   const take=(p,lv)=>{
     if(p.gen){for(let tr=0;tr<5;tr++){LV=lv;let q;try{q=makeQ(p.t)}catch(e){return null}if(!seen.has(q.q)){q.lv=lv;return q}}return null}
     const b=p.bank[lv];while(b.length){const s=b.pop(),q=bankQ(s);if(!seen.has(q.q)){q.lv=s.lv;return q}}return null;
   };
-  for(const lv of mixLevels(n)){
+  for(const lv of mixLevels(n,komposisi)){
     let q=null;
     for(const l of [3,2,1].sort((a,b)=>Math.abs(a-lv)-Math.abs(b-lv))){
       for(let j=0;j<pools.length&&!q;j++){const p=pools[(k+j)%pools.length];q=take(p,l);if(q){q.topic=p.t.name;k=(k+j+1)%pools.length}}
@@ -1290,10 +1303,13 @@ function renderTryout(app){
   const m=$('#tmulai');if(m)m.onclick=startExam;
 }
 
-function startExam(){
+async function startExam(){
   if(jedaSP1()>Date.now())return render();
   if(sudahTryout(S.kur,S.mapel)){alert('Tryout pelajaran ini hari ini sudah dikerjakan. Coba lagi besok, ya.');return}
-  const qs=buildExam(tryoutTopics(),TO.n);
+  const permintaan=++permintaanSesi,mapel=S.mapel,kelas=S.kelas,kur=S.kur,n=TO.n,menit=TO.menit;
+  const config=await muatPengaturanGame();
+  if(permintaan!==permintaanSesi||mapel!==S.mapel||kelas!==S.kelas||kur!==S.kur||n!==TO.n||menit!==TO.menit)return;
+  const qs=buildExam(tryoutTopics(),n,config?.tryout??TRYOUT_AWAL);
   if(!qs.length){alert('Belum ada soal untuk kelas ini.');return}
   S.tryoutHari=Object.assign({},S.tryoutHari,{[`${S.kur}|${S.mapel}`]:hariIni()});save();
   const now=Date.now();

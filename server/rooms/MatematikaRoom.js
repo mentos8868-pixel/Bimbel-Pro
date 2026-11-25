@@ -1,7 +1,8 @@
 import colyseus from "colyseus";
 import { Schema, MapSchema, ArraySchema, defineTypes } from "@colyseus/schema";
 import { authTable } from "../room-auth.js";
-import { JUMLAH_RONDE, MODE_LOMBA, TINGKAT_LOMBA, soalLomba } from "../../shared/lomba-matematika.js";
+import { MODE_LOMBA, TINGKAT_LOMBA, soalLomba } from "../../shared/lomba-matematika.js";
+import { pengaturanGame } from "../pengaturan-game.js";
 
 const { Room, ServerError } = colyseus;
 
@@ -18,6 +19,7 @@ class Lomba extends Schema {
 defineTypes(Lomba, {
   status: "string", ronde: "number", soal: "string", pilihan: ["number"], sisa: "number",
   pemenang: "string", tingkat: "string", mode: "string", host: "string", pemain: { map: Pemain },
+  jumlahSoal: "number", waktu: "number", jumlahPilihan: "number",
 });
 
 export class MatematikaRoom extends Room {
@@ -25,12 +27,14 @@ export class MatematikaRoom extends Room {
 
   onCreate({ meja, tingkat, mode } = {}) {
     this.meja = meja;
+    const aturan = pengaturanGame().matematika;
     const state = new Lomba();
     Object.assign(state, {
       status: "menunggu", ronde: 0, soal: "", sisa: 0, pemenang: "", host: "",
       tingkat: typeof tingkat === "string" && Object.hasOwn(TINGKAT_LOMBA, tingkat) ? tingkat : "sedang",
       mode: typeof mode === "string" && Object.hasOwn(MODE_LOMBA, mode) ? mode : "cepat",
     });
+    Object.assign(state, aturan[state.tingkat]);
     this.setState(state);
 
     for (const [kunci, daftar] of [["tingkat", TINGKAT_LOMBA], ["mode", MODE_LOMBA]]) {
@@ -38,6 +42,7 @@ export class MatematikaRoom extends Room {
         if (state.status !== "menunggu" || client.sessionId !== state.host || nilai === state[kunci]
           || typeof nilai !== "string" || !Object.hasOwn(daftar, nilai)) return;
         state[kunci] = nilai;
+        if (kunci === "tingkat") Object.assign(state, aturan[nilai]);
         for (const p of state.pemain.values()) p.siap = false;
       });
     }
@@ -72,15 +77,15 @@ export class MatematikaRoom extends Room {
 
   rondeBerikut() {
     const s = this.state;
-    if (s.ronde >= JUMLAH_RONDE) {
+    if (s.ronde >= s.jumlahSoal) {
       const [a, b] = [...s.pemain.values()];
       const beda = a.poin - b.poin || (s.mode === "cepat" ? b.durasiBenar - a.durasiBenar : 0);
       s.pemenang = beda === 0 ? "" : beda > 0 ? a.nama : b.nama;
       s.status = "selesai";
       return;
     }
-    const soal = soalLomba(s.ronde, s.tingkat);
-    const waktu = TINGKAT_LOMBA[s.tingkat].waktu;
+    const soal = soalLomba(s.ronde, s.tingkat, Math.random, s.jumlahPilihan);
+    const waktu = s.waktu;
     s.ronde++;
     s.soal = soal.teks;
     s.pilihan = new ArraySchema(...soal.pilihan);

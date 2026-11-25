@@ -2,8 +2,9 @@
 // Bintang dicatat per kunci (topik|tingkat, atau tryout|tanggal|kurikulum|pelajaran) dan saldo hanya
 // bertambah ketika bintang terbaik pada kunci itu naik, jadi mengulang latihan yang sama tidak menambah bintang.
 import { db, today } from "./db.js";
-import { AVATAR_AWAL_ANAK, KATALOG_AVATAR, avatarOr } from "../shared/avatars.js";
-import { AKSESORI, aksesoriById, rapikanAksesori } from "../shared/aksesori.js";
+import { AVATAR_AWAL_ANAK, avatarOr, parseAvatar } from "../shared/avatars.js";
+import { aksesoriById, rapikanAksesori } from "../shared/aksesori.js";
+import { katalogPemain, produkToko } from "./katalog-toko.js";
 import { levelDariXp, auraUntukLevel, auraBerikutnya, auraDipakai, auraTerbuka, auraById } from "../shared/aura.js";
 
 const XP_MAKS = 1_000_000;   // batas wajar total XP (Level 10.001)
@@ -99,14 +100,14 @@ export function handleToko({ m, path, body, anak, send, ApiError }) {
   }
 
   if (m === "GET" && path[0] === "toko" && path.length === 1) {
-    return send(200, { items: AKSESORI, ...keadaan(id) }), true;
+    const k = keadaan(id);
+    const anggota = parseAvatar(k.avatar)?.member.id === "putri" ? "putri" : "putra";
+    return send(200, { ...katalogPemain(anggota, k), ...k }), true;
   }
 
   if (m === "POST" && path[0] === "toko" && path[1] === "beli-avatar" && path.length === 2) {
-    const produk = KATALOG_AVATAR.find((a) => a.id === body.id);
-    if (!produk) throw new ApiError(400, "Avatar ini tidak dijual.");
-    const { id: avatar, harga } = produk;
     transaksi(() => {
+      const { id: avatar, harga } = produkToko(body.id, "avatar", body.harga, ApiError);
       const k = keadaan(id);
       if (k.avatarPunya.includes(avatar)) throw new ApiError(400, "Avatar ini sudah kamu punya.");
       if (k.bintang < harga) throw new ApiError(400, `Perlu ${harga} bintang untuk membeli avatar ini.`);
@@ -118,9 +119,8 @@ export function handleToko({ m, path, body, anak, send, ApiError }) {
   }
 
   if (m === "POST" && path[0] === "toko" && path[1] === "beli") {
-    const a = aksesoriById(String(body.id || ""));
-    if (!a) throw new ApiError(400, "Aksesori tidak dikenal.");
     transaksi(() => {
+      const a = produkToko(body.id, "aksesori", body.harga, ApiError);
       const k = keadaan(id);
       if (k.punya.includes(a.id)) throw new ApiError(400, "Aksesori ini sudah kamu punya.");
       if (k.bintang < a.harga) throw new ApiError(400, `Bintangmu belum cukup. Perlu ${a.harga} bintang.`);

@@ -1,4 +1,6 @@
-import { JUMLAH_RONDE, MODE_LOMBA, TINGKAT_LOMBA, soalLomba } from "../../shared/lomba-matematika.js";
+import { MODE_LOMBA, TINGKAT_LOMBA, soalLomba } from "../../shared/lomba-matematika.js";
+import { PENGATURAN_AWAL } from "../../shared/pengaturan-game.js";
+import { api } from "./api.js";
 export function pasangLombaMatematika(panel, keluarMeja, joinLombaMatematika) {
   const elemen = (nama) => panel.querySelector(`[data-mat-${nama}]`);
   const pilihan = [...panel.querySelectorAll("[data-mat-pilih]")];
@@ -16,13 +18,14 @@ export function pasangLombaMatematika(panel, keluarMeja, joinLombaMatematika) {
   for (const [id, m] of Object.entries(MODE_LOMBA)) mode.add(new Option(m.nama, id));
   tingkat.value = "sedang";
   let room, meja, timer, versi = 0, nomor, kunci, batas, poin, terkirim;
-  let tingkatLatihan;
+  let tingkatLatihan, aturanLatihan;
+  let aturan = PENGATURAN_AWAL.matematika;
 
-  function tampilTingkat(id, terkunci = false) {
+  function tampilTingkat(id, terkunci = false, config = aturan[id]) {
     const level = TINGKAT_LOMBA[id];
     tingkat.value = id;
     tingkat.disabled = terkunci;
-    elemen("tingkat-info").textContent = `${level.keterangan} ${level.jumlahPilihan} pilihan, ${level.waktu} detik per soal.${terkunci ? " Pemain pertama memilih tingkat." : ""}`;
+    elemen("tingkat-info").textContent = `${level.keterangan} ${config.jumlahSoal} soal, ${config.jumlahPilihan} pilihan, ${config.waktu} detik per soal.${terkunci ? " Pemain pertama memilih tingkat." : ""}`;
   }
   function tampilMode(id, terkunci = false) {
     mode.value = id;
@@ -33,12 +36,12 @@ export function pasangLombaMatematika(panel, keluarMeja, joinLombaMatematika) {
   function pesan(teks) {
     if (status.textContent !== teks) status.textContent = teks;
   }
-  function tampilSoal(ronde, soal, jawaban, sisa, idTingkat, terkunci) {
+  function tampilSoal(ronde, soal, jawaban, sisa, idTingkat, config, terkunci) {
     elemen("ronde").hidden = false;
-    elemen("angka").textContent = `${TINGKAT_LOMBA[idTingkat].nama} · Ronde ${ronde}/${JUMLAH_RONDE}`;
+    elemen("angka").textContent = `${TINGKAT_LOMBA[idTingkat].nama} · Ronde ${ronde}/${config.jumlahSoal}`;
     elemen("waktu").textContent = `${sisa} detik`;
     elemen("soal").textContent = soal;
-    bar.max = TINGKAT_LOMBA[idTingkat].waktu;
+    bar.max = config.waktu;
     bar.value = sisa;
     pilihan.forEach((b, i) => {
       b.hidden = i >= jawaban.length;
@@ -65,13 +68,13 @@ export function pasangLombaMatematika(panel, keluarMeja, joinLombaMatematika) {
       latihan.hidden = true;
       const sudah = saya?.dijawab || terkirim === s.ronde;
       pesan(sudah ? "Jawaban dikirim. Tunggu ronde berikutnya." : MODE_LOMBA[s.mode].nama);
-      tampilSoal(s.ronde, s.soal, s.pilihan, s.sisa, s.tingkat, sudah);
+      tampilSoal(s.ronde, s.soal, s.pilihan, s.sisa, s.tingkat, s, sudah);
     } else if (s.status === "selesai") {
       elemen("ronde").hidden = true;
       latihan.hidden = false;
       pesan(s.pemenang ? `Pemenang: ${s.pemenang}` : "Hasil seri.");
     } else {
-      tampilTingkat(s.tingkat, s.host !== room.sessionId);
+      tampilTingkat(s.tingkat, s.host !== room.sessionId, s);
       tampilMode(s.mode, s.host !== room.sessionId);
       const pemain = [...s.pemain.entries()];
       const baris = Array.from({ length: 2 }, (_, i) => {
@@ -100,30 +103,37 @@ export function pasangLombaMatematika(panel, keluarMeja, joinLombaMatematika) {
     tunggu.hidden = true;
   }
   function rondeLatihan() {
-    if (nomor >= JUMLAH_RONDE) {
+    if (nomor >= aturanLatihan.jumlahSoal) {
       clearInterval(timer);
       elemen("ronde").hidden = true;
       latihan.hidden = false;
       online.hidden = !meja;
       pengaturan.hidden = false;
-      pesan(`Latihan selesai. ${poin}/${JUMLAH_RONDE} jawaban benar.`);
+      pesan(`Latihan selesai. ${poin}/${aturanLatihan.jumlahSoal} jawaban benar.`);
       return;
     }
-    const soal = soalLomba(nomor++, tingkatLatihan);
-    const waktu = TINGKAT_LOMBA[tingkatLatihan].waktu;
+    const soal = soalLomba(nomor++, tingkatLatihan, Math.random, aturanLatihan.jumlahPilihan);
+    const waktu = aturanLatihan.waktu;
     kunci = soal.kunci;
     batas = Date.now() + waktu * 1000;
-    tampilSoal(nomor, soal.teks, soal.pilihan, waktu, tingkatLatihan, false);
+    tampilSoal(nomor, soal.teks, soal.pilihan, waktu, tingkatLatihan, aturanLatihan, false);
   }
-  latihan.onclick = () => {
+  latihan.onclick = async () => {
     hentikan();
+    const permintaan = versi;
     tingkatLatihan = tingkat.value;
+    pengaturan.hidden = true;
+    online.hidden = latihan.hidden = true;
+    pesan("Memuat pengaturan latihan…");
+    const config = await api("GET", "pengaturan-game").catch(() => null);
+    if (permintaan !== versi) return;
+    aturan = config?.matematika ?? aturan;
+    aturanLatihan = aturan[tingkatLatihan];
     tampilTingkat(tingkatLatihan);
     pengaturan.hidden = true;
     skor.hidden = false;
     nomor = 0;
     poin = 0;
-    online.hidden = latihan.hidden = true;
     pesan("");
     tampilSkor([["Kamu", poin]]);
     rondeLatihan();
@@ -200,6 +210,12 @@ export function pasangLombaMatematika(panel, keluarMeja, joinLombaMatematika) {
       skor.replaceChildren();
       pesan("Pilih satu jawaban di setiap ronde. Jawaban benar bernilai satu poin.");
       (meja ? online : latihan).focus();
+      const permintaan = versi;
+      api("GET", "pengaturan-game").then((config) => {
+        if (versi !== permintaan || panel.hidden || room) return;
+        aturan = config.matematika;
+        tampilTingkat(tingkat.value);
+      }).catch(() => {});
     },
     tutup() {
       hentikan();

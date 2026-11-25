@@ -1,15 +1,15 @@
-export const JUMLAH_RONDE = 5;
+import { PENGATURAN_AWAL } from "./pengaturan-game.js";
 export const MODE_LOMBA = {
   cepat: { nama: "Lomba cepat", keterangan: "Keduanya boleh menjawab setiap soal. Jika poin seri, total waktu jawaban benar menentukan pemenang." },
   rebutan: { nama: "Rebutan soal", keterangan: "Pemain pertama yang menjawab benar mendapat poin dan langsung membuka soal berikutnya." },
 };
 export const TINGKAT_LOMBA = {
-  mudah: { nama: "Mudah", waktu: 15, jumlahPilihan: 2, keterangan: "Tambah dan kurang dengan angka kecil." },
-  sedang: { nama: "Sedang", waktu: 10, jumlahPilihan: 3, keterangan: "Tambah, kurang, dan perkalian." },
-  sulit: { nama: "Sulit", waktu: 8, jumlahPilihan: 4, keterangan: "Pembagian tepat dan operasi campuran." },
+  mudah: { nama: "Mudah", keterangan: "Tambah dan kurang dengan angka kecil." },
+  sedang: { nama: "Sedang", keterangan: "Tambah, kurang, dan perkalian." },
+  sulit: { nama: "Sulit", keterangan: "Pembagian tepat dan operasi campuran." },
 };
 
-export function soalLomba(indeks, tingkat, acak = Math.random) {
+export function soalLomba(indeks, tingkat, acak = Math.random, jumlah = PENGATURAN_AWAL.matematika[tingkat]?.jumlahPilihan ?? 3) {
   const angka = (min, max) => min + Math.floor(acak() * (max - min + 1));
   let teks, benar;
   if (tingkat === "sulit") {
@@ -29,7 +29,6 @@ export function soalLomba(indeks, tingkat, acak = Math.random) {
     teks = `${a} ${op} ${b}`;
     benar = op === "+" ? a + b : op === "−" ? a - b : a * b;
   }
-  const jumlah = TINGKAT_LOMBA[tingkat]?.jumlahPilihan ?? 3;
   const cadangan = [-3, -2, -1, 1, 2, 3].map((beda) => benar + beda).filter((n) => n >= 0);
   const pilihan = Array.from({ length: jumlah - 1 }, () => cadangan.splice(angka(0, cadangan.length - 1), 1)[0]);
   const kunci = angka(0, jumlah - 1);

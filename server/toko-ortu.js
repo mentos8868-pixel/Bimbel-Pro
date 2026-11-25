@@ -2,8 +2,9 @@
 // dibeli dengan bintang yang diperoleh orang tua dari Kantor (parents.bintang). Karakter yang dijual mengikuti peran
 // (Ayah/Ibu), karena anggota keluarga avatar orang tua ditentukan otomatis.
 import { db } from "./db.js";
-import { AVATAR_AWAL_ORTU, KATALOG_AVATAR, avatarOr, DEFAULT_ORTU_AVATAR } from "../shared/avatars.js";
-import { AKSESORI, aksesoriById, rapikanAksesori } from "../shared/aksesori.js";
+import { AVATAR_AWAL_ORTU, avatarOr, DEFAULT_ORTU_AVATAR } from "../shared/avatars.js";
+import { aksesoriById, rapikanAksesori } from "../shared/aksesori.js";
+import { katalogPemain, produkToko } from "./katalog-toko.js";
 
 const daftar = (s) => String(s || "").split(",").filter(Boolean);
 function transaksi(fn) {
@@ -41,16 +42,14 @@ export function handleTokoOrtu({ m, path, body, ortuSaya, send, ApiError }) {
   if (m === "GET" && path.length === 1) {
     const k = keadaan(id);
     // Katalog karakter sesuai peran: Ayah membeli "<jenis>-ayah", Ibu membeli "<jenis>-ibu".
-    const katalog = KATALOG_AVATAR.filter((a) => a.id.endsWith(`-${k.peran}`));
-    return send(200, { items: AKSESORI, katalog, ...k }), true;
+    return send(200, { ...katalogPemain(k.peran, k), ...k }), true;
   }
 
   if (m === "POST" && path[1] === "beli-avatar") {
-    const k0 = keadaan(id);
-    const produk = KATALOG_AVATAR.find((a) => a.id === body.id && a.id.endsWith(`-${k0.peran}`));
-    if (!produk) throw new ApiError(400, "Avatar ini tidak dijual untuk Anda.");
     transaksi(() => {
       const k = keadaan(id);
+      const produk = produkToko(body.id, "avatar", body.harga, ApiError);
+      if (!produk.id.endsWith(`-${k.peran}`)) throw new ApiError(400, "Avatar ini tidak dijual untuk Anda.");
       if (k.avatarPunya.includes(produk.id)) throw new ApiError(400, "Avatar ini sudah Anda miliki.");
       if (k.bintang < produk.harga) throw new ApiError(400, `Perlu ${produk.harga} bintang untuk membeli avatar ini.`);
       db.prepare("INSERT OR IGNORE INTO parent_avatar (parent_id, avatar) VALUES (?, ?)").run(id, produk.id);
@@ -60,9 +59,8 @@ export function handleTokoOrtu({ m, path, body, ortuSaya, send, ApiError }) {
   }
 
   if (m === "POST" && path[1] === "beli") {
-    const a = aksesoriById(String(body.id || ""));
-    if (!a) throw new ApiError(400, "Aksesori tidak dikenal.");
     transaksi(() => {
+      const a = produkToko(body.id, "aksesori", body.harga, ApiError);
       const k = keadaan(id);
       if (k.punya.includes(a.id)) throw new ApiError(400, "Aksesori ini sudah Anda miliki.");
       if (k.bintang < a.harga) throw new ApiError(400, `Bintang belum cukup. Perlu ${a.harga} bintang.`);

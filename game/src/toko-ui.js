@@ -3,7 +3,7 @@
 import { api } from "./api.js";
 import { avatarSvg } from "./avatar-svg.js";
 import { SLOT } from "../../shared/aksesori.js";
-import { KATALOG_AVATAR, parseAvatar } from "../../shared/avatars.js";
+import { parseAvatar } from "../../shared/avatars.js";
 import { katalogAvatar } from "./katalog-avatar.js";
 
 const $ = (id) => document.getElementById(id);
@@ -69,9 +69,8 @@ export class TokoUI {
         <b>${esc(a.name)}</b><span class="harga">${punya ? (pakai ? "Sedang dipakai" : "Sudah dimiliki") : `★ ${a.harga}`}</span>${tombol}</div>`;
     };
     const isi = $("toko-isi");
-    const anggota = parseAvatar(k.avatar)?.member.id === "putri" ? "putri" : "putra";
-    const daftar = k.katalog ?? KATALOG_AVATAR.filter((a) => a.id.endsWith(`-${anggota}`))
-      .map((a) => ({ ...a, nama: parseAvatar(a.id).family.name }));
+    const daftar = this.sebagai === "ortu" ? k.katalog
+      : k.katalog.map((a) => ({ ...a, nama: parseAvatar(a.id).family.name }));
     const katalog = katalogAvatar(k, this.profile.color, this.yakin, isi.querySelector("[data-katalog-avatar]")?.open ?? true, daftar);
     isi.innerHTML = katalog + SLOT.map((s) => {
       const items = k.items.filter((a) => a.slot === s.id);
@@ -89,7 +88,8 @@ export class TokoUI {
         if (this.yakin !== id) { this.yakin = id; this.render(); return; }
         this.yakin = null;
         b.disabled = true;
-        this.k = { ...this.k, ...(await api("POST", this.alamat + "/beli-avatar", { id })) };
+        const harga = this.k.katalog.find((item) => item.id === id).harga;
+        this.k = { ...this.k, ...(await api("POST", this.alamat + "/beli-avatar", { id, harga })) };
         this.onBerubah(this.k);
       } else if (b.dataset.pakaiAvatar) {
         b.disabled = true;
@@ -102,7 +102,8 @@ export class TokoUI {
         if (this.yakin !== id) { this.yakin = id; this.render(); return; }
         this.yakin = null;
         b.disabled = true;
-        this.k = { ...this.k, ...(await api("POST", this.alamat + "/beli", { id })) };
+        const harga = this.k.items.find((item) => item.id === id).harga;
+        this.k = { ...this.k, ...(await api("POST", this.alamat + "/beli", { id, harga })) };
         this.k = { ...this.k, ...(await api("POST", this.alamat + "/pakai", { id, pakai: true })) };
         this.onBerubah(this.k);
       } else if (b.dataset.pakai) {
@@ -112,6 +113,9 @@ export class TokoUI {
       }
     } catch (x) {
       this.err(x.message);
+      if (x.status === 409 || b.dataset.beli || b.dataset.beliAvatar) {
+        try { this.k = await api("GET", this.alamat); } catch { /* tampilkan pesan gagal beli */ }
+      }
     }
     this.render();
   }

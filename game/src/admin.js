@@ -1,4 +1,5 @@
 import { api } from "./api.js";
+import { bukaPengaturan, tutupPengaturan } from "./admin-pengaturan.js";
 import { negaraName } from "../../shared/negara.js";
 
 const form = document.getElementById("akses-admin");
@@ -43,6 +44,7 @@ async function perbarui(tujuan = halaman) {
     rincian.hidden = false;
     statistik.hidden = false;
     status.textContent = "Diperbarui pukul " + new Date().toLocaleTimeString("id-ID");
+    await bukaPengaturan(token);
   } catch (error) {
     jenis.value = jenisTerakhir;
     if (error.status === 403) {
@@ -50,6 +52,7 @@ async function perbarui(tujuan = halaman) {
       statistik.hidden = true;
       rincian.hidden = true;
       daftar.replaceChildren();
+      tutupPengaturan();
     }
     status.textContent = error.message;
   } finally {

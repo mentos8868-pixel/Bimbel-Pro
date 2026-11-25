@@ -9,6 +9,7 @@
       .tabel-akun { overflow-x: auto; }
       .tabel-akun table { width: 100%; border-collapse: collapse; }
       .tabel-akun th, .tabel-akun td { padding: 10px; text-align: start; border-bottom: 1px solid var(--border); }
+      .tabel-akun input[type="number"] { width: 8ch; }
     </style>
   </head>
   <body>
@@ -16,9 +17,25 @@
       <h1>Admin Bimbel Pro</h1>
       <form id="akses-admin" class="panel">
         <label>Kunci admin <input type="password" name="kunci" autocomplete="off" required /></label>
-        <button type="submit" class="primary">Lihat statistik</button>
+        <button type="submit" class="primary">Buka dasbor</button>
       </form>
       <p id="status-admin" class="muted" role="status"></p>
+      <section id="pengaturan-admin" hidden>
+        <form id="form-game" class="panel">
+          <h2>Pengaturan permainan</h2>
+          <p class="muted">Perubahan berlaku untuk sesi latihan, tryout, dan meja lomba baru.</p>
+          <div class="tabel-akun" id="aturan-game"></div>
+          <button class="primary">Simpan pengaturan</button>
+          <p id="status-game" role="status"></p>
+        </form>
+        <form id="form-katalog" class="panel">
+          <h2>Katalog Toko Avatar</h2>
+          <p class="muted">Harga dalam bintang. Item yang ditarik dari toko masih bisa dipakai oleh pemiliknya.</p>
+          <div id="katalog-admin"></div>
+          <button class="primary">Simpan katalog</button>
+          <p id="status-katalog" role="status"></p>
+        </form>
+      </section>
       <section id="statistik" class="grid2" aria-label="Statistik pengguna" hidden>
         <article class="panel"><h2>Akun orang tua</h2><strong id="orangTua"></strong></article>
         <article class="panel"><h2>Akun anak</h2><strong id="anak"></strong></article>

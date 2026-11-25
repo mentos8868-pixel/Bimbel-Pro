@@ -36,6 +36,10 @@ Buka [dasbor admin lokal](http://localhost:5173/admin.html) dan masukkan kunci y
 
 Dasbor menampilkan jumlah akun orang tua dan anak yang tersimpan, jumlah akun terhubung ke Arena, serta jumlah akun unik yang ada di Arena atau terdeteksi aktif di dashboard dalam dua menit terakhir. Statistik aktivitas berlaku untuk satu proses server.
 
+Di bagian **Pengaturan permainan**, admin bisa mengatur jumlah soal latihan Ruang Pintar per tingkat, komposisi kesulitan tryout, serta jumlah soal, waktu per soal, dan jumlah pilihan jawaban Lomba Matematika per tingkat. Nilai berlaku untuk sesi dan meja baru. Topik yang punya sedikit soal unik bisa menampilkan kurang dari jumlah yang disetel.
+
+Di bagian **Katalog Toko Avatar**, admin bisa mengatur harga dalam bintang dan ketersediaan karakter serta aksesori yang sudah ada. Pemain tetap bisa memakai item yang sudah mereka miliki. Pengaturan dan katalog disimpan di database server.
+
 ## Cara memakai akun
 
 1. **Orang tua** membuka dashboard, lalu mendaftar: memilih **Ayah** atau **Ibu**, mengisi nama, email, kata sandi, dan mencentang persetujuan data anak. Yang mendaftar pertama menjadi **kepala keluarga**.
