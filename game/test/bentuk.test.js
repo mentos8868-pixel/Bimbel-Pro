@@ -18,3 +18,16 @@ test("semua titik tetap di dalam batas kotak", () => {
     assert.ok(Math.abs(out[i + 2]) <= s.z + 1e-9);
   }
 });
+
+test("normal sudut pipih hampir tegak lurus ke atas", async () => {
+  const { normalElips } = await import("../src/bentuk.js");
+  const n = normalElips([Math.SQRT1_2, Math.SQRT1_2, 0], { x: 1.2, y: 0.02, z: 1.2 });
+  assert.ok(n[1] > 0.99, `y = ${n[1]}`);
+  assert.ok(Math.abs(Math.hypot(...n) - 1) < 1e-9);
+});
+
+test("normal sudut seragam tidak berubah", async () => {
+  const { normalElips } = await import("../src/bentuk.js");
+  const n = normalElips([0.6, 0.8, 0], { x: 0.1, y: 0.1, z: 0.1 });
+  assert.deepEqual(n.map((v) => +v.toFixed(6) + 0), [0.6, 0.8, 0]);
+});

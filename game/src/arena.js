@@ -19,7 +19,8 @@ function mat(scene, hex) {
   if (mats.has(hex)) return mats.get(hex);
   const m = new StandardMaterial("m" + hex, scene);
   m.diffuseColor = Color3.FromHexString(hex);
-  m.specularColor = new Color3(0.05, 0.05, 0.05);
+  m.specularColor = new Color3(0.08, 0.08, 0.08);
+  m.specularPower = 32;
   mats.set(hex, m);
   return m;
 }
@@ -90,6 +91,14 @@ function box(scene, name, { w, h, d, x, y = h / 2, z, color, walls }) {
   return b;
 }
 
+// Jalan setapak pipih dengan ujung membulat (tanpa tabrakan).
+function jalan(scene, name, { w, h, d, x, y, z, color }) {
+  const b = kotakBulat(scene, name, { w, h, d, r: { x: Math.min(1.2, w / 2), y: h / 2, z: Math.min(1.2, d / 2) }, segmen: 16 });
+  b.position.set(x, y, z);
+  b.material = mat(scene, color);
+  return b;
+}
+
 // Ruangan berdinding rendah, pintu menghadap ke alun-alun.
 function room(scene, walls, { cx, cz, w, d, door, floor, wall }) {
   box(scene, "floor", { w, h: 0.1, d, x: cx, y: 0.05, z: cz, color: floor });
@@ -107,17 +116,49 @@ function room(scene, walls, { cx, cz, w, d, door, floor, wall }) {
       const off = p === 0 ? 0 : p * (gap / 2 + len / 2);
       if (s.horiz) box(scene, "wall", { w: len, h, d: t, x: s.x + off, z: s.z, color: wall, walls });
       else box(scene, "wall", { w: t, h, d: len, x: s.x, z: s.z + off, color: wall, walls });
+      // Lis atas (sedikit menjorok, warna lebih gelap) dan lis bawah tipis. Hiasan saja, tanpa walls.
+      const lis = (nama, tinggi, tebal, y, warna) => s.horiz
+        ? box(scene, nama, { w: len + 0.12, h: tinggi, d: t + tebal, x: s.x + off, y, z: s.z, color: warna })
+        : box(scene, nama, { w: t + tebal, h: tinggi, d: len + 0.12, x: s.x, y, z: s.z + off, color: warna });
+      lis("lisAtas", 0.12, 0.12, h + 0.04, gelapkan(wall, 0.15));
+      lis("lisBawah", 0.1, 0.06, 0.1, gelapkan(wall, 0.25));
+    }
+    if (k === door) {
+      // Kusen: dua tiang di kiri-kanan celah pintu.
+      for (const p of [-1, 1]) {
+        const o = p * (gap / 2 + 0.08);
+        if (s.horiz) box(scene, "kusen", { w: 0.22, h: 1.5, d: t + 0.14, x: s.x + o, z: s.z, color: gelapkan(wall, 0.3) });
+        else box(scene, "kusen", { w: t + 0.14, h: 1.5, d: 0.22, x: s.x, z: s.z + o, color: gelapkan(wall, 0.3) });
+      }
     }
   }
 }
 
-function tree(scene, x, z, s = 1) {
-  const trunk = MeshBuilder.CreateCylinder("trunk", { height: 1.2 * s, diameter: 0.35 * s, tessellation: 6 }, scene);
-  trunk.position.set(x, 0.6 * s, z);
+// Warna hex digelapkan sebanyak f (0–1).
+function gelapkan(hex, f) {
+  return Color3.FromHexString(hex).scale(1 - f).toHexString();
+}
+
+// Pohon versi kode: batang bulat + tiga gumpalan daun bertumpuk. Dipakai sebagai cadangan model alam.
+export function pohonCadangan(scene, x, z, s = 1) {
+  const akar = new TransformNode("pohon", scene);
+  akar.position.set(x, 0, z);
+  const trunk = MeshBuilder.CreateCylinder("trunk", { height: 1.5 * s, diameterTop: 0.24 * s, diameterBottom: 0.38 * s, tessellation: 16 }, scene);
+  trunk.position.y = 0.75 * s;
   trunk.material = mat(scene, "#8d6e4a");
-  const top = MeshBuilder.CreateCylinder("leaf", { height: 2.4 * s, diameterTop: 0, diameterBottom: 2 * s, tessellation: 6 }, scene);
-  top.position.set(x, 2.3 * s, z);
-  top.material = mat(scene, "#3e9b4f");
+  trunk.parent = akar;
+  // Geser kecil yang tetap (berdasarkan posisi), supaya tiap pohon sedikit berbeda.
+  const g = Math.sin(x * 12.9898 + z * 78.233) * 0.5;
+  const daun = [[0, 2.1, 0, 1.9], [0.45 + g * 0.2, 2.75, 0.2, 1.4], [-0.35, 2.6, -0.3 + g * 0.2, 1.3]];
+  const warna = ["#4fa65a", "#5cb465", "#469a50"];
+  daun.forEach(([dx, dy, dz, dm], i) => {
+    const bola = MeshBuilder.CreateSphere("leaf", { diameter: dm * s, segments: 12 }, scene);
+    bola.position.set(dx * s, dy * s, dz * s);
+    bola.scaling.y = 0.85;
+    bola.material = mat(scene, warna[i]);
+    bola.parent = akar;
+  });
+  return akar;
 }
 
 function papanCatur(scene, x, z) {
@@ -161,7 +202,7 @@ function mejaPertandingan(scene, { id, x, z, warna, pemain }, walls) {
 
 // ---------- Ruang kelas (Ruang Bimbel) ----------
 function tabung(scene, h, d, color, x, y, z) {
-  const m = MeshBuilder.CreateCylinder("kelas", { height: h, diameter: d, tessellation: 10 }, scene);
+  const m = MeshBuilder.CreateCylinder("kelas", { height: h, diameter: d, tessellation: 16 }, scene);
   m.position.set(x, y, z);
   m.material = mat(scene, color);
   return m;
@@ -267,7 +308,7 @@ function kiosToko(scene, x, z, walls) {
   box(scene, "kiosBelakang", { w: W, h: 2.4, d: 0.15, x, y: 1.2, z: z + D / 2, color: "#ffd1e0" });
   box(scene, "kiosRak", { w: W - 0.4, h: 0.08, d: 0.35, x, y: 1.65, z: z + D / 2 - 0.25, color: "#c97b9b" });
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    const post = MeshBuilder.CreateCylinder("kiosTiang", { height: 2.7, diameter: 0.14, tessellation: 8 }, scene);
+    const post = MeshBuilder.CreateCylinder("kiosTiang", { height: 2.7, diameter: 0.14, tessellation: 16 }, scene);
     post.position.set(x + sx * (W / 2 - 0.05), 1.35, z + sz * (D / 2 - 0.05));
     post.material = mat(scene, "#ffffff");
   }
@@ -371,16 +412,20 @@ export function createArena(canvas) {
   const plaza = MeshBuilder.CreateCylinder("plaza", { diameter: 16, height: 0.06, tessellation: 48 }, scene);
   plaza.position.y = 0.03;
   plaza.material = mat(scene, "#e8dcc2");
+  const tepiPlaza = MeshBuilder.CreateTorus("tepiPlaza", { diameter: 16, thickness: 0.25, tessellation: 64 }, scene);
+  tepiPlaza.position.y = 0.05;
+  tepiPlaza.scaling.y = 0.5;
+  tepiPlaza.material = mat(scene, "#d4c5a6");
   const plazaSign = makeSign(scene, ["Alun-alun", "Bimbel utara · Game timur · Pertokoan selatan"], { width: 7.4, height: 1.5 });
   plazaSign.position.set(0, 3, 0);
   // Kios Toko Avatar di sisi barat laut alun-alun (terlihat dari tempat muncul).
   const kios = kiosToko(scene, -5, 4.6, walls);
 
   // Jalan setapak
-  box(scene, "pathN", { w: 3, h: 0.04, d: 11, x: 0, y: 0.02, z: 13.5, color: "#e8dcc2" });
-  box(scene, "pathE", { w: 9, h: 0.04, d: 3, x: 12, y: 0.02, z: 0, color: "#e8dcc2" });
-  box(scene, "pathW", { w: 9, h: 0.04, d: 3, x: -12, y: 0.02, z: 0, color: "#efe7d4" });
-  box(scene, "pathS", { w: 3, h: 0.04, d: 11, x: 0, y: 0.02, z: -13.5, color: "#efe7d4" });
+  jalan(scene, "pathN", { w: 3, h: 0.04, d: 11, x: 0, y: 0.02, z: 13.5, color: "#e8dcc2" });
+  jalan(scene, "pathE", { w: 9, h: 0.04, d: 3, x: 12, y: 0.02, z: 0, color: "#e8dcc2" });
+  jalan(scene, "pathW", { w: 9, h: 0.04, d: 3, x: -12, y: 0.02, z: 0, color: "#efe7d4" });
+  jalan(scene, "pathS", { w: 3, h: 0.04, d: 11, x: 0, y: 0.02, z: -13.5, color: "#efe7d4" });
 
   // Ruang Bimbel (utara)
   room(scene, walls, { cx: 0, cz: 25, w: 16, d: 12, door: "s", floor: "#fff3d6", wall: "#f2b134" });
@@ -447,20 +492,22 @@ export function createArena(canvas) {
     }
   }
 
-  box(scene, "jalan-pertokoan", { w: 29, h: 0.045, d: 2.7, x: 0, y: 0.023, z: -19.8, color: "#efe7d4" });
+  jalan(scene, "jalan-pertokoan", { w: 29, h: 0.045, d: 2.7, x: 0, y: 0.023, z: -19.8, color: "#efe7d4" });
   const pertokoan = [
     tokoKerja(scene, walls, "sarapan", -10, { warna: "#a45621", lantai: "#fff0cf", produk: ["#e8ac59", "#ae6934", "#edc37a"] }),
     tokoKerja(scene, walls, "bunga", 0, { warna: "#963f66", lantai: "#f9eaf1", produk: ["#e8618d", "#c17ed7", "#efbf52"] }),
     tokoKerja(scene, walls, "restoran", 10, { warna: "#8c3e37", lantai: "#f8e8dc", produk: ["#bc6d39", "#65a653", "#c06159"] }),
   ];
 
-  // Pepohonan di pinggir arena
+  // Pepohonan di pinggir arena (versi kode; diganti model alam bila berhasil dimuat, lihat alam.js)
+  const pohon = [];
   for (let i = 0; i < 28; i++) {
     const a = (i / 28) * Math.PI * 2 + 0.11;
     const r = ARENA_RADIUS - 1 + (i % 3) * 0.8;
-    tree(scene, Math.cos(a) * r, Math.sin(a) * r, 0.9 + (i % 4) * 0.12);
+    pohon.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, s: 0.9 + (i % 4) * 0.12 });
   }
-  for (const [x, z] of [[-9, 9], [9, 9], [-9, -9], [9, -9]]) tree(scene, x, z, 0.8);
+  for (const [x, z] of [[-9, 9], [9, 9], [-9, -9], [9, -9]]) pohon.push({ x, z, s: 0.8 });
+  for (const p of pohon) p.mesh = pohonCadangan(scene, p.x, p.z, p.s);
   for (const [x, z] of [[-9, 9], [9, 9], [-9, -9], [9, -9]]) walls.push({ minX: x - 0.3, maxX: x + 0.3, minZ: z - 0.3, maxZ: z + 0.3 });
 
   window.addEventListener("resize", () => engine.resize());
