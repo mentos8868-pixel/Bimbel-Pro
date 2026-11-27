@@ -19,5 +19,13 @@ export async function lihatArena({ alpha = -Math.PI / 2 - 0.5, beta = 1, radius 
   a.engine.resize();
   const alam = await a.alam;
   await new Promise((r) => setTimeout(r, 2500));
-  return { wallsSama: JSON.stringify(a.walls) === awal.trim(), mesh: a.scene.meshes.length, alam: alam?.jenis };
+  const s = a.scene;
+  return {
+    wallsSama: JSON.stringify(a.walls) === awal.trim(),
+    mesh: s.meshes.length,
+    alam: alam?.jenis,
+    // Mesh bergeometri tanpa bahan = tampil abu-abu polos (mis. bahan bersama ikut terbuang).
+    tanpaBahan: s.meshes.filter((m) => m.getClassName() !== "InstancedMesh" && !m.material && m.getTotalVertices() > 0).map((m) => m.name),
+    instance: s.meshes.filter((m) => m.getClassName() === "InstancedMesh").length,
+  };
 }

@@ -88,7 +88,8 @@ export async function tanamAlam(scene, { pohon }) {
       a.metadata = { fase: p.x * 0.7 + p.z * 1.3 };
       return a;
     });
-    for (const p of pohon) p.mesh?.dispose(false, true);
+    // Bahan pohon cadangan dipakai bersama benda lain (mis. bingkai papan tulis), jadi hanya mesh-nya yang dibuang.
+    for (const p of pohon) p.mesh?.dispose(false, false);
     return { jenis: "model", akar: induk, pohon: akarPohon };
   } catch (e) {
     console.warn("Model alam gagal dimuat, memakai pohon versi kode:", e?.message || e);
