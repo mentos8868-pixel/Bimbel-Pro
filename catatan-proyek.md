@@ -45,3 +45,19 @@
   1. Kurikulum Merdeka (Indonesia)
   2. Cambridge
   3. Kurikulum Singapura
+
+## Catatan 3 — 27 November 2026
+
+### Yang disampaikan (apa adanya)
+
+> tolong perhalus arenanya dan design lebih bagus
+
+> terlalu kaku dan kotak kotak
+
+### Rangkuman
+
+- Arena terasa kaku dan kotak-kotak. Dipilih cara **campuran**: bangunan diperhalus lewat kode, alam memakai model jadi CC0.
+- Hasil: sudut dinding dan meja membulat, lis atap, kusen pintu, jalan setapak berujung membulat, cincin tepi alun-alun.
+- Pohon dari Kenney Nature Kit (8 model, 81 KB), ditambah rumput, bunga, batu, awan melayang, dan daun bergoyang.
+- Tata letak dan batas tabrakan tidak berubah. Di kualitas grafis **Rendah**, hiasan dikurangi dan goyangan dimatikan.
+- Rancangan: `docs/superpowers/specs/2026-11-27-arena-lebih-halus-design.md`. Gambar sebelum/sesudah: `docs/superpowers/gambar/`.

@@ -56,6 +56,8 @@ Di bagian **Katalog Toko Avatar**, admin bisa mengatur harga dalam bintang dan k
 | Folder | Isi |
 |--------|-----|
 | `game/` | Halaman browser: arena 3D (Babylon.js), layar masuk, tiga game, dan dashboard orang tua (`orangtua.html`) |
+| `game/public/model/alam/` | Model pohon, semak, bunga, batu, dan rumput untuk arena (Kenney Nature Kit, CC0, lihat `LISENSI.txt` di folder itu). Bila gagal dimuat, arena memakai pohon versi kode |
+| `game/test/` | Uji otomatis (`npm test --prefix game`), snapshot batas tabrakan arena, dan alat pengembang `lihat.html` untuk melihat arena tanpa akun (hanya saat `npm run dev`) |
 | `server/` | API akun (`/api/...`), database SQLite, dan server multiplayer (Colyseus) |
 | `server/data/` | File database `bimbel.db`. Dibuat otomatis dan tidak dibagikan |
 | `shared/` | Kode yang dipakai bersama game dan server: daftar kata dan aturan Scramble, aturan Kartu Kilat dan bot-nya |
