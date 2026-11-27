@@ -110,6 +110,7 @@ function room(scene, walls, { cx, cz, w, d, door, floor, wall }) {
     e: { x: cx + w / 2, z: cz, len: d, horiz: false },
     w: { x: cx - w / 2, z: cz, len: d, horiz: false },
   };
+  const hiasanDinding = [];   // lis dan kusen; digabung per bahan di akhir supaya hemat panggilan gambar
   for (const [k, s] of Object.entries(sides)) {
     const parts = k === door ? [-1, 1] : [0];
     for (const p of parts) {
@@ -118,9 +119,9 @@ function room(scene, walls, { cx, cz, w, d, door, floor, wall }) {
       if (s.horiz) box(scene, "wall", { w: len, h, d: t, x: s.x + off, z: s.z, color: wall, walls });
       else box(scene, "wall", { w: t, h, d: len, x: s.x, z: s.z + off, color: wall, walls });
       // Lis atas (sedikit menjorok, warna lebih gelap) dan lis bawah tipis. Hiasan saja, tanpa walls.
-      const lis = (nama, tinggi, tebal, y, warna) => s.horiz
+      const lis = (nama, tinggi, tebal, y, warna) => hiasanDinding.push(s.horiz
         ? box(scene, nama, { w: len + 0.12, h: tinggi, d: t + tebal, x: s.x + off, y, z: s.z, color: warna })
-        : box(scene, nama, { w: t + tebal, h: tinggi, d: len + 0.12, x: s.x, y, z: s.z + off, color: warna });
+        : box(scene, nama, { w: t + tebal, h: tinggi, d: len + 0.12, x: s.x, y, z: s.z + off, color: warna }));
       lis("lisAtas", 0.12, 0.12, h + 0.04, gelapkan(wall, 0.15));
       lis("lisBawah", 0.1, 0.06, 0.1, gelapkan(wall, 0.25));
     }
@@ -128,10 +129,19 @@ function room(scene, walls, { cx, cz, w, d, door, floor, wall }) {
       // Kusen: dua tiang di kiri-kanan celah pintu.
       for (const p of [-1, 1]) {
         const o = p * (gap / 2 + 0.08);
-        if (s.horiz) box(scene, "kusen", { w: 0.22, h: 1.5, d: t + 0.14, x: s.x + o, z: s.z, color: gelapkan(wall, 0.3) });
-        else box(scene, "kusen", { w: t + 0.14, h: 1.5, d: 0.22, x: s.x, z: s.z + o, color: gelapkan(wall, 0.3) });
+        hiasanDinding.push(s.horiz
+          ? box(scene, "kusen", { w: 0.22, h: 1.5, d: t + 0.14, x: s.x + o, z: s.z, color: gelapkan(wall, 0.3) })
+          : box(scene, "kusen", { w: t + 0.14, h: 1.5, d: 0.22, x: s.x, z: s.z + o, color: gelapkan(wall, 0.3) }));
       }
     }
+  }
+  const perBahan = new Map();
+  for (const m of hiasanDinding) perBahan.set(m.material, [...(perBahan.get(m.material) || []), m]);
+  for (const kelompok of perBahan.values()) {
+    const gabung = Mesh.MergeMeshes(kelompok, true);
+    if (!gabung) continue;
+    gabung.name = "lisRuang";
+    gabung.freezeWorldMatrix();
   }
 }
 
