@@ -65,7 +65,8 @@ export function muatJenis(scene, jenis) {
 // Satu salinan model di (x, z). `i` memilih varian; putaran dan skala dari pemanggil.
 export function tanam(scene, model, jenis, { x, z, putar = 0, skala = 1, i = 0 }, induk) {
   const { wadah: c, tinggi } = model[i % model.length];
-  const hasil = c.instantiateModelsToScene((n) => `${jenis}-${n}`, false);
+  // doNotInstantiate: false → salinan berupa instance (satu panggilan gambar per model), bukan klon.
+  const hasil = c.instantiateModelsToScene((n) => `${jenis}-${n}`, false, { doNotInstantiate: false });
   const akar = new TransformNode(jenis, scene);
   for (const r of hasil.rootNodes) r.parent = akar;
   const s = (TINGGI[jenis] / tinggi) * skala;
@@ -104,10 +105,19 @@ const JENIS_HIASAN = [["rumput", 11], ["bunga", 23], ["batu", 37]];   // [jenis,
 const WARNA_CADANGAN = { rumput: "#6fae4f", bunga: "#e8618d", batu: "#a39a8c" };
 
 // Hiasan kecil cadangan (bila model gagal dimuat): bola pipih berwarna.
-function hiasanCadangan(scene, jenis, p, induk) {
+// Bola pertama menjadi sumber; sisanya instance darinya (satu panggilan gambar per jenis).
+function hiasanCadangan(scene, jenis, p, induk, sumber) {
+  if (sumber.has(jenis)) {
+    const n = sumber.get(jenis).createInstance(jenis);
+    n.position.set(p.x, 0.06, p.z);
+    n.scaling.y = 0.6;
+    n.parent = induk;
+    return n;
+  }
   const m = MeshBuilder.CreateSphere(jenis, { diameter: jenis === "batu" ? 0.35 : 0.22, segments: 6 }, scene);
   m.scaling.y = 0.6;
   m.position.set(p.x, 0.06, p.z);
+  sumber.set(jenis, m);
   if (!bahanStandar.has(scene.uid + jenis)) {
     const b = new StandardMaterial(`hiasan-${jenis}`, scene);
     b.diffuseColor = Color3.FromHexString(WARNA_CADANGAN[jenis]);
@@ -152,6 +162,7 @@ export function pasangHiasan(scene, { larangan, lingkaranLarangan, radius, grafi
     const akar = new TransformNode("hiasan", scene);
     induk = akar;
     const jumlah = jumlahHiasan(k);
+    const sumberCadangan = new Map();
     for (const [jenis, benih] of JENIS_HIASAN) {
       const titik = tebarHiasan({ jumlah: jumlah[jenis], radius, larangan, lingkaranLarangan, benih });
       let model = null;
@@ -159,7 +170,7 @@ export function pasangHiasan(scene, { larangan, lingkaranLarangan, radius, grafi
       // Kualitas diganti lagi saat model sedang dimuat: hasil lama dibuang, tidak menumpuk.
       if (ini !== giliran) return;
       titik.forEach((p, i) => {
-        const n = model ? tanam(scene, model, jenis, { ...p, i }, akar) : hiasanCadangan(scene, jenis, p, akar);
+        const n = model ? tanam(scene, model, jenis, { ...p, i }, akar) : hiasanCadangan(scene, jenis, p, akar, sumberCadangan);
         n.computeWorldMatrix(true);
         for (const m of [n, ...n.getChildMeshes(false)]) {
           m.metadata = { ...(m.metadata || {}), tanpaBayangan: true };
