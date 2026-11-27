@@ -21,7 +21,9 @@ function kualitasAwal(engine) {
 const tanpaBayangan = (m) => {
   const mt = m.material;
   // Model beranimasi (bertulang) cukup memakai bayangan bulat di kaki: menggambar ulang tulangnya ke peta bayangan tiap frame terlalu berat.
-  return !mt || m.skeleton || mt.disableLighting || mt.alpha < 1 || mt.useAlphaFromDiffuseTexture || m.name === "sign" || m.name === "bayang" || m.name === "aura";
+  return !mt || m.skeleton || mt.disableLighting || mt.alpha < 1 || mt.useAlphaFromDiffuseTexture || m.name === "sign" || m.name === "bayang" || m.name === "aura"
+    // Hiasan kecil (rumput, bunga, batu) terlalu banyak untuk ikut membuat bayangan.
+    || m.metadata?.tanpaBayangan === true;
 };
 
 export function pasangGrafis({ scene, camera, sun, hemi }) {
@@ -63,8 +65,18 @@ export function pasangGrafis({ scene, camera, sun, hemi }) {
     if (ssao) { scene.postProcessRenderPipelineManager.detachCamerasFromRenderPipeline(ssao.name, camera); ssao.dispose(); ssao = null; }
   }
 
+  // Pendengar perubahan kualitas (mis. hiasan dan goyangan pohon di alam.js).
+  const pendengar = [];
+  function onKualitas(cb) { pendengar.push(cb); if (kualitas) cb(kualitas); }
+
   function setKualitas(k) {
     if (!KUALITAS.includes(k) || k === kualitas) return kualitas;
+    terapkan(k);
+    for (const cb of pendengar) cb(k);
+    return k;
+  }
+
+  function terapkan(k) {
     kualitas = k;
     try { localStorage.setItem(KUNCI, k); } catch { /* abaikan */ }
     lepas();
@@ -117,5 +129,5 @@ export function pasangGrafis({ scene, camera, sun, hemi }) {
   }
 
   setKualitas(kualitasAwal(engine));
-  return { setKualitas, get kualitas() { return kualitas; } };
+  return { setKualitas, onKualitas, get kualitas() { return kualitas; } };
 }

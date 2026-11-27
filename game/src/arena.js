@@ -7,7 +7,7 @@ import {
 import { buildAvatar3d, buildManekin } from "./avatar3d.js";
 import { pasangGrafis } from "./grafis.js";
 import { kotakBulat } from "./bentuk.js";
-import { tanamAlam } from "./alam.js";
+import { pasangHiasan, tanamAlam } from "./alam.js";
 import { drawFlag, namaKelas } from "../../shared/negara.js";
 import { BARIS_BIMBEL, KOLOM_BIMBEL, TITIK_BIMBEL } from "../../shared/kursi-bimbel.js";
 import { MEJA_GAME } from "../../shared/meja-game.js";
@@ -518,6 +518,20 @@ export function createArena(canvas) {
   if (import.meta.env?.DEV) window.__arenaWalls = walls;
   // Pohon dari model jadi (CC0); bila gagal, pohon versi kode tetap dipakai.
   const alam = tanamAlam(scene, { pohon });
+  // Hiasan (rumput, bunga, batu, awan) tidak boleh muncul di dinding, lantai ruangan, jalan, depan pintu, meja, dan sawah.
+  const kotak = (cx, cz, w, d) => ({ minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2 });
+  const larangan = [
+    ...walls,
+    kotak(0, 25, 16, 12), kotak(25, 0, 14, 32), kotak(-24.5, 0, 16, 20),          // lantai Bimbel, Game, Kantor
+    ...[-10, 0, 10].map((x) => kotak(x, -25, 8.6, 8)),                            // lantai pertokoan
+    kotak(0, 13.5, 3, 11), kotak(12, 0, 9, 3), kotak(-12, 0, 9, 3), kotak(0, -13.5, 3, 11), kotak(0, -19.8, 29, 2.7),   // jalan
+    kotak(0, 17, 5, 4), kotak(16, 0, 4, 5), kotak(-14.5, 0, 4, 5),               // depan pintu
+    kotak(-24, -14, 13, 9),                                                       // sawah
+    ...tables.filter((t) => Number.isFinite(t.x)).map((t) => kotak(t.x, t.z, 3, 3)),
+  ];
+  alam.then((h) => pasangHiasan(scene, {
+    larangan, lingkaranLarangan: [{ x: 0, z: 0, r: 8.5 }], radius: ARENA_RADIUS - 3, grafis, pohon: h.pohon,
+  }));
   return { engine, scene, camera, walls, grafis, alam, tables: [...tables, studyDesk, kios, ...mejaKantor, sawah, ...pertokoan] };
 }
 
