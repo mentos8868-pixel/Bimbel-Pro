@@ -17,6 +17,7 @@ export async function lihatArena({ alpha = -Math.PI / 2 - 0.5, beta = 1, radius 
   a.camera.target.set(x, 1, z);
   a.engine.runRenderLoop(() => a.scene.render());
   a.engine.resize();
+  const alam = await a.alam;
   await new Promise((r) => setTimeout(r, 2500));
-  return { wallsSama: JSON.stringify(a.walls) === awal.trim(), mesh: a.scene.meshes.length };
+  return { wallsSama: JSON.stringify(a.walls) === awal.trim(), mesh: a.scene.meshes.length, alam: alam?.jenis };
 }

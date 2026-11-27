@@ -7,6 +7,7 @@ import {
 import { buildAvatar3d, buildManekin } from "./avatar3d.js";
 import { pasangGrafis } from "./grafis.js";
 import { kotakBulat } from "./bentuk.js";
+import { tanamAlam } from "./alam.js";
 import { drawFlag, namaKelas } from "../../shared/negara.js";
 import { BARIS_BIMBEL, KOLOM_BIMBEL, TITIK_BIMBEL } from "../../shared/kursi-bimbel.js";
 import { MEJA_GAME } from "../../shared/meja-game.js";
@@ -515,7 +516,9 @@ export function createArena(canvas) {
   const grafis = pasangGrafis({ scene, camera, sun, hemi });
   // Hanya saat pengembangan: dipakai untuk memastikan batas tabrakan tidak berubah (game/test/walls-awal.json).
   if (import.meta.env?.DEV) window.__arenaWalls = walls;
-  return { engine, scene, camera, walls, grafis, tables: [...tables, studyDesk, kios, ...mejaKantor, sawah, ...pertokoan] };
+  // Pohon dari model jadi (CC0); bila gagal, pohon versi kode tetap dipakai.
+  const alam = tanamAlam(scene, { pohon });
+  return { engine, scene, camera, walls, grafis, alam, tables: [...tables, studyDesk, kios, ...mejaKantor, sawah, ...pertokoan] };
 }
 
 // Gelembung chat di atas kepala avatar (hilang setelah 5 detik).
