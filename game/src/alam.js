@@ -129,20 +129,40 @@ function hiasanCadangan(scene, jenis, p, induk, sumber) {
   return m;
 }
 
+// Awan berputar pelan di cakrawala, jauh di luar jangkauan kamera (kamera paling jauh ±65 m dari tengah),
+// jadi tetap terlihat di langit tetapi tidak pernah menutupi pandangan.
+// Tidak bisa diklik, supaya ketukan pada avatar tidak tertahan awan.
+const JARAK_AWAN = 95;
+function letakAwan(a) {
+  const { sudut, jarak } = a.metadata;
+  a.position.x = Math.cos(sudut) * jarak;
+  a.position.z = Math.sin(sudut) * jarak;
+  a.rotation.y = -sudut;
+}
 function buatAwan(scene, jumlah, induk) {
   const bahan = new StandardMaterial("awan", scene);
   bahan.disableLighting = true;
   bahan.emissiveColor = new Color3(0.97, 0.97, 0.97);
   const awan = [];
+  let sumber = null;   // satu bola sumber, sisanya instance
   for (let i = 0; i < jumlah; i++) {
     const a = new TransformNode("awan", scene);
     a.parent = induk;
-    a.position.set(-45 + (i * 90) / jumlah, 18 + (i % 3) * 3, -30 + ((i * 37) % 60));
+    a.metadata = { sudut: (i / jumlah) * Math.PI * 2 + (i % 2) * 0.3, jarak: JARAK_AWAN + (i % 3) * 8 };
+    a.position.y = 16 + (i % 3) * 4;
+    letakAwan(a);
     for (let j = 0; j < 4; j++) {
-      const b = MeshBuilder.CreateSphere("awan", { diameter: 3 + (j % 2) * 1.5, segments: 10 }, scene);
-      b.material = bahan;
-      b.position.set(j * 1.7 - 2.5, (j % 2) * 0.6, (j % 3) * 0.5);
-      b.scaling.y = 0.7;
+      let b;
+      if (sumber) b = sumber.createInstance("awan");
+      else {
+        b = sumber = MeshBuilder.CreateSphere("awan", { diameter: 1, segments: 10 }, scene);
+        b.applyFog = false;   // jauh di cakrawala: tanpa ini awan hilang tertutup kabut
+        b.material = bahan;
+      }
+      const ukuran = 9 + (j % 2) * 4;
+      b.scaling.set(ukuran, ukuran * 0.6, ukuran);
+      b.position.set((j % 3) * 1.5, (j % 2) * 1.5, j * 5 - 7.5);
+      b.isPickable = false;
       b.parent = a;
     }
     awan.push(a);
@@ -190,8 +210,8 @@ export function pasangHiasan(scene, { larangan, lingkaranLarangan, radius, grafi
     const dt = scene.getEngine().getDeltaTime() / 1000;
     t += dt;
     for (const a of awan) {
-      a.position.x += 0.4 * dt;
-      if (a.position.x > 45) a.position.x = -45;
+      a.metadata.sudut += 0.004 * dt;
+      letakAwan(a);
     }
     if (!goyang) return;
     for (const p of pohon) {
