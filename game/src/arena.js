@@ -6,6 +6,7 @@ import {
 } from "@babylonjs/core";
 import { buildAvatar3d, buildManekin } from "./avatar3d.js";
 import { pasangGrafis } from "./grafis.js";
+import { kotakBulat } from "./bentuk.js";
 import { drawFlag, namaKelas } from "../../shared/negara.js";
 import { BARIS_BIMBEL, KOLOM_BIMBEL, TITIK_BIMBEL } from "../../shared/kursi-bimbel.js";
 import { MEJA_GAME } from "../../shared/meja-game.js";
@@ -81,7 +82,8 @@ export function makeSign(scene, lines, { width = 4, height = 1.4, bg = "#ffffff"
 }
 
 function box(scene, name, { w, h, d, x, y = h / 2, z, color, walls }) {
-  const b = MeshBuilder.CreateBox(name, { width: w, height: h, depth: d }, scene);
+  // Sudut sedikit membulat supaya tidak terasa kaku. Batas tabrakan (walls) tetap kotak penuh.
+  const b = kotakBulat(scene, name, { w, h, d, r: Math.min(0.08, w / 2, h / 2, d / 2) * 0.9 });
   b.position.set(x, y, z);
   b.material = mat(scene, color);
   if (walls) walls.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 });
@@ -464,6 +466,8 @@ export function createArena(canvas) {
   window.addEventListener("resize", () => engine.resize());
   // Cahaya hangat, bayangan lembut, dan efek ala film (lihat grafis.js); dipasang setelah semua benda dibuat.
   const grafis = pasangGrafis({ scene, camera, sun, hemi });
+  // Hanya saat pengembangan: dipakai untuk memastikan batas tabrakan tidak berubah (game/test/walls-awal.json).
+  if (import.meta.env?.DEV) window.__arenaWalls = walls;
   return { engine, scene, camera, walls, grafis, tables: [...tables, studyDesk, kios, ...mejaKantor, sawah, ...pertokoan] };
 }
 
