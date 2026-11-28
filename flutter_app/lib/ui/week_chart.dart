@@ -25,20 +25,31 @@ class WeekChart extends StatelessWidget {
               child: Tooltip(
                 message: '${week[i].day}: ${week[i].minutes} menit',
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    Text('${week[i].minutes}', style: const TextStyle(fontSize: 11, color: Warna.muted)),
-                    const SizedBox(height: 2),
-                    Container(
-                      height: 90 * (week[i].minutes / maks).clamp(0.0, 1.0) + 2,
-                      margin: const EdgeInsets.symmetric(horizontal: 6),
-                      decoration: BoxDecoration(
-                        color: i == week.length - 1 ? Warna.primary : Warna.primary.withValues(alpha: 0.45),
-                        borderRadius: BorderRadius.circular(6),
+                    // Batang mengisi sisa tinggi; angka dan nama hari selalu satu baris (aman di HP sempit).
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text('${week[i].minutes}', maxLines: 1, softWrap: false, style: const TextStyle(fontSize: 11, color: Warna.muted)),
+                          const SizedBox(height: 2),
+                          Flexible(
+                            child: FractionallySizedBox(
+                              heightFactor: (week[i].minutes / maks).clamp(0.02, 1.0),
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 4),
+                                decoration: BoxDecoration(
+                                  color: i == week.length - 1 ? Warna.primary : Warna.primary.withValues(alpha: 0.45),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(labelHari(week[i].day), style: const TextStyle(fontSize: 12)),
+                    Text(labelHari(week[i].day), maxLines: 1, softWrap: false, style: const TextStyle(fontSize: 12)),
                   ],
                 ),
               ),

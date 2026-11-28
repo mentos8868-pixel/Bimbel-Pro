@@ -53,6 +53,16 @@ void main() {
     expect(find.text('Catur · Menang'), findsOneWidget);
   });
 
+  testWidgets('judul kolom statistik tidak terpotong di HP sempit', (tester) async {
+    await bukaAplikasi(tester);
+    tester.view.physicalSize = const Size(800, 1800); // 320 x 720 logis
+    await masuk(tester, 'ortu', 'rahasia123');
+    final satuBaris = tester.getSize(find.text('Catur').first).height;
+    for (final judul in ['Main', 'Menang', 'Kalah', 'Seri']) {
+      expect(tester.getSize(find.text(judul)).height, lessThanOrEqualTo(satuBaris), reason: '$judul terpotong');
+    }
+  });
+
   testWidgets('batas 0 ditampilkan sebagai tanpa batas', (tester) async {
     await bukaAplikasi(tester, limitMin: 0);
     await masuk(tester, 'ortu', 'rahasia123');

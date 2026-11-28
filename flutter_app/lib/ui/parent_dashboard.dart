@@ -88,7 +88,11 @@ class KartuAnak extends StatelessWidget {
                   Text(c.kelasLabel, style: const TextStyle(color: Warna.muted)),
                 ]),
               ),
-              OutlinedButton.icon(key: Key('pengaturan-${c.id}'), onPressed: onPengaturan, icon: const Icon(Icons.tune, size: 18), label: const Text('Pengaturan')),
+              // Di HP sempit tombol cukup ikon, supaya nama anak tetap muat.
+              if (MediaQuery.sizeOf(context).width < 380)
+                IconButton.outlined(key: Key('pengaturan-${c.id}'), tooltip: 'Pengaturan', onPressed: onPengaturan, icon: const Icon(Icons.tune))
+              else
+                OutlinedButton.icon(key: Key('pengaturan-${c.id}'), onPressed: onPengaturan, icon: const Icon(Icons.tune, size: 18), label: const Text('Pengaturan')),
             ]),
             const SizedBox(height: 16),
             Text('Waktu bermain hari ini', style: judul),
@@ -142,9 +146,19 @@ class _TabelStatistik extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const kepala = TextStyle(fontWeight: FontWeight.w600, color: Warna.muted);
-    Widget sel(String t, [TextStyle? s]) => Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Text(t, style: s));
+    // Kolom angka selebar isinya (judul tidak terpotong di HP), kolom nama game mengambil sisa ruang.
+    Widget sel(String t, [TextStyle? s]) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+          child: Text(t, style: s, maxLines: 1, softWrap: false, textAlign: s == null && int.tryParse(t) != null ? TextAlign.center : null),
+        );
     return Table(
-      columnWidths: const {0: FlexColumnWidth(2)},
+      columnWidths: const {
+        0: FlexColumnWidth(),
+        1: IntrinsicColumnWidth(),
+        2: IntrinsicColumnWidth(),
+        3: IntrinsicColumnWidth(),
+        4: IntrinsicColumnWidth(),
+      },
       children: [
         TableRow(children: [sel('Game', kepala), sel('Main', kepala), sel('Menang', kepala), sel('Kalah', kepala), sel('Seri', kepala)]),
         for (final g in namaGame.keys)
