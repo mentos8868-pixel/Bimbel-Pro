@@ -1,6 +1,7 @@
 // Chat, profil pemain, pertemanan, undangan, blokir, dan laporan di dalam arena.
 import { PRESETS, checkText } from "../../shared/chat.js";
 import { catatChatArena } from "../chat.js";
+import { sekeluarga } from "../accounts.js";
 import {
   uidOf, chatSetting, isMuted, block, blockedEitherWay, report, REASONS,
   relation, requestFriend, answerFriend, friendsOf, areFriends,
@@ -8,6 +9,19 @@ import {
 } from "../social.js";
 
 const GAMES = { catur: "Catur", scramble: "Scramble Words", kartu: "Kartu Kilat" };
+
+// Apakah pesan chat arena dari `dari` boleh sampai ke `ke`. Penerima hanya melihat chat sesuai pengaturannya
+// sendiri, dan tidak dari pemain yang diblokir. Anak hanya menerima teks bebas dari sesama anak atau dari
+// orang tuanya sendiri; dari orang dewasa keluarga lain, anak hanya menerima pesan siap pakai.
+export function bolehTerimaChat(dari, ke, preset) {
+  const from = uidOf(dari), to = uidOf(ke);
+  const rs = chatSetting(to);
+  if (rs === "mati" || blockedEitherWay(from, to)) return false;
+  if (preset) return true;
+  if (rs !== "bebas") return false;
+  if (ke.role === "anak" && dari.role === "ortu" && !sekeluarga(dari, ke)) return false;
+  return true;
+}
 
 export function setupSocial(room) {
   room.lastChats = new Map(); // uid -> pesan terakhir (bukti untuk laporan)
@@ -52,10 +66,7 @@ export function setupSocial(room) {
     const msg = { from: client.sessionId, name: client.auth.name, text, preset };
     for (const c of room.clients) {
       if (c === client) { c.send("chat-masuk", msg); continue; }
-      const to = uidOf(c.auth);
-      const rs = chatSetting(to);
-      // Penerima hanya melihat chat sesuai pengaturannya sendiri, dan tidak dari pemain yang diblokir.
-      if (rs === "mati" || (!preset && rs !== "bebas") || blockedEitherWay(from, to)) continue;
+      if (!bolehTerimaChat(client.auth, c.auth, preset)) continue;
       c.send("chat-masuk", msg);
     }
   });
