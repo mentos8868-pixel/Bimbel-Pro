@@ -26,7 +26,7 @@ const HAL = {
   keuangan: ["Keuangan", "Uang saku dari orang tua. Catat sendiri uang yang kamu dapat, belanja, dan tabunganmu."],
   report: ["Report", "Catatan bermain dan belajarmu."],
   chat: ["Chat", "Pesan dengan orang tua."],
-  avatar: ["Avatar", "Pilih avatar kesukaanmu."],
+  avatar: ["Setting", "Pilih avatar kesukaanmu."],   // menu Pengaturan (berisi avatar, aksesori, aura)
 };
 let hal = HAL[location.hash.slice(1)] ? location.hash.slice(1) : "home";
 let anak = null;   // profil dari /api/saya
