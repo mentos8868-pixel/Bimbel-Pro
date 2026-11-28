@@ -6,3 +6,4 @@ server/data/
 # Repo terpisah (clone dari GitHub mentos8868-pixel/Bimbel)
 /Bimbel/
 akun-uji-coba.txt
+.env
