@@ -19,7 +19,7 @@ const menit = (m) => (m >= 60 ? `${Math.floor(m / 60)} jam${m % 60 ? ` ${m % 60}
 const bar = (persen, warna = "") => `<span class="bar"><span class="bar-fill ${warna}" style="width:${Math.max(0, Math.min(100, persen))}%"></span></span>`;
 
 const HAL = {
-  home: ["", "Apa yang mau kamu lakukan hari ini?"],
+  home: ["", ""],   // beranda tanpa judul: langsung ke isi
   tugas: ["Tugas", "Tugas dari orang tua dan misi belajar hari ini."],
   arena: ["Arena", "Dunia 3D tempat bermain bersama teman."],
   bimbel: ["Bimbel", "Belajar dan tryout di Ruang Pintar."],
@@ -148,8 +148,7 @@ function uangSakuku(lengkap = false) {
 // ---------- isi tiap menu ----------
 let alarmAnak;
 const ISI = {
-  home: () => `${kepala()}${kotakAngka()}
-    <section id="alarm-anak" class="panel"></section>
+  home: () => `<section id="alarm-anak" class="panel"></section>
     <div class="dua">
       <section class="panel"><h3>✅ Tugas hari ini</h3>${daftarTugas()}<h3 class="sub-judul">🎯 Misi belajar</h3>${daftarMisi()}</section>
       <section class="panel"><h3>Mau ke mana?</h3><div class="aksi-besar">${tombolArena()}${tombolBimbel()}</div>
@@ -281,8 +280,10 @@ function isiAura() {
 function gambar() {
   bahasaDashboard("anak:" + anak.id, gambar);
   const [judul, sub] = HAL[hal];
-  $("judul").textContent = hal === "home" ? `${terjemah("Halo")}, ${anak.name}!` : terjemah(judul);
-  $("sub").textContent = terjemah(sub);
+  $("judul").textContent = judul ? terjemah(judul) : "";
+  $("judul").hidden = !judul;
+  $("sub").textContent = sub ? terjemah(sub) : "";
+  $("sub").hidden = !sub;
   $("menu").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.ke === hal));
   clearInterval(chatTimer);
   bersihkanSuara?.();
