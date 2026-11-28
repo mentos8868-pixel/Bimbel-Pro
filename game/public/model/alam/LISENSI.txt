@@ -1,0 +1,19 @@
+Model alam di folder ini diambil dari:
+
+  Nature Kit (2.1) oleh Kenney (www.kenney.nl)
+  https://kenney.nl/assets/nature-kit
+  Lisensi: Creative Commons Zero (CC0)
+  http://creativecommons.org/publicdomain/zero/1.0/
+  Diambil: 27 November 2026
+
+Berkas asli → nama di sini:
+  tree_default.glb   → pohon-1.glb
+  tree_oak.glb       → pohon-2.glb
+  tree_fat.glb       → pohon-3.glb
+  plant_bush.glb     → semak.glb
+  flower_redA.glb    → bunga-1.glb
+  flower_yellowA.glb → bunga-2.glb
+  rock_smallA.glb    → batu.glb
+  grass.glb          → rumput.glb
+
+Terima kasih kepada Kenney (atribusi tidak wajib untuk CC0).

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="id">
+<head><meta charset="utf-8"><title>Lihat arena (alat pengembang)</title>
+<style>html,body{margin:0;height:100%;overflow:hidden}</style></head>
+<body>
+<!-- Alat pengembang: menampilkan arena tanpa akun. Kamera diatur lewat ?alpha=&beta=&radius=&x=&z=&kualitas= -->
+<script type="module">
+  import { lihatArena } from "./lihat-arena.js";
+  const q = new URLSearchParams(location.search);
+  const opsi = {};
+  for (const k of ["alpha", "beta", "radius", "x", "z"]) if (q.has(k)) opsi[k] = Number(q.get(k));
+  if (q.has("kualitas")) opsi.kualitas = q.get("kualitas");
+  window.hasil = lihatArena(opsi);
+</script>
+</body>
+</html>
