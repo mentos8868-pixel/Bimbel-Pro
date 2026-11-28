@@ -28,6 +28,9 @@
   details.topik>summary::before{content:"▸";color:var(--muted)}
   details.topik[open]>summary::before{content:"▾"}
   .desc{font-weight:400;color:var(--muted);font-size:13px}
+  details.topik.acak{border-style:dashed}
+  details.topik.acak .n{color:#8a6d00}
+  .acak-info{margin:0;padding:0 14px 12px 34px;color:var(--muted);font-size:13px}
   .n{margin-left:auto;font-size:12px;color:var(--muted);font-weight:600}
   ol.soal{margin:0;padding:0 14px 12px 40px}
   ol.soal>li{padding:10px 0;border-top:1px solid var(--line)}
@@ -91,9 +94,13 @@
 <script src="bank_soal_tambahan_ipa.js"></script>
 <script src="bank_intl.js"></script>
 <script src="bank_intl_tambahan.js"></script>
+<!-- Topik yang soalnya dibuat acak: Matematika Merdeka (topik_merdeka_mat.js + topik_tambahan.js) dan Math Cambridge/Singapore (topik_intl.js) -->
+<script src="topik_merdeka_mat.js"></script>
+<script src="topik_tambahan.js"></script>
+<script src="topik_intl.js"></script>
 <script>
 const KURS={
-  merdeka:{name:'Kurikulum Merdeka',mapel:{big:'Bahasa Inggris',bin:'Bahasa Indonesia',ipa:'IPA'},
+  merdeka:{name:'Kurikulum Merdeka',mapel:{mat:'Matematika',big:'Bahasa Inggris',bin:'Bahasa Indonesia',ipa:'IPA'},
     label:k=>`Kelas ${k} ${k<=6?'SD':k<=9?'SMP':'SMA'}`,data:window.BANK||{}},
   cam:{name:'Cambridge International',mapel:{math:'Math',sci:'Science',eng:'English'},
     label:k=>k<=6?`Primary Stage ${k}`:k<=9?`Lower Secondary Stage ${k}`:k<=11?`IGCSE Year ${k-9}`:'AS Level',
@@ -110,7 +117,24 @@ const HUR='ABCD';
 const SEMUA=[];
 for(const kur in KURS)for(const m in KURS[kur].data)for(const k in KURS[kur].data[m])
   for(const t of KURS[kur].data[m][k])SEMUA.push({kur,mapel:m,kelas:+k,t});
+// Topik dengan soal acak tidak punya soal tetap, tetapi tetap didaftar supaya daftar topik sama dengan Ruang Pintar
+// (topik tetap dulu, lalu topik acak — urutan seperti di sana).
+// Matematika Merdeka: topik dasar (topik_merdeka_mat.js) lalu topik tambahan (topik_tambahan.js).
+const MAT=window.TOPIK_MERDEKA_MAT||{},MAT_EXTRA=window.TOPIK_EXTRA||{};
+for(const k of new Set([...Object.keys(MAT),...Object.keys(MAT_EXTRA)]))
+  for(const [id,name,desc] of [...(MAT[k]||[]),...(MAT_EXTRA[k]||[])])SEMUA.push({kur:'merdeka',mapel:'mat',kelas:+k,t:{id,name,desc,soal:[]},acak:true});
+// Math Cambridge/Singapore (topik_intl.js).
+const INTL=window.INTL_TOPIK||{};
+for(const kur in INTL)for(const m in INTL[kur])for(const k in INTL[kur][m])
+  for(const [id,name,desc] of INTL[kur][m][k])SEMUA.push({kur,mapel:m,kelas:+k,t:{id,name,desc,soal:[]},acak:true});
+{
+  const urutKur=Object.keys(KURS),urutMapel=kur=>Object.keys(KURS[kur].mapel);
+  const asal=new Map(SEMUA.map((x,i)=>[x,i]));
+  SEMUA.sort((a,b)=>urutKur.indexOf(a.kur)-urutKur.indexOf(b.kur)||urutMapel(a.kur).indexOf(a.mapel)-urutMapel(b.kur).indexOf(b.mapel)
+    ||a.kelas-b.kelas||(a.acak?1:0)-(b.acak?1:0)||asal.get(a)-asal.get(b));
+}
 const totalSoal=SEMUA.reduce((s,x)=>s+x.t.soal.length,0);
+const totalAcak=SEMUA.filter(x=>x.acak).length;
 
 function isiPilihan(sel,opsi,semua){
   const v=sel.value;
@@ -140,6 +164,17 @@ function tampil(){
   for(const x of SEMUA){
     if(kur&&x.kur!==kur||mapel&&x.mapel!==mapel||kelas&&x.kelas!==+kelas)continue;
     const K=KURS[x.kur];
+    if(x.acak){
+      // Tidak ada soal tetap: tampil bila tidak memfilter level/status review, dan cocok dengan pencarian nama topik.
+      if(lv||fSt||cari&&!(x.t.name+' '+x.t.desc).toLowerCase().includes(cari))continue;
+      const grp=`${K.name} · ${K.mapel[x.mapel]||x.mapel} · ${K.label(x.kelas)}`;
+      if(grp!==grpLama){html+=`<div class="grp">${esc(grp)}</div>`;grpLama=grp}
+      nTopik++;
+      html+=`<details class="topik acak"><summary>${tandai(x.t.name)} <span class="desc">${esc(x.t.desc||'')}</span>
+        <span class="n">soal dibuat acak · ${esc(x.t.id)}</span></summary>
+        <p class="acak-info">Soal topik ini dibuat otomatis setiap kali dibuka di Ruang Pintar, jadi tidak ada daftar soal tetap untuk direview.</p></details>`;
+      continue;
+    }
     const soal=x.t.soal.map((q,i)=>({q,i})).filter(({q,i})=>(!lv||q.lv===+lv)&&
       (!fSt||(RV[kunciRv(x.t,i)]?.s||'belum')===fSt)&&
       (!cari||(q.q+' '+q.o.join(' ')+' '+q.p+' '+x.t.name).toLowerCase().includes(cari)));
@@ -157,8 +192,7 @@ function tampil(){
   }
   $('isi').innerHTML=html||'<div class="kosong">Tidak ada soal yang cocok dengan pilihan ini.</div>';
   $('info').innerHTML=`Menampilkan <b>${nSoal.toLocaleString('id')}</b> soal dari <b>${nTopik}</b> topik `+
-    `(seluruh bank: ${totalSoal.toLocaleString('id')} soal, ${SEMUA.length} topik).`+
-    (!kur||kur==='merdeka'?` <span class="note" style="display:inline-block;margin:4px 0 0">Matematika Kurikulum Merdeka tidak tampil di sini karena soalnya dibuat acak setiap kali dibuka di Ruang Bimbel.</span>`:'');
+    `(seluruh bank: ${totalSoal.toLocaleString('id')} soal, ${SEMUA.length} topik, termasuk ${totalAcak} topik Matematika yang soalnya dibuat acak).`;
 }
 
 // ===== Review guru: status per soal disimpan di browser ini (localStorage) =====
