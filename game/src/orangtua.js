@@ -1110,14 +1110,21 @@ function daftarPersetujuanHadiah(riwayat) {
       <span class="row"><button class="primary" data-tukar-setujui="${t.id}" ${bisaSetujui ? "" : "disabled"}>${siap ? "Setujui" : "Setujui cicilan"}</button><button data-tukar-tolak="${t.id}">Tolak</button></span></li>`;
   }).join("");
 }
+// Riwayat penukaran: 3 terbaru dulu, sisanya lewat tombol "Lihat semua".
+const RIWAYAT_HADIAH_RINGKAS = 3;
+let riwayatHadiahSemua = false;
 function daftarRiwayatHadiah(riwayat) {
-  const selesai = riwayat.filter((t) => t.status !== "menunggu").slice(0, 8);
+  const selesai = riwayat.filter((t) => t.status !== "menunggu");
   if (!selesai.length) return '<li class="muted kosong">Belum ada riwayat penukaran.</li>';
-  return selesai.map((t) => {
+  const tampil = riwayatHadiahSemua ? selesai : selesai.slice(0, RIWAYAT_HADIAH_RINGKAS);
+  const tombol = selesai.length > RIWAYAT_HADIAH_RINGKAS
+    ? `<li class="lihat-semua"><button type="button" class="ghost" data-riwayat-semua>${riwayatHadiahSemua ? "Tampilkan lebih sedikit" : `Lihat semua (${selesai.length})`}</button></li>`
+    : "";
+  return tampil.map((t) => {
     const [ik, tx, kelas] = STATUS_TUKAR[t.status] || ["", t.status, ""];
     const peserta = t.patungan ? t.peserta.map((p) => `${esc(p.nama)} ${p.bintang} ⭐`).join(" · ") : namaPenukar(t);
     return `<li><span class="tugas-judul"><b>${esc(t.nama)}</b><span class="muted kecil">${t.bintang} ⭐${t.rupiah ? ` → ${rp(t.rupiah)}` : ""} · ${jam(t.at)} · ${t.patungan ? "Patungan: " : ""}${peserta}</span></span><span class="tugas-status ${kelas}">${ik} ${tx}</span></li>`;
-  }).join("");
+  }).join("") + tombol;
 }
 
 function daftarHadiahKeluarga(hadiah) {
@@ -1194,6 +1201,11 @@ $("keuangan-isi").addEventListener("click", async (e) => {
 });
 // Tombol hadiah di menu Tugas: setujui/tolak penukaran, hapus hadiah.
 $("hadiah-isi").addEventListener("click", async (e) => {
+  if (e.target.closest("button[data-riwayat-semua]")) {
+    riwayatHadiahSemua = !riwayatHadiahSemua;
+    $("riwayat-hadiah").innerHTML = daftarRiwayatHadiah(riwayatHadiahKeluarga(dataHadiah));
+    return;
+  }
   const b = e.target.closest("button[data-tukar-setujui], button[data-tukar-tolak], button[data-hapus-hadiah]");
   if (!b) return;
   try {
