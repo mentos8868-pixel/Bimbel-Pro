@@ -108,6 +108,19 @@ function limited(key, max = 5, windowMs = 15 * 60000) {
   };
 }
 
+// Batas percobaan masuk: per IP (10 kali) dan per ID masuk (20 kali) dalam 15 menit. Batas per ID menahan
+// penebakan kata sandi satu akun dari banyak IP; dibuat lebih longgar supaya orang lain tidak mudah
+// mengunci akun seseorang dengan sengaja salah sandi.
+const MAKS_PER_IP = 10, MAKS_PER_AKUN = 20;
+function batasMasuk(ip, login, jenis = "masuk") {
+  const perIp = limited(`${jenis}-ip:${ip}`, MAKS_PER_IP);
+  const perAkun = limited(`${jenis}-akun:${login}`, MAKS_PER_AKUN);
+  return {
+    fail() { perIp.fail(); perAkun.fail(); },
+    ok() { perIp.ok(); perAkun.ok(); },
+  };
+}
+
 // ---------- sesi ----------
 function createSession(role, parentId, childId = null) {
   const token = newToken();
@@ -453,10 +466,13 @@ export async function handleApi(req, res) {
     }
     if (m === "POST" && path[0] === "masuk") {
       const login = loginAnak(body.login ?? body.email);
-      const lim = limited(`masuk-id:${ip}`, 10);
+      const lim = batasMasuk(ip, login);
       const p = db.prepare("SELECT p.* FROM parents p JOIN login_id_ortu i ON i.parent_id = p.id WHERE i.login = ?").get(login);
       const c = p ? null : db.prepare("SELECT * FROM children WHERE login_anak = ?").get(login);
-      if (!(p || c?.sandi_anak_hash) || !checkSecret(body.password || "", p?.pass_hash ?? c.sandi_anak_hash)) { lim.fail(); throw new ApiError(401, "ID masuk atau kata sandi salah."); }
+      // ID yang tidak ada tetap diperiksa dengan hash cadangan, supaya lama jawaban tidak membocorkan ID mana yang terdaftar.
+      const hash = p?.pass_hash ?? c?.sandi_anak_hash;
+      const cocok = checkSecret(body.password || "", hash || sandiAnakCadangan);
+      if (!hash || !cocok) { lim.fail(); throw new ApiError(401, "ID masuk atau kata sandi salah."); }
       if (c) {
         lim.ok();
         endSession(cookies[COOKIE.anak]);
@@ -753,7 +769,7 @@ export async function handleApi(req, res) {
     }
     if (path[0] === "anak" && path.length === 2 && path[1] === "masuk" && m === "POST") {
       const login = loginAnak(body.loginAnak);
-      const lim = limited(`sandi-anak:${ip}`, 10);
+      const lim = batasMasuk(ip, login, "sandi-anak");
       const c = POLA_LOGIN_ANAK.test(login) ? db.prepare("SELECT * FROM children WHERE login_anak = ?").get(login) : null;
       const valid = typeof body.sandiAnak === "string" && body.sandiAnak.length <= 128
         && checkSecret(body.sandiAnak, c?.sandi_anak_hash || sandiAnakCadangan);
