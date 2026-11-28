@@ -22,6 +22,23 @@ Lalu buka:
 - Dashboard anak: http://localhost:5173/anak.html (anak diarahkan ke sini setelah masuk)
 - Di HP/tablet yang tersambung ke Wi-Fi yang sama: http://ALAMAT-IP-LAPTOP:5173 (alamatnya muncul di terminal pada baris "Network")
 
+## Aplikasi Flutter (HP, tablet, laptop)
+
+Folder `flutter_app/` berisi aplikasi Bimbel Pro versi Flutter untuk Android, iOS, Windows, dan Web. Aplikasi ini memakai server yang sama, jadi server tidak perlu diubah.
+
+Tahap 1 berisi:
+- masuk sebagai orang tua atau anak
+- dashboard orang tua: waktu bermain, grafik 7 hari, statistik game, dan pengaturan anak
+- beranda anak
+
+Jalankan server seperti biasa, lalu buka aplikasinya di Windows:
+
+```powershell
+cd flutter_app; flutter run -d windows
+```
+
+Cara memasang Flutter, menjalankan di Android dan Web, mengganti alamat server (misalnya alamat `trycloudflare.com`), dan membuat file APK ada di [flutter_app/README.md](flutter_app/README.md).
+
 ## Dasbor admin
 
 Atur kunci admin di lingkungan server sebelum menjalankan Bimbel Pro. Untuk pengembangan lokal, jalankan ini di PowerShell yang sama dengan server.
@@ -60,6 +77,7 @@ Di bagian **Katalog Toko Avatar**, admin bisa mengatur harga dalam bintang dan k
 | `game/test/` | Uji otomatis (`npm test --prefix game`), snapshot batas tabrakan arena, dan alat pengembang `lihat.html` untuk melihat arena tanpa akun (hanya saat `npm run dev`) |
 | `server/` | API akun (`/api/...`), database SQLite, dan server multiplayer (Colyseus) |
 | `server/data/` | File database `bimbel.db`. Dibuat otomatis dan tidak dibagikan |
+| `flutter_app/` | Aplikasi Flutter (Android, iOS, Windows, Web) yang memakai server yang sama. Lihat [flutter_app/README.md](flutter_app/README.md) |
 | `shared/` | Kode yang dipakai bersama game dan server: daftar kata dan aturan Scramble, aturan Kartu Kilat dan bot-nya |
 | `.claude/agents/` | Tim AI proyek (lihat bagian "Tim AI" di bawah), ditambah 14 agen dari Claude Code Game Studios (lisensi MIT, lihat file LICENSE di folder itu) |
 
