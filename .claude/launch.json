@@ -25,6 +25,13 @@
       "port": 5174
     },
     {
+      "name": "flutter-web",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["tool/serve_web.mjs", "--port", "8080", "--api", "http://localhost:2567"],
+      "cwd": "flutter_app",
+      "port": 8080
+    },
+    {
       "name": "online-lokal",
       "runtimeExecutable": "node",
       "runtimeArgs": ["server/index.js"],
